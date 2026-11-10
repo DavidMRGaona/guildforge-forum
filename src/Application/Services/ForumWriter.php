@@ -191,6 +191,22 @@ final readonly class ForumWriter
     }
 
     /**
+     * Moves every discussion of one category into another (before deleting it), refreshing both.
+     */
+    public function moveAllDiscussions(CategoryId $from, CategoryId $to): void
+    {
+        DB::transaction(function () use ($from, $to): void {
+            $categories = $this->lockCategories([$from, $to]);
+
+            $this->discussions->moveAllToCategory($from, $to);
+
+            foreach ($categories as $categoryId) {
+                $this->counters->refreshCategory($categoryId);
+            }
+        }, self::ATTEMPTS);
+    }
+
+    /**
      * Locks the discussion's category and then the discussion. Should another write move it
      * between reading its category and locking it, the new category is locked too.
      *

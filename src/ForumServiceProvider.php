@@ -10,15 +10,18 @@ use App\Modules\ModuleServiceProvider;
 use Filament\Pages\Page;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
+use Modules\Forum\Policies\CategoryPolicy;
 
 final class ForumServiceProvider extends ModuleServiceProvider
 {
@@ -41,6 +44,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
         $this->app->bind(ForumCountersInterface::class, EloquentForumCounters::class);
         $this->app->bind(ForumSettingsInterface::class, ForumSettings::class);
+        // Roles and rosters are read once per request (or queue job)
+        $this->app->scoped(CategoryAccessPolicy::class);
     }
 
     /**
@@ -61,6 +66,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
             ),
             self::PERMISSIONS,
         );
+    }
+
+    /**
+     * @return array<class-string, class-string>
+     */
+    public function registerPolicies(): array
+    {
+        return [CategoryModel::class => CategoryPolicy::class];
     }
 
     /**

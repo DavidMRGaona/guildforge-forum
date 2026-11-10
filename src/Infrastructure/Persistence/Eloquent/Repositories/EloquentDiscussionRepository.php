@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
@@ -11,7 +12,9 @@ use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
+use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionTopicModel;
 
 final class EloquentDiscussionRepository implements DiscussionRepositoryInterface
 {
@@ -50,6 +53,43 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
     public function delete(DiscussionId $id): void
     {
         DiscussionModel::query()->whereKey($id->value)->delete();
+    }
+
+    public function countInCategory(CategoryId $categoryId): int
+    {
+        return DiscussionModel::query()->where('category_id', $categoryId->value)->count();
+    }
+
+    public function moveAllToCategory(CategoryId $from, CategoryId $to): void
+    {
+        DiscussionModel::query()->where('category_id', $from->value)->update(['category_id' => $to->value]);
+    }
+
+    public function replaceTopics(DiscussionId $id, array $topics): void
+    {
+        DB::transaction(static function () use ($id, $topics): void {
+            DiscussionTopicModel::query()->where('discussion_id', $id->value)->delete();
+
+            $rows = [];
+            foreach ($topics as $topic) {
+                $rows[$topic->key] = ['discussion_id' => $id->value, 'key' => $topic->key, 'label' => $topic->label];
+            }
+
+            if ($rows !== []) {
+                DiscussionTopicModel::query()->insert(array_values($rows));
+            }
+        });
+    }
+
+    public function topicsOf(DiscussionId $id): array
+    {
+        return array_values(DiscussionTopicModel::query()
+            ->where('discussion_id', $id->value)
+            ->orderBy('label')
+            ->orderBy('key')
+            ->get()
+            ->map(static fn (DiscussionTopicModel $model): DiscussionTopic => new DiscussionTopic($model->key, $model->label))
+            ->all());
     }
 
     private function toEntity(DiscussionModel $model): Discussion

@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "jsx": "preserve",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "paths": {
+            "@/*": ["../../resources/js/*"],
+            "vue": ["../../node_modules/vue"],
+            "vue-i18n": ["../../node_modules/vue-i18n"],
+            "pinia": ["../../node_modules/pinia"],
+            "@inertiajs/vue3": ["../../node_modules/@inertiajs/vue3"],
+            "@unhead/vue": ["../../node_modules/@unhead/vue"]
+        },
+        "types": ["vite/client", "vue-i18n"]
+    },
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.vue",
+        "tests/js/**/*.ts",
+        "../../resources/js/types/**/*.d.ts"
+    ]
+}

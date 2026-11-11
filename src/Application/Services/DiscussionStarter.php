@@ -90,7 +90,7 @@ final readonly class DiscussionStarter
             throw DiscussionNotStartedException::notModerator();
         }
 
-        $title = new DiscussionTitle(self::checkedTitle($input->title));
+        $title = new DiscussionTitle($this->checkedTitle($input->title));
         $topics = $this->checkedTopics($author, $input->topicKeys);
         $body = $this->bodies->fromInput($input->document, $author);
         $this->posting->countPost($author);
@@ -119,7 +119,7 @@ final readonly class DiscussionStarter
     /**
      * @throws InvalidDiscussionException
      */
-    private static function checkedTitle(string $title): string
+    private function checkedTitle(string $title): string
     {
         $title = trim((string) preg_replace('/\s+/u', ' ', $title));
         $length = mb_strlen($title);

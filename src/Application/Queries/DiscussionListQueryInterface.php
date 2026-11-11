@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Queries;
 
+use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
+
 interface DiscussionListQueryInterface
 {
     /**
@@ -16,7 +18,7 @@ interface DiscussionListQueryInterface
      * The game-system tags discussions of the categories carry, by label.
      *
      * @param  list<string>  $categoryIds
-     * @return list<\Modules\Forum\Domain\ValueObjects\DiscussionTopic>
+     * @return list<DiscussionTopic>
      */
     public function topicsIn(array $categoryIds): array;
 }

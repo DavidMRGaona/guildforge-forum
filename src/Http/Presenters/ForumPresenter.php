@@ -138,7 +138,22 @@ final readonly class ForumPresenter
     public function conversation(ConversationPageDTO $page, array $readable): array
     {
         $discussion = $page->discussion;
-        $names = $this->names(array_values(array_filter(array_map(static fn ($post): ?string => $post->authorId(), $page->posts))));
+        // The editor of a post its author may change starts from its stored document
+        $editable = [];
+        foreach ($page->posts as $index => $post) {
+            if ($page->contents[$index]->canEdit) {
+                $editable[$post->id()->value] = $post->body()->document;
+            }
+        }
+        $mentioned = [];
+        foreach ($editable as $document) {
+            self::collectMentions($document, $mentioned);
+        }
+
+        $names = $this->names(array_values(array_unique([
+            ...array_filter(array_map(static fn ($post): ?string => $post->authorId(), $page->posts)),
+            ...array_keys($mentioned),
+        ])));
 
         $posts = [];
         foreach ($page->posts as $index => $post) {
@@ -164,6 +179,9 @@ final readonly class ForumPresenter
                 'url' => $number === null ? null : $this->urls->discussion($discussion, $number),
                 'canEdit' => $content->canEdit,
                 'canDelete' => $content->canDelete,
+                'document' => $editable[$post->id()->value] ?? null,
+                'updateUrl' => $content->canEdit ? route('forum.posts.update', ['post' => $post->id()->value]) : null,
+                'deleteUrl' => $content->canDelete ? route('forum.posts.destroy', ['post' => $post->id()->value]) : null,
             ];
         }
 
@@ -204,7 +222,27 @@ final readonly class ForumPresenter
             ],
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
+            'mentionNames' => array_intersect_key($names, $mentioned),
         ];
+    }
+
+    /**
+     * The account ids a document mentions.
+     *
+     * @param  array<mixed>  $node
+     * @param  array<string, true>  $ids
+     */
+    private static function collectMentions(array $node, array &$ids): void
+    {
+        if (($node['type'] ?? null) === 'mention' && is_array($node['attrs'] ?? null) && is_string($node['attrs']['id'] ?? null)) {
+            $ids[strtolower($node['attrs']['id'])] = true;
+        }
+
+        foreach (is_array($node['content'] ?? null) ? $node['content'] : [] as $child) {
+            if (is_array($child)) {
+                self::collectMentions($child, $ids);
+            }
+        }
     }
 
     /**

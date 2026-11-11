@@ -61,7 +61,7 @@ final readonly class ForumWriter
     {
         for ($attempt = 1; ; $attempt++) {
             try {
-                $post = DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
+                return DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
                     $this->categories->lockForWrite($discussion->categoryId());
 
                     // Numbered on a copy: a failed attempt leaves the caller's discussion as it was
@@ -81,8 +81,6 @@ final readonly class ForumWriter
 
                     return $post;
                 }, self::ATTEMPTS);
-
-                return $post;
             } catch (UniqueConstraintViolationException $exception) {
                 if ($attempt >= self::NUMBER_ATTEMPTS || $this->discussions->find($discussion->id()) instanceof Discussion) {
                     throw $exception;

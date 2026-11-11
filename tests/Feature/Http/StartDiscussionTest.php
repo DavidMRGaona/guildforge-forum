@@ -140,12 +140,10 @@ final class StartDiscussionTest extends ModuleTestCase
         $this->start(['title' => 'Torneo de primavera'])->assertCreated();
 
         Event::assertDispatchedTimes(ForumDiscussionStarted::class, 1);
-        Event::assertDispatched(ForumDiscussionStarted::class, function (ForumDiscussionStarted $event): bool {
-            return $event->title === 'Torneo de primavera'
-                && $event->url === url('/foro/t/1-torneo-de-primavera')
-                && $event->excerpt === 'Hola a todos'
-                && $event->tags === ['General'];
-        });
+        Event::assertDispatched(ForumDiscussionStarted::class, fn (ForumDiscussionStarted $event): bool => $event->title === 'Torneo de primavera'
+            && $event->url === url('/foro/t/1-torneo-de-primavera')
+            && $event->excerpt === 'Hola a todos'
+            && $event->tags === ['General']);
     }
 
     public function test_nothing_is_announced_outside_the_rules(): void

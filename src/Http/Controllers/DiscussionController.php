@@ -25,6 +25,7 @@ use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\DiscussionNotStartedException;
 use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\ForumPresenter;
@@ -110,7 +111,7 @@ final class DiscussionController extends Controller
             'categories' => array_map(static fn (CategoryAccessDTO $access): array => [
                 'id' => $access->category->id()->value,
                 'name' => $access->category->name(),
-                'parentName' => ($parentId = $access->category->parentId()) === null ? null : ForumBrowser::categoryById($readable, $parentId->value)?->name(),
+                'parentName' => ($parentId = $access->category->parentId()) instanceof CategoryId ? ForumBrowser::categoryById($readable, $parentId->value)?->name() : null,
                 'canModerate' => $access->canModerate,
             ], $categories),
             'topics' => $this->presenter->topics($this->starter->topicsFor($user)),

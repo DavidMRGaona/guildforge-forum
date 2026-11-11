@@ -6,10 +6,13 @@ use Illuminate\Support\Facades\Route;
 use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Http\Controllers\CategoryController;
 use Modules\Forum\Http\Controllers\DiscussionController;
+use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
+use Modules\Forum\Http\Controllers\ForumPreferencesController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\PostController;
 use Modules\Forum\Http\Controllers\PostImageController;
+use Modules\Forum\Http\Controllers\PostLikesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
 
@@ -79,5 +82,31 @@ Route::prefix('foro')
             Route::post('imagenes', [PostImageController::class, 'store'])
                 ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
                 ->name('images.store');
+        });
+
+        // Likes, follows and the forum's preferences, all JSON
+        Route::middleware('auth')->group(function (): void {
+            Route::post('mensajes/{post}/me-gusta', [PostLikesController::class, 'store'])
+                ->whereUuid('post')
+                ->middleware('throttle:60,1,forum-likes')
+                ->name('posts.like');
+            Route::delete('mensajes/{post}/me-gusta', [PostLikesController::class, 'destroy'])
+                ->whereUuid('post')
+                ->middleware('throttle:60,1,forum-likes')
+                ->name('posts.unlike');
+            Route::put('temas/{discussion}/seguimiento', [FollowsController::class, 'discussion'])
+                ->whereUuid('discussion')
+                ->middleware('throttle:30,1,forum-follows')
+                ->name('discussions.follow');
+            Route::put('c/{category}/seguimiento', [FollowsController::class, 'category'])
+                ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
+                ->middleware('throttle:30,1,forum-follows')
+                ->name('categories.follow');
+            Route::get('preferencias', [ForumPreferencesController::class, 'show'])
+                ->middleware('throttle:60,1,forum-preferences')
+                ->name('preferences.show');
+            Route::put('preferencias', [ForumPreferencesController::class, 'update'])
+                ->middleware('throttle:30,1,forum-preferences')
+                ->name('preferences.update');
         });
     });

@@ -7,6 +7,7 @@ import { EyeOff, Lock, Pin } from '@lucide/vue';
 import { useAuth } from '@/composables/useAuth';
 import { useRoutes } from '@/composables/useRoutes';
 import PostEditor from '../../components/editor/PostEditor.vue';
+import FollowSelect from '../../components/forum/FollowSelect.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import { useReadTracker } from '../../composables/useReadTracker';
@@ -170,6 +171,12 @@ async function send(document: JSONContent): Promise<void> {
                     {{ topic.label }}
                 </span>
             </div>
+            <FollowSelect
+                v-if="discussion.follow"
+                class="mt-4"
+                :follow="discussion.follow"
+                :discussion-id="discussion.id"
+            />
         </div>
     </div>
 

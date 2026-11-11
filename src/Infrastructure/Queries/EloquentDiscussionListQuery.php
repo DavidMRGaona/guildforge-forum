@@ -16,6 +16,7 @@ use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
+use Modules\Forum\Domain\Enums\FollowLevel;
 use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
 use stdClass;
 use Throwable;
@@ -130,6 +131,17 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
                     ->from('forum_discussion_topics as t')
                     ->whereColumn('t.discussion_id', 'd.id')
                     ->where('t.key', $topicKey);
+            });
+        }
+
+        if ($criteria->onlyFollowed && $criteria->readerId !== null) {
+            $followerId = $criteria->readerId;
+            $query->whereExists(static function (Builder $exists) use ($followerId): void {
+                $exists->selectRaw('1')
+                    ->from('forum_discussion_follows as f')
+                    ->whereColumn('f.discussion_id', 'd.id')
+                    ->where('f.user_id', $followerId)
+                    ->where('f.level', FollowLevel::Following->value);
             });
         }
 

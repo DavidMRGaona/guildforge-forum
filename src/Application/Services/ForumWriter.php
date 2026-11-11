@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
+use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Entities\PostRevision;
@@ -33,7 +34,8 @@ use RuntimeException;
  * share a number or leave a count behind.
  *
  * Who may write what is decided before calling it (the forum's access rules); this class only
- * keeps the records consistent.
+ * keeps the records consistent. Every post that gets its number (and every edit of a published
+ * post) is handed to the notices, which run once the write commits.
  */
 final readonly class ForumWriter
 {
@@ -49,6 +51,7 @@ final readonly class ForumWriter
         private PostRepositoryInterface $posts,
         private ForumCountersInterface $counters,
         private PostRevisionRepositoryInterface $revisions,
+        private ForumNoticesInterface $notices,
     ) {}
 
     /**
@@ -61,7 +64,7 @@ final readonly class ForumWriter
     {
         for ($attempt = 1; ; $attempt++) {
             try {
-                return DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
+                $post = DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
                     $this->categories->lockForWrite($discussion->categoryId());
 
                     // Numbered on a copy: a failed attempt leaves the caller's discussion as it was
@@ -81,6 +84,8 @@ final readonly class ForumWriter
 
                     return $post;
                 }, self::ATTEMPTS);
+
+                return $this->announced($post);
             } catch (UniqueConstraintViolationException $exception) {
                 if ($attempt >= self::NUMBER_ATTEMPTS || $this->discussions->find($discussion->id()) instanceof Discussion) {
                     throw $exception;
@@ -97,7 +102,7 @@ final readonly class ForumWriter
      */
     public function reply(DiscussionId $discussionId, PostId $postId, ?string $authorId, PostBody $body, DateTimeImmutable $at, bool $needsApproval): Post
     {
-        return DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval): Post {
+        return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval): Post {
             $discussion = $this->lockDiscussion($discussionId);
 
             $post = $needsApproval
@@ -108,7 +113,7 @@ final readonly class ForumWriter
             $this->refresh($discussionId, [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS);
+        }, self::ATTEMPTS));
     }
 
     /**
@@ -120,7 +125,7 @@ final readonly class ForumWriter
      */
     public function approvePost(PostId $postId, DateTimeImmutable $at): Post
     {
-        return DB::transaction(function () use ($postId, $at): Post {
+        return $this->announced(DB::transaction(function () use ($postId, $at): Post {
             $discussion = $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
@@ -130,7 +135,7 @@ final readonly class ForumWriter
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS);
+        }, self::ATTEMPTS));
     }
 
     /**
@@ -162,7 +167,8 @@ final readonly class ForumWriter
      */
     public function editPost(PostId $postId, PostBody $body, ?string $editorId, DateTimeImmutable $at): Post
     {
-        return DB::transaction(function () use ($postId, $body, $editorId, $at): Post {
+        $replaced = null;
+        $post = DB::transaction(function () use ($postId, $body, $editorId, $at, &$replaced): Post {
             $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
@@ -178,6 +184,13 @@ final readonly class ForumWriter
 
             return $post;
         }, self::ATTEMPTS);
+
+        // Only who the edit newly mentions or quotes hears about it
+        if ($replaced instanceof PostBody && $post->isVisible()) {
+            $this->notices->postEdited($postId, $replaced);
+        }
+
+        return $post;
     }
 
     /**
@@ -285,6 +298,8 @@ final readonly class ForumWriter
 
             $this->counters->refreshCategory($discussion->categoryId());
         }, self::ATTEMPTS);
+
+        $this->notices->forgetDiscussion($discussionId);
     }
 
     /**
@@ -301,6 +316,18 @@ final readonly class ForumWriter
                 $this->counters->refreshCategory($categoryId);
             }
         }, self::ATTEMPTS);
+    }
+
+    /**
+     * Hands a post that got its number to the notices; one awaiting approval waits for it.
+     */
+    private function announced(Post $post): Post
+    {
+        if ($post->isVisible()) {
+            $this->notices->postPublished($post->id());
+        }
+
+        return $post;
     }
 
     /**

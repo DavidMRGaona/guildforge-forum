@@ -28,6 +28,7 @@ use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
 use Modules\Forum\Http\Presenters\EditorProps;
+use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 use Modules\Forum\Http\Requests\StoreDiscussionRequest;
 
@@ -49,6 +50,7 @@ final class DiscussionController extends Controller
         private readonly EditorProps $editor,
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
+        private readonly EngagementPresenter $engagement,
     ) {}
 
     public function show(Request $request, string $discussion, ?string $post = null): Response|RedirectResponse
@@ -81,7 +83,7 @@ final class DiscussionController extends Controller
         $seo['canonicalUrl'] = $this->urls->discussion($found, $page->pageStart, absolute: true);
 
         return Inertia::render('Forum/Discussion', [
-            ...$this->presenter->conversation($page, $readable),
+            ...$this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user),
             'reply' => [
                 'canPost' => $page->canPost,
                 'postUrl' => route('forum.posts.store', ['discussion' => $found->id()->value]),

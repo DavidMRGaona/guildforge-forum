@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n';
 import type { ForumListFilters } from '../../types/forum';
 
 /**
- * «Todos / Sin leer» and the game-system tag. Each change loads the list from its first page,
- * keeping the other filter.
+ * «Todos / Sin leer / Siguiendo» and the game-system tag. Each change loads the list from its
+ * first page, keeping the tag.
  */
 const props = defineProps<{
     filters: ForumListFilters;
@@ -16,12 +16,23 @@ const { t } = useI18n();
 
 const topicId = computed(() => `forum-topic-${props.filters.baseUrl.replace(/[^a-z0-9]/gi, '-')}`);
 
-function visit(next: { unread?: boolean; topic?: string | null }): void {
-    const unread = next.unread ?? props.filters.unread;
+type Show = 'all' | 'unread' | 'following';
+
+const show = computed<Show>(() =>
+    props.filters.following ? 'following' : props.filters.unread ? 'unread' : 'all'
+);
+
+const SHOW_OPTIONS: Show[] = ['all', 'unread', 'following'];
+
+function visit(next: { show?: Show; topic?: string | null }): void {
+    const shown = next.show ?? show.value;
     const topic = next.topic === undefined ? props.filters.topic : next.topic;
     const query: Record<string, string> = {};
-    if (unread) {
+    if (shown === 'unread') {
         query['sin-leer'] = '1';
+    }
+    if (shown === 'following') {
+        query.siguiendo = '1';
     }
     if (topic) {
         query.etiqueta = topic;
@@ -51,26 +62,17 @@ function onTopicChange(event: Event): void {
             class="inline-flex w-full rounded-md border border-default bg-surface p-1 sm:w-auto"
         >
             <button
+                v-for="option in SHOW_OPTIONS"
+                :key="option"
                 type="button"
-                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium whitespace-nowrap sm:flex-none"
+                class="min-h-[40px] flex-1 rounded px-3 text-sm font-medium whitespace-nowrap sm:flex-none sm:px-4"
                 :class="
-                    !filters.unread ? 'bg-primary text-white' : 'text-base-secondary hover:bg-muted'
+                    show === option ? 'bg-primary text-white' : 'text-base-secondary hover:bg-muted'
                 "
-                :aria-pressed="!filters.unread"
-                @click="visit({ unread: false })"
+                :aria-pressed="show === option"
+                @click="visit({ show: option })"
             >
-                {{ t('forum.filters.all') }}
-            </button>
-            <button
-                type="button"
-                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium whitespace-nowrap sm:flex-none"
-                :class="
-                    filters.unread ? 'bg-primary text-white' : 'text-base-secondary hover:bg-muted'
-                "
-                :aria-pressed="filters.unread"
-                @click="visit({ unread: true })"
-            >
-                {{ t('forum.filters.unread') }}
+                {{ t(`forum.filters.${option}`) }}
             </button>
         </div>
 

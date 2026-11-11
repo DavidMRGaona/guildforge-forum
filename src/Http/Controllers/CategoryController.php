@@ -13,6 +13,7 @@ use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\Services\ForumBrowser;
+use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 
 /**
@@ -28,6 +29,7 @@ final class CategoryController extends Controller
         private readonly ForumPresenter $presenter,
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
+        private readonly EngagementPresenter $engagement,
     ) {}
 
     public function show(Request $request, string $category): Response
@@ -41,7 +43,7 @@ final class CategoryController extends Controller
         $canStart = array_filter($scope, static fn (CategoryAccessDTO $candidate): bool => $candidate->canStartDiscussions()) !== [];
 
         return Inertia::render('Forum/Category', [
-            'category' => $this->presenter->categoryHeader($access, $readable),
+            'category' => [...$this->presenter->categoryHeader($access, $readable), 'follow' => $this->engagement->categoryFollow($reader, $access->category)],
             'subcategories' => $this->presenter->categoryTree($readable, $access->category->id()),
             ...$this->listProps($request, $scope, pinnedFirst: true, baseUrl: $this->urls->category($access->category)),
             'canStart' => $canStart,

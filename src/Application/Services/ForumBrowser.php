@@ -97,7 +97,7 @@ final readonly class ForumBrowser
      *
      * @param  list<CategoryAccessDTO>  $scope  categories the reader may read
      */
-    public function discussions(?Authenticatable $reader, array $scope, ?string $topicKey, bool $onlyUnread, ?DiscussionCursor $after, bool $pinnedFirst): DiscussionListPageDTO
+    public function discussions(?Authenticatable $reader, array $scope, ?string $topicKey, bool $onlyUnread, ?DiscussionCursor $after, bool $pinnedFirst, bool $onlyFollowed = false): DiscussionListPageDTO
     {
         $readerId = self::accountId($reader);
 
@@ -113,6 +113,7 @@ final readonly class ForumBrowser
             topicKey: $topicKey,
             pinnedFirst: $pinnedFirst,
             after: $after,
+            onlyFollowed: $onlyFollowed && $readerId !== null,
         ));
     }
 

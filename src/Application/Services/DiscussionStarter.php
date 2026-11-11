@@ -43,6 +43,7 @@ final readonly class DiscussionStarter
         private DiscussionRepositoryInterface $discussions,
         private DiscussionAnnouncer $announcer,
         private DiscussionReadsInterface $reads,
+        private FollowService $follows,
     ) {}
 
     /**
@@ -113,8 +114,9 @@ final readonly class DiscussionStarter
             }
         });
 
-        // Its author has read what they wrote
+        // Its author has read what they wrote, and follows it
         $this->reads->advance((string) $authorId, $discussion->id(), 1, $discussion->createdAt());
+        $this->follows->followAfterPosting((string) $authorId, $discussion->id());
         $this->announcer->announce($discussion, $access->category, $body, $topics);
 
         return $discussion;

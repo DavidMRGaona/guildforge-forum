@@ -9,6 +9,7 @@ import type {
     ForumDiscussionList,
     ForumListFilters,
 } from '../../types/forum';
+import CategoryFollowButton from '../../components/forum/CategoryFollowButton.vue';
 import CategoryIcon from '../../components/forum/CategoryIcon.vue';
 import CategoryList from '../../components/forum/CategoryList.vue';
 import DiscussionFilters from '../../components/forum/DiscussionFilters.vue';
@@ -52,6 +53,7 @@ const breadcrumbs = computed(() => [
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <CategoryFollowButton v-if="category.follow" :follow="category.follow" />
                     <MarkReadButton
                         v-if="markReadUrl"
                         :url="markReadUrl"
@@ -92,9 +94,11 @@ const breadcrumbs = computed(() => [
                 :discussions="discussions"
                 :show-category="subcategories.length > 0"
                 :empty-description="
-                    filters.unread
-                        ? t('forum.discussions.noUnread')
-                        : t('forum.discussions.emptyCategory')
+                    filters.following
+                        ? t('forum.discussions.noFollowed')
+                        : filters.unread
+                          ? t('forum.discussions.noUnread')
+                          : t('forum.discussions.emptyCategory')
                 "
             />
         </section>

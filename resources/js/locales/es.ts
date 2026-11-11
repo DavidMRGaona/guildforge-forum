@@ -157,6 +157,8 @@ export default {
             title: 'Conversación',
             viewAll: 'Ver conversación completa',
             older: 'Ver el mensaje anterior | Ver los {count} anteriores',
+            loadError: 'No se ha podido cargar la conversación.',
+            retry: 'Reintentar',
             olderError: 'No se han podido cargar los mensajes anteriores. Inténtalo de nuevo.',
             empty: 'Todavía no hay comentarios. Puedes ser la primera persona en escribir.',
             emptyReadOnly: 'Todavía no hay comentarios.',

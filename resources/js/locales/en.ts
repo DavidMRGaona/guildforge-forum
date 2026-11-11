@@ -156,6 +156,8 @@ export default {
             title: 'Conversation',
             viewAll: 'See the whole conversation',
             older: 'See the previous post | See the {count} previous ones',
+            loadError: 'The conversation could not be loaded.',
+            retry: 'Try again',
             olderError: 'The previous posts could not be loaded. Please try again.',
             empty: 'No comments yet. You can be the first to write.',
             emptyReadOnly: 'No comments yet.',

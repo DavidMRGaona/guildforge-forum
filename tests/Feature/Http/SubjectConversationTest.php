@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Feature\Http;
 
 use App\Application\Publications\Enums\PublicationState;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use DateTimeImmutable;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Publications\PublicationFacts;
@@ -19,6 +20,7 @@ use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -43,6 +45,7 @@ final class SubjectConversationTest extends ModuleTestCase
         parent::setUp();
 
         $this->useUtcStorage();
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
         $this->public = $this->aCategoryFor(CategoryAudience::everyone(), 'mesas');
     }
 
@@ -56,6 +59,33 @@ final class SubjectConversationTest extends ModuleTestCase
 
         // Not a publication type at all
         $this->getJson('/foro/fichas/Game_Table/x')->assertOk()->assertExactJson(['conversation' => null]);
+    }
+
+    public function test_a_type_without_an_active_source_shows_nothing_even_with_a_discussion(): void
+    {
+        [$discussion, $opening] = $this->aDiscussion($this->public, '2026-11-10 10:00:00');
+        $record = new SubjectDiscussion(new PublicationKey('campaign', 'campaign-1'));
+        $record->announce($discussion->id(), $opening->id(), ['presence' => PublicationFacts::PUBLISHED], true);
+        app(SubjectDiscussionRepositoryInterface::class)->save($record);
+
+        // Its module is off: answered as if it had no discussion
+        $this->getJson('/foro/fichas/campaign/campaign-1')->assertOk()->assertExactJson(['conversation' => null]);
+
+        app(PublicationSourceRegistryInterface::class)->unregisterModule('example');
+        $this->aSubjectDiscussion('table-1', $this->public);
+        $this->getJson('/foro/fichas/game-table/table-1')->assertOk()->assertExactJson(['conversation' => null]);
+    }
+
+    public function test_the_answer_is_never_kept_by_shared_caches(): void
+    {
+        $this->aSubjectDiscussion('table-1', $this->public);
+
+        $cache = (string) $this->getJson('/foro/fichas/game-table/table-1')->headers->get('Cache-Control');
+        self::assertStringContainsString('private', $cache);
+        self::assertStringContainsString('no-store', $cache);
+
+        $cache = (string) $this->getJson('/foro/fichas/game-table/unknown')->headers->get('Cache-Control');
+        self::assertStringContainsString('no-store', $cache);
     }
 
     public function test_it_shows_the_last_posts_without_the_opening_one(): void

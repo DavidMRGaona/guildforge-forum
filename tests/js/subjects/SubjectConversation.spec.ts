@@ -62,6 +62,71 @@ function aConversation(
     };
 }
 
+const READ_URL = '/foro/temas/discussion-1/leido';
+
+/** Posts `from`–`to` of a discussion whose reader read up to `lastRead` (the opening post aside) */
+function aGap(from: number, to: number, lastRead: number): ForumSubjectConversation {
+    const posts: ForumPost[] = [];
+    for (let number = from; number <= to; number++) {
+        posts.push(aPost(number));
+    }
+
+    return aConversation({
+        posts,
+        olderCount: from - 2,
+        olderNext: Math.min(10, from - 2),
+        olderUrl: from > 2 ? `${BASE}?antes=${from}` : null,
+        highestNumber: 50,
+        readUrl: READ_URL,
+        lastReadNumber: lastRead,
+    });
+}
+
+/** The intersection observers the read tracker creates, so a test can show it every post */
+class FakeObserver {
+    static last: FakeObserver | null = null;
+
+    elements: Element[] = [];
+
+    constructor(private readonly callback: IntersectionObserverCallback) {
+        FakeObserver.last = this;
+    }
+
+    observe(element: Element): void {
+        this.elements.push(element);
+    }
+
+    unobserve(): void {}
+
+    disconnect(): void {}
+
+    takeRecords(): IntersectionObserverEntry[] {
+        return [];
+    }
+}
+
+/** Every post of the current list scrolls fully into view */
+function seeEveryPost(): void {
+    const observer = FakeObserver.last;
+    if (observer === null) {
+        return;
+    }
+    const entries = observer.elements.map(
+        (target) =>
+            ({
+                target,
+                isIntersecting: true,
+                intersectionRatio: 1,
+                intersectionRect: { height: 200 },
+                rootBounds: { height: 800 },
+            }) as unknown as IntersectionObserverEntry
+    );
+    (observer as unknown as { callback: IntersectionObserverCallback }).callback(
+        entries,
+        observer as unknown as IntersectionObserver
+    );
+}
+
 /** Answers each address with its JSON (or status), and records what was asked */
 function serve(
     answers: Record<string, { status?: number; body?: unknown }>
@@ -90,6 +155,8 @@ async function mountIt(): Promise<VueWrapper> {
 
 beforeEach(() => {
     localStorage.clear();
+    FakeObserver.last = null;
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
 });
 
 afterEach(() => {
@@ -103,10 +170,21 @@ describe('SubjectConversation', () => {
         expect((await mountIt()).html()).toBe('<!--v-if-->');
     });
 
-    it('draws nothing when the forum does not answer', async () => {
+    it('says neutrally that it could not load, and tries again', async () => {
         serve({ [BASE]: { status: 500 } });
+        const wrapper = await mountIt();
 
-        expect((await mountIt()).html()).toBe('<!--v-if-->');
+        expect(wrapper.find('[role="status"]').text()).toContain(
+            'No se ha podido cargar la conversación.'
+        );
+        expect(wrapper.find('section').exists()).toBe(false);
+
+        serve({ [BASE]: { body: { conversation: aConversation() } } });
+        await wrapper.find('[role="status"] button').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[role="status"]').exists()).toBe(false);
+        expect(wrapper.findAll('article')).toHaveLength(5);
     });
 
     it('shows the last posts, the way to earlier ones and to the whole conversation', async () => {
@@ -170,34 +248,45 @@ describe('SubjectConversation', () => {
         );
     });
 
-    it('moves the read mark only while reading is continuous', async () => {
+    it('never moves the read mark over posts it did not show', async () => {
         signIn();
-        serve({
-            [BASE]: {
-                body: {
-                    conversation: aConversation({
-                        readUrl: '/foro/temas/discussion-1/leido',
-                        lastReadNumber: 3,
-                    }),
-                },
-            },
-        });
-        const gap = await mountIt();
-        expect(gap.findComponent(SubjectConversationThread).props('readUrl')).toBeNull();
+        const fetchMock = serve({ [BASE]: { body: { conversation: aGap(46, 50, 10) } } });
+        const wrapper = await mountIt();
 
-        serve({
-            [BASE]: {
-                body: {
-                    conversation: aConversation({
-                        readUrl: '/foro/temas/discussion-1/leido',
-                        lastReadNumber: 15,
-                    }),
-                },
-            },
-        });
-        const continuous = await mountIt();
-        expect(continuous.findComponent(SubjectConversationThread).props('readUrl')).toBe(
-            '/foro/temas/discussion-1/leido'
+        expect(wrapper.findComponent(SubjectConversationThread).props('readUrl')).toBeNull();
+        seeEveryPost();
+        wrapper.unmount();
+
+        expect(fetchMock).not.toHaveBeenCalledWith(READ_URL, expect.anything());
+    });
+
+    it('moves the read mark once earlier posts join it to what was read', async () => {
+        signIn();
+        const answers: Record<string, { body: unknown }> = {
+            [BASE]: { body: { conversation: aGap(46, 50, 10) } },
+        };
+        for (const before of [46, 36, 26, 16]) {
+            answers[`${BASE}?antes=${before}`] = {
+                body: { conversation: aGap(Math.max(2, before - 10), before - 1, 10) },
+            };
+        }
+        const fetchMock = serve(answers);
+        const wrapper = await mountIt();
+
+        for (let i = 0; i < 4; i++) {
+            expect(wrapper.findComponent(SubjectConversationThread).props('readUrl')).toBeNull();
+            await wrapper.find('section > div.space-y-2 button').trigger('click');
+            await flushPromises();
+        }
+
+        // Posts 6–50 are on the page and the mark was at 10: reading goes on from there
+        expect(wrapper.findComponent(SubjectConversationThread).props('readUrl')).toBe(READ_URL);
+        seeEveryPost();
+        wrapper.unmount();
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            READ_URL,
+            expect.objectContaining({ method: 'POST', body: JSON.stringify({ number: 50 }) })
         );
     });
 

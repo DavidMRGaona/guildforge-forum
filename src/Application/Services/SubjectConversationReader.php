@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Services;
 
+use App\Application\Publications\Contracts\PublicationSourceInterface;
 use App\Application\Publications\Enums\PublicationState;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use InvalidArgumentException;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
@@ -21,12 +23,14 @@ use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
+use Throwable;
 
 /**
  * The conversation a record's page shows (a game table, a campaign, an event): the last posts
  * of its publication's discussion, read with the forum's own rules. A record without a
- * discussion, or one the reader may not read, has none (null), whatever the reason, so the
- * page cannot tell a private discussion from a missing one.
+ * discussion, one the reader may not read, or of a type no active source offers (its module
+ * is off) has none (null), whatever the reason, so the page cannot tell a private discussion
+ * from a missing one.
  */
 final readonly class SubjectConversationReader
 {
@@ -47,6 +51,7 @@ final readonly class SubjectConversationReader
         private PostingService $posting,
         private PostContentPresenter $presenter,
         private DiscussionReadsInterface $reads,
+        private PublicationSourceRegistryInterface $publications,
     ) {}
 
     /**
@@ -57,6 +62,10 @@ final readonly class SubjectConversationReader
         try {
             $key = new PublicationKey($type, $id);
         } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        if (! $this->isOffered($key->type)) {
             return null;
         }
 
@@ -104,6 +113,18 @@ final readonly class SubjectConversationReader
             canPost: $this->posting->canPost($reader, $discussion),
             closedReason: $this->closedReason($discussion, $record),
         );
+    }
+
+    /**
+     * Whether an active publication source offers the type; a registry that fails says no.
+     */
+    private function isOffered(string $type): bool
+    {
+        try {
+            return $this->publications->source($type) instanceof PublicationSourceInterface;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function closedReason(Discussion $discussion, SubjectDiscussion $record): ?SubjectClosedReason

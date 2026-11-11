@@ -11,9 +11,9 @@ import type { ForumPost, ForumSubjectConversation } from '../../types/forum';
 /**
  * The conversation of a record (a game table, a campaign, an event), in the core's
  * `subject-discussion` slot of its page: its last posts, earlier ones on demand, and a reply
- * box. It is asked for once the page is drawn, so the page never waits for the forum. A record
- * without a discussion, or with one the reader may not read, shows nothing; so does a failed
- * request.
+ * box. It is asked for once the page is drawn, so the page never waits for the forum: nothing
+ * shows while it loads. A record without a discussion, or with one the reader may not read,
+ * shows nothing; a failed request, a neutral notice that offers to try again.
  */
 const props = defineProps<{
     subjectType: string;
@@ -29,6 +29,8 @@ const { t } = useI18n();
 const headingId = useId();
 
 const conversation = ref<ForumSubjectConversation | null>(null);
+const failed = ref(false);
+const retrying = ref(false);
 const earlier = ref<ForumPost[]>([]);
 const earlierNames = ref<Record<string, string>>({});
 const olderUrl = ref<string | null>(null);
@@ -73,10 +75,14 @@ async function load(): Promise<void> {
         subjectConversationUrl(props.subjectType, props.subjectId),
         'GET'
     );
-    // A failed request keeps whatever the page shows (nothing, the first time)
+    // A failed request keeps whatever the page shows; with nothing shown yet, it says so
     if (!answer.ok) {
+        failed.value = conversation.value === null;
+
         return;
     }
+
+    failed.value = false;
 
     const loaded = answer.data?.conversation ?? null;
     conversation.value = loaded;
@@ -118,6 +124,12 @@ async function loadOlder(): Promise<void> {
         await nextTick();
         document.getElementById(`post-${first}`)?.focus();
     }
+}
+
+async function retry(): Promise<void> {
+    retrying.value = true;
+    await load();
+    retrying.value = false;
 }
 
 function onQuote(source: { postId: string; text: string }): void {
@@ -217,4 +229,20 @@ watch(() => [props.subjectType, props.subjectId], load);
             @submit="send"
         />
     </section>
+
+    <p
+        v-else-if="failed"
+        role="status"
+        class="flex flex-wrap items-center gap-x-3 text-sm text-base-secondary"
+    >
+        {{ t('forum.subjects.loadError') }}
+        <button
+            type="button"
+            class="inline-flex min-h-[44px] items-center font-medium text-primary hover:underline disabled:opacity-60"
+            :disabled="retrying"
+            @click="retry"
+        >
+            {{ t('forum.subjects.retry') }}
+        </button>
+    </p>
 </template>

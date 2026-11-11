@@ -37,7 +37,10 @@ final class SubjectConversationController extends Controller
 
         $conversation = $this->reader->read($user, $type, $id, $before);
 
-        return response()->json(['conversation' => $conversation instanceof SubjectConversationDTO ? $this->present($conversation, $user) : null]);
+        // What it holds depends on who asks: no shared cache may keep it
+        return response()
+            ->json(['conversation' => $conversation instanceof SubjectConversationDTO ? $this->present($conversation, $user) : null])
+            ->header('Cache-Control', 'private, no-store');
     }
 
     /**

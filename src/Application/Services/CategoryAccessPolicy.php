@@ -34,7 +34,7 @@ use Throwable;
  *   moderate it.
  * - A category is moderated by whoever moderates the whole forum (forum:forum.moderate), by its
  *   moderators (roles, or part of its publication's roster), and by its parent's; never by
- *   someone suspended in the forum.
+ *   someone suspended in the forum, whoever moderates the whole forum included (they still read).
  * - Whoever moderates the whole forum reads and writes everywhere, so reports can be handled in
  *   any category.
  *
@@ -91,9 +91,10 @@ final class CategoryAccessPolicy
 
     public function canModerate(?Authenticatable $user, Category $category): bool
     {
-        // Someone suspended in the forum moderates nothing (whoever moderates all of it is never suspended)
+        // Someone suspended in the forum moderates nothing, not even whoever moderates all of it
         return $this->decide(fn (): bool => $user instanceof Authenticatable
-            && ($this->moderatesForum($user) || (! $this->suspensions->isSuspended($user) && $this->reads($user, $category) && $this->moderatesCategory($user, $category))));
+            && ! $this->suspensions->isSuspended($user)
+            && ($this->moderatesForum($user) || ($this->reads($user, $category) && $this->moderatesCategory($user, $category))));
     }
 
     /**
@@ -101,7 +102,7 @@ final class CategoryAccessPolicy
      */
     public function canModerateForum(?Authenticatable $user): bool
     {
-        return $this->decide(fn (): bool => $this->moderatesForum($user));
+        return $this->decide(fn (): bool => $this->moderatesForum($user) && ! $this->suspensions->isSuspended($user));
     }
 
     private function moderatesForum(?Authenticatable $user): bool

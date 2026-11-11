@@ -103,7 +103,8 @@ final class ForumModerationPage extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return self::userCan(CategoryAccessPolicy::MODERATE_FORUM);
+        // Someone suspended in the forum moderates nothing, here either
+        return self::userCan(CategoryAccessPolicy::MODERATE_FORUM) && app(CategoryAccessPolicy::class)->canModerateForum(auth()->user());
     }
 
     /**

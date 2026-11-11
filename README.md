@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, todavía sin pantallas públicas.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos y los temas automáticos de las publicaciones, todavía sin pantallas públicas.
 
 ## Qué hay
 
@@ -30,6 +30,22 @@ Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes
 - **Categorías del sistema**: «Mesas», «Campañas» y «Eventos», con claves estables. Las usan los temas automáticos. Se pueden renombrar y cambiar de aspecto, pero no borrar.
 - **Etiquetas de sistema de juego** (`game-system.<uuid>`, de los temas de cada publicación): sirven para filtrar, nunca para dar acceso.
 - **Instalación**: al habilitar el módulo se crean «General», «Partidas por foro» y las tres del sistema, todas legibles por cualquiera.
+
+## Temas automáticos
+
+Cada partida suelta, campaña y evento publicados tiene su tema en el foro sin que nadie lo abra. Todo llega por el contrato de publicaciones del core (`PublicationSourceInterface`, eventos `PublicationChanged` y `PublicationRemoved`): el módulo no importa nada de otros módulos. Lo hace `PublicationDiscussionSync`.
+
+- **Un tema por publicación**, con la clave estable `<tipo>:<id>` en `forum_subject_discussions`. Volver a publicar nunca abre otro. Va en la categoría del sistema de su tipo (`game-table` → «Mesas», `campaign` → «Campañas», `event` → «Eventos»), con las etiquetas de sus `topics` (el sistema de juego).
+- **El primer mensaje** lo escribe la cuenta del sistema: el resumen en texto plano, la fecha, el sistema de juego y un enlace a la ficha. Si cambian, se reescribe (queda como edición) y, si cambia el título, se renombra el tema.
+- **Solo lo que está por llegar**: una publicación cancelada o terminada que nunca tuvo tema no lo tiene.
+- **Avisos** como respuestas de la cuenta del sistema: nueva fecha; plaza libre en una partida llena con las inscripciones abiertas; cierre de inscripciones; cancelación, que cierra el tema; reactivación; retirada o borrado, que cierran el tema; y vuelta a publicar, que lo reabre. El tema nunca se borra.
+  - Se guarda lo último que se dijo de cada cosa (los hechos), en la misma transacción que el aviso. Por eso, aunque la publicación se guarde dos veces, el aviso sale una sola vez. La primera lectura solo toma nota.
+  - El módulo solo reabre lo que cerró él: un tema que cerró la moderación sigue cerrado.
+  - Un tema que borra la moderación no se vuelve a abrir.
+- **En cola**: cada cambio encola `SyncPublicationDiscussionJob`, que relee la publicación al ejecutarse. Si la fuente falla, el job falla y se reintenta: nunca se toma por una retirada. Si el tipo se queda sin fuente (su módulo deshabilitado), no se toca nada. Publicar en la web nunca falla por el foro.
+- **Cierre de inscripciones a su hora**: si la publicación dice cuándo se cierran, se encola una comprobación para ese momento (una sola vez por hora de cierre).
+- **Reconciliación diaria** (`forum:sync-publications`, a las 04:40): comprueba lo que cada fuente da por publicado (`publishedIds()`) y lo que el foro sigue, para lo publicado antes de habilitar el módulo y lo que se pierda por el camino.
+- **Cuenta del sistema**: una cuenta local con el nombre del sitio (`SiteBrandingServiceInterface::siteName()`, que sigue a cada cambio), creada al habilitar el módulo. No tiene ningún rol, su contraseña es aleatoria y su dirección (`forum-system@system.invalid`) no recibe correo, así que nadie puede entrar con ella. Su id se guarda en el ajuste `forum_system_account_id`.
 
 ## Editor de mensajes
 

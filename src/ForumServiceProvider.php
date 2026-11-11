@@ -7,6 +7,8 @@ namespace Modules\Forum;
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
+use App\Domain\Publications\Events\PublicationChanged;
+use App\Domain\Publications\Events\PublicationRemoved;
 use App\Infrastructure\Media\Observers\RefreshMediaUsagesObserver;
 use App\Modules\ModuleServiceProvider;
 use Filament\Pages\Page;
@@ -15,6 +17,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
 use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
@@ -28,13 +31,18 @@ use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
+use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
+use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
+use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
@@ -42,12 +50,15 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCateg
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubjectDiscussionRepository;
 use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
+use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
+use Modules\Forum\Infrastructure\Services\JobPublicationSyncQueue;
 use Modules\Forum\Infrastructure\Services\NoPostLinks;
 use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
 use Modules\Forum\Policies\CategoryPolicy;
@@ -83,6 +94,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
         $this->app->bind(PostRevisionRepositoryInterface::class, EloquentPostRevisionRepository::class);
         $this->app->bind(ForumCountersInterface::class, EloquentForumCounters::class);
+        $this->app->bind(SubjectDiscussionRepositoryInterface::class, EloquentSubjectDiscussionRepository::class);
+        $this->app->bind(SystemAccountInterface::class, EloquentSystemAccount::class);
+        $this->app->bind(PublicationSyncQueueInterface::class, JobPublicationSyncQueue::class);
         $this->app->bind(ForumSettingsInterface::class, ForumSettings::class);
         // Roles and rosters are read once per request (or queue job)
         $this->app->scoped(CategoryAccessPolicy::class);
@@ -117,12 +131,18 @@ final class ForumServiceProvider extends ModuleServiceProvider
             ->by('forum-images:'.self::requesterKey($request)));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PurgeDeletedPostsCommand::class]);
+            $this->commands([PurgeDeletedPostsCommand::class, SyncPublicationDiscussionsCommand::class]);
         }
+
+        // Game tables, campaigns and events get their discussion; each change is checked in the queue
+        Event::listen(PublicationChanged::class, [QueuePublicationDiscussionSync::class, 'handle']);
+        Event::listen(PublicationRemoved::class, [QueuePublicationDiscussionSync::class, 'handle']);
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('forum:purge-deleted-posts')->dailyAt('04:10')->withoutOverlapping(60);
+            // What was published before the module was enabled, or a check that got lost
+            $schedule->command('forum:sync-publications')->dailyAt('04:40')->withoutOverlapping(60);
         });
 
         // The media library learns at once which images a post started or stopped using

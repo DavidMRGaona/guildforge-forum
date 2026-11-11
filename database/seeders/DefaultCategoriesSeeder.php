@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Modules\Forum\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
 
 /**
- * Creates the categories a new forum starts with when the module is first enabled. The
- * installer only adds what is missing.
+ * Creates the categories a new forum starts with, and the system account its automatic
+ * discussions are written with, when the module is first enabled. Only what is missing is added.
  */
 final class DefaultCategoriesSeeder extends Seeder
 {
@@ -27,5 +28,6 @@ final class DefaultCategoriesSeeder extends Seeder
 
         // Resolved here, not in the constructor: seeders are built before the provider binds
         app(DefaultCategoriesInstaller::class)->install();
+        app(SystemAccountInterface::class)->id();
     }
 }

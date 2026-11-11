@@ -10,12 +10,15 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\PostContentDTO;
 use Modules\Forum\Application\DTOs\PostLikesDTO;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -144,52 +147,7 @@ final readonly class ForumPresenter
     public function conversation(ConversationPageDTO $page, array $readable): array
     {
         $discussion = $page->discussion;
-        // The editor of a post its author may change starts from its stored document
-        $editable = [];
-        foreach ($page->posts as $index => $post) {
-            if ($page->contents[$index]->canEdit) {
-                $editable[$post->id()->value] = $post->body()->document;
-            }
-        }
-        $mentioned = [];
-        foreach ($editable as $document) {
-            self::collectMentions($document, $mentioned);
-        }
-
-        $names = $this->names(array_values(array_unique([
-            ...array_filter(array_map(static fn ($post): ?string => $post->authorId(), $page->posts)),
-            ...array_keys($mentioned),
-        ])));
-
-        $posts = [];
-        foreach ($page->posts as $index => $post) {
-            $content = $page->contents[$index];
-            $number = $post->number()?->value;
-            $published = $post->publishedAt() ?? $post->createdAt();
-
-            $posts[] = [
-                'id' => $post->id()->value,
-                'number' => $number,
-                'authorId' => $post->authorId(),
-                'authorName' => $post->authorId() === null ? null : ($names[$post->authorId()] ?? null),
-                'isStarter' => $post->authorId() !== null && $post->authorId() === $discussion->authorId(),
-                'status' => $post->status()->value,
-                'html' => $content->html,
-                'placeholder' => $content->placeholder,
-                'publishedAt' => $this->timezone->iso($published),
-                'publishedLabel' => $this->timezone->format($published),
-                'editedAt' => $this->timezone->iso($post->editedAt()),
-                'editedLabel' => $post->editedAt() instanceof DateTimeImmutable && $post->status() !== PostStatus::Deleted
-                    ? $this->timezone->format($post->editedAt())
-                    : null,
-                'url' => $number === null ? null : $this->urls->discussion($discussion, $number),
-                'canEdit' => $content->canEdit,
-                'canDelete' => $content->canDelete,
-                'document' => $editable[$post->id()->value] ?? null,
-                'updateUrl' => $content->canEdit ? route('forum.posts.update', ['post' => $post->id()->value]) : null,
-                'deleteUrl' => $content->canDelete ? route('forum.posts.destroy', ['post' => $post->id()->value]) : null,
-            ];
-        }
+        ['posts' => $posts, 'mentionNames' => $mentionNames] = $this->posts($discussion, $page->posts, $page->contents);
 
         $categoryAccess = null;
         foreach ($readable as $access) {
@@ -228,7 +186,7 @@ final readonly class ForumPresenter
             ],
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
-            'mentionNames' => array_intersect_key($names, $mentioned),
+            'mentionNames' => $mentionNames,
         ];
     }
 
@@ -249,6 +207,66 @@ final readonly class ForumPresenter
             'names' => $shown,
             'others' => max(0, $likes->count - count($shown)),
         ];
+    }
+
+    /**
+     * The posts as the conversation draws them, and the names of whoever the editable ones
+     * mention (their editor starts from the stored document).
+     *
+     * @param  list<Post>  $posts
+     * @param  list<PostContentDTO>  $contents  what each post shows to the reader, in the same order
+     * @return array{posts: list<array<string, mixed>>, mentionNames: array<string, string>}
+     */
+    public function posts(Discussion $discussion, array $posts, array $contents): array
+    {
+        // The editor of a post its author may change starts from its stored document
+        $editable = [];
+        foreach ($posts as $index => $post) {
+            if ($contents[$index]->canEdit) {
+                $editable[$post->id()->value] = $post->body()->document;
+            }
+        }
+        $mentioned = [];
+        foreach ($editable as $document) {
+            self::collectMentions($document, $mentioned);
+        }
+
+        $names = $this->names(array_values(array_unique([
+            ...array_filter(array_map(static fn ($post): ?string => $post->authorId(), $posts)),
+            ...array_keys($mentioned),
+        ])));
+
+        $items = [];
+        foreach ($posts as $index => $post) {
+            $content = $contents[$index];
+            $number = $post->number()?->value;
+            $published = $post->publishedAt() ?? $post->createdAt();
+
+            $items[] = [
+                'id' => $post->id()->value,
+                'number' => $number,
+                'authorId' => $post->authorId(),
+                'authorName' => $post->authorId() === null ? null : ($names[$post->authorId()] ?? null),
+                'isStarter' => $post->authorId() !== null && $post->authorId() === $discussion->authorId(),
+                'status' => $post->status()->value,
+                'html' => $content->html,
+                'placeholder' => $content->placeholder,
+                'publishedAt' => $this->timezone->iso($published),
+                'publishedLabel' => $this->timezone->format($published),
+                'editedAt' => $this->timezone->iso($post->editedAt()),
+                'editedLabel' => $post->editedAt() instanceof DateTimeImmutable && $post->status() !== PostStatus::Deleted
+                    ? $this->timezone->format($post->editedAt())
+                    : null,
+                'url' => $number === null ? null : $this->urls->discussion($discussion, $number),
+                'canEdit' => $content->canEdit,
+                'canDelete' => $content->canDelete,
+                'document' => $editable[$post->id()->value] ?? null,
+                'updateUrl' => $content->canEdit ? route('forum.posts.update', ['post' => $post->id()->value]) : null,
+                'deleteUrl' => $content->canDelete ? route('forum.posts.destroy', ['post' => $post->id()->value]) : null,
+            ];
+        }
+
+        return ['posts' => $items, 'mentionNames' => array_intersect_key($names, $mentioned)];
     }
 
     /**

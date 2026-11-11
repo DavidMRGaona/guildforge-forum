@@ -4,12 +4,10 @@ import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { EyeOff, Lock, Pin } from '@lucide/vue';
-import { useAuth } from '@/composables/useAuth';
-import { useRoutes } from '@/composables/useRoutes';
-import PostEditor from '../../components/editor/PostEditor.vue';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import PostItem from '../../components/forum/PostItem.vue';
+import ReplyBox from '../../components/forum/ReplyBox.vue';
 import { useReadTracker } from '../../composables/useReadTracker';
 import { sendJson } from '../../forum/api';
 import type {
@@ -31,11 +29,9 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const { isAuthenticated, mustVerifyEmail } = useAuth();
-const routes = useRoutes();
 
 const list = ref<HTMLElement | null>(null);
-const editor = ref<InstanceType<typeof PostEditor> | null>(null);
+const editor = ref<InstanceType<typeof ReplyBox> | null>(null);
 const sending = ref(false);
 const replyError = ref<string | null>(null);
 
@@ -46,21 +42,6 @@ const breadcrumbs = computed(() => [
 ]);
 
 const isLastPage = computed(() => props.pagination.nextUrl === null);
-
-/** Why there is no reply box, when there is none */
-const noReplyReason = computed<string | null>(() => {
-    if (props.reply.canPost) {
-        return null;
-    }
-    if (!isAuthenticated.value) {
-        return 'guest';
-    }
-    if (mustVerifyEmail.value) {
-        return 'verify';
-    }
-
-    return props.discussion.isClosed ? 'closed' : 'forbidden';
-});
 
 useReadTracker({
     readUrl: props.readUrl,
@@ -267,45 +248,24 @@ async function send(document: JSONContent): Promise<void> {
                 {{ t('forum.posts.reply') }}
             </h2>
 
-            <template v-if="reply.canPost">
-                <p v-if="!isLastPage" class="text-sm text-base-secondary">
-                    {{ t('forum.posts.replyGoesLast') }}
-                </p>
-                <PostEditor
-                    ref="editor"
-                    :label="t('forum.posts.replyLabel')"
-                    :draft-key="`forum-reply-${discussion.id}`"
-                    :mentions-url="reply.mentionsUrl"
-                    :upload-url="reply.uploadUrl"
-                    :max-images="reply.maxImages"
-                    :image-types="reply.imageTypes"
-                    :submit-label="t('forum.posts.send')"
-                    :submitting="sending"
-                    :error="replyError"
-                    @submit="send"
-                />
-            </template>
-
-            <p
-                v-else
-                class="rounded-lg border border-default bg-surface p-4 text-sm text-base-secondary"
+            <ReplyBox
+                ref="editor"
+                :reply="reply"
+                :draft-key="`forum-reply-${discussion.id}`"
+                :is-closed="discussion.isClosed"
+                :label="t('forum.posts.replyLabel')"
+                :submit-label="t('forum.posts.send')"
+                :sign-in-suffix="t('forum.posts.signInToReply')"
+                :sending="sending"
+                :error="replyError"
+                @submit="send"
             >
-                <template v-if="noReplyReason === 'guest'">
-                    <Link
-                        :href="routes.auth.login"
-                        class="font-medium text-primary hover:underline"
-                        >{{ t('forum.posts.signIn') }}</Link
-                    >
-                    {{ t('forum.posts.signInToReply') }}
+                <template v-if="!isLastPage" #intro>
+                    <p class="text-sm text-base-secondary">
+                        {{ t('forum.posts.replyGoesLast') }}
+                    </p>
                 </template>
-                <template v-else-if="noReplyReason === 'verify'">{{
-                    t('forum.posts.verifyToReply')
-                }}</template>
-                <template v-else-if="noReplyReason === 'closed'">{{
-                    t('forum.posts.closedNotice')
-                }}</template>
-                <template v-else>{{ t('forum.posts.cannotReply') }}</template>
-            </p>
+            </ReplyBox>
         </section>
     </div>
 </template>

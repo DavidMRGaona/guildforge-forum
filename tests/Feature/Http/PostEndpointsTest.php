@@ -260,7 +260,11 @@ final class PostEndpointsTest extends ModuleTestCase
         $names = $this->actingAs($this->author)->getJson($url.'?q=ana')
             ->assertOk()
             ->json('data.*.name');
-        $this->assertSame(['Ana Pérez', 'Anabel Ruiz', 'Luciana'], $names);
+        $this->assertIsArray($names);
+        // Names that start with the text first (in the database's collation), then those that contain it
+        $this->assertCount(3, $names);
+        $this->assertEqualsCanonicalizing(['Ana Pérez', 'Anabel Ruiz'], array_slice($names, 0, 2));
+        $this->assertSame('Luciana', $names[2]);
 
         $this->actingAs($this->author)->getJson($url.'?q=')->assertOk()->assertJsonCount(0, 'data');
         $this->actingAs($this->author)->getJson($url.'?q=100%25')->assertOk()->assertJsonCount(0, 'data');

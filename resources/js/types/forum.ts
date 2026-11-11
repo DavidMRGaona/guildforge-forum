@@ -41,6 +41,35 @@ export interface ForumCategoryHeader {
     canModerate: boolean;
     isPublicationSpace: boolean;
     readOnly: boolean;
+    /** Only on the category page, and null for guests */
+    follow?: ForumCategoryFollow | null;
+}
+
+export interface ForumCategoryFollow {
+    following: boolean;
+    url: string;
+}
+
+export type ForumFollowLevel = 'following' | 'normal' | 'muted';
+
+export interface ForumDiscussionFollow {
+    level: ForumFollowLevel;
+    url: string;
+}
+
+export interface ForumLikes {
+    count: number;
+    liked: boolean;
+    /** Names of the latest likes, newest first */
+    names: string[];
+    /** Likes beyond the names shown */
+    others: number;
+}
+
+export interface ForumPostLikes extends ForumLikes {
+    canLike: boolean;
+    /** Where to like (POST) and take it back (DELETE); null when the reader can do neither */
+    url: string | null;
 }
 
 export interface ForumDiscussionRow {
@@ -78,6 +107,7 @@ export interface ForumDiscussionList {
 export interface ForumListFilters {
     topic: string | null;
     unread: boolean;
+    following: boolean;
     topics: ForumTopic[];
     canFilterUnread: boolean;
     baseUrl: string;
@@ -105,6 +135,7 @@ export interface ForumPost {
     document: JSONContent | null;
     updateUrl: string | null;
     deleteUrl: string | null;
+    likes: ForumPostLikes;
 }
 
 export interface ForumConversation {
@@ -117,6 +148,31 @@ export interface ForumConversation {
     isHidden: boolean;
     topics: ForumTopic[];
     category: ForumCategoryHeader;
+    /** null for guests */
+    follow: ForumDiscussionFollow | null;
+}
+
+export interface ForumPreferenceCategory {
+    id: string;
+    name: string;
+    parentName: string | null;
+    url: string;
+    followUrl: string;
+}
+
+export interface ForumPreferenceDiscussion {
+    id: string;
+    title: string;
+    url: string;
+    followUrl: string;
+}
+
+export interface ForumPreferences {
+    autoFollow: boolean;
+    updateUrl: string;
+    categories: ForumPreferenceCategory[];
+    discussions: ForumPreferenceDiscussion[];
+    forumUrl: string;
 }
 
 export interface ForumPagination {

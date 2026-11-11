@@ -7,6 +7,7 @@ import type { ForumListFilters } from '../../../resources/js/types/forum';
 const FILTERS: ForumListFilters = {
     topic: null,
     unread: false,
+    following: false,
     topics: [{ key: 'game-system.x', label: 'Pathfinder' }],
     canFilterUnread: true,
     baseUrl: '/foro/c/general',
@@ -29,6 +30,33 @@ describe('DiscussionFilters', () => {
             { 'sin-leer': '1', etiqueta: 'game-system.x' },
             expect.objectContaining({ preserveScroll: true })
         );
+    });
+
+    it('loads the followed discussions instead of the unread ones', async () => {
+        const wrapper = mount(DiscussionFilters, {
+            props: { filters: { ...FILTERS, unread: true } },
+        });
+
+        const following = wrapper.findAll('button')[2];
+        expect(following?.text()).toBe('Siguiendo');
+        await following?.trigger('click');
+
+        expect(router.get).toHaveBeenCalledWith(
+            '/foro/c/general',
+            { siguiendo: '1' },
+            expect.anything()
+        );
+    });
+
+    it('marks the shown filter as pressed', () => {
+        const wrapper = mount(DiscussionFilters, {
+            props: { filters: { ...FILTERS, following: true } },
+        });
+
+        const pressed = wrapper
+            .findAll('button')
+            .map((button) => button.attributes('aria-pressed'));
+        expect(pressed).toEqual(['false', 'false', 'true']);
     });
 
     it('filters by tag from the first page', async () => {

@@ -15,7 +15,7 @@ export interface JsonAnswer<T> {
  */
 export async function sendJson<T>(
     url: string,
-    method: 'POST' | 'PATCH' | 'DELETE',
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     body?: unknown
 ): Promise<JsonAnswer<T>> {
     let response: Response;

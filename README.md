@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña y las páginas públicas.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña, las páginas públicas, los «me gusta», el seguimiento y los avisos.
 
 ## Qué hay
 
@@ -42,7 +42,7 @@ Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes
 
 - **Número del tema**: cada tema recibe al empezar un número correlativo (1, 2, 3…), que es lo que identifica la dirección. Si el resto de la dirección no coincide (el tema se renombró), redirige a la buena con un 301. Si dos temas se abren a la vez y les toca el mismo número, se vuelve a intentar con el siguiente.
 - **Lo que no se puede ver da 404**, nunca 403: una categoría privada, un tema oculto (salvo para quien lo modera) o un tema que no existe.
-- **Listas**: por última actividad, con paginación por cursor (`?desde=`) sobre la actividad y el id, así que la actividad nueva nunca repite ni salta temas entre páginas. Filtros «Sin leer» (`?sin-leer=1`, solo con sesión) y etiqueta de sistema de juego (`?etiqueta=`). En una categoría, los fijados salen aparte en la primera página.
+- **Listas**: por última actividad, con paginación por cursor (`?desde=`) sobre la actividad y el id, así que la actividad nueva nunca repite ni salta temas entre páginas. Filtros «Sin leer» (`?sin-leer=1`) y «Siguiendo» (`?siguiendo=1`, los temas que la persona sigue), solo con sesión, y etiqueta de sistema de juego (`?etiqueta=`). En una categoría, los fijados salen aparte en la primera página.
 - **Conversación**: un enlace a un mensaje abre su página y lo resalta. Sin número, se abre en el primer mensaje sin leer (en el último si ya está todo leído) y, para quien nunca lo abrió o no tiene sesión, en el primero. La dirección del navegador sigue al mensaje que se lee, sin añadir entradas al historial. La URL canónica es la del principio de cada página.
 - **Desde la conversación**: responder, citar (el texto seleccionado o el mensaje entero, con enlace al original) y editar o borrar los mensajes propios, con el editor de abajo.
 - **No leídos**, solo con sesión:
@@ -89,6 +89,28 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
 - **Cabecera**: la página de la categoría pinta `SpaceNotices.vue` (`resources/js/components/spaces`), que dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (`isPublicationSpace` y `readOnly` de la cabecera; una madre en solo lectura cuenta).
 - **Reconciliación diaria**: la de los temas automáticos comprueba también las campañas cuyo espacio aún admite mensajes.
 
+## Me gusta, seguimiento y avisos
+
+- **Me gusta**: uno por persona y mensaje (`forum_post_likes`), que se quita con otro clic. Lo da cualquiera con sesión que pueda leer el mensaje, también en temas cerrados o espacios de solo lectura, salvo su autor, y nunca en los mensajes de la cuenta del sistema, en temas ocultos ni en mensajes pendientes de aprobación. Cada mensaje enseña el número y, al pasar el ratón o tocarlo, los nombres de los 10 últimos.
+- **Seguir un tema**: «Seguir» (cada respuesta), «Normal» (menciones y citas) o «Silenciar» (nada).
+  - Se guarda en `forum_discussion_follows`. «Silenciar» es el silencio del core del tema (`MailSubjectMuteServiceInterface`, tipo `forum.discussion`), el mismo que ofrece el pie de cada correo, así que el foro, el correo y la pestaña «Avisos» del perfil siempre coinciden.
+  - Abrir un tema o responder en él lo sigue, salvo que la persona lo haya quitado en la pestaña «Foro» del perfil (`forum_user_preferences`) o ya hubiera elegido algo para ese tema: una elección explícita no se pisa.
+- **Seguir una categoría** (`forum_category_follows`, botón en su página): avisa de cada tema nuevo en ella y en sus subcategorías. Al entrar en la plantilla de una campaña se sigue su espacio y llega el aviso «Te han añadido a la campaña X», una sola vez; al salir se deja de seguir, salvo que la persona lo siguiera por su cuenta. Lo hace `SpaceRosterFollows`, que relee el roster al ejecutarse.
+- **Avisos**, en la campana del core y por correo, con cuatro categorías en la sección «Foro» de la pestaña «Avisos»:
+
+| Categoría | Qué avisa | Correo |
+|---|---|---|
+| `forum.replies` | Respuestas en temas que sigues (en la web, agrupadas por tema mientras no se lean) | Uno por tema hasta que se vuelve a leer; admite el resumen diario |
+| `forum.discussions` | Temas nuevos en categorías que sigues y espacios de campaña en los que puedes entrar | Admite el resumen diario (el aviso del espacio va solo en la web) |
+| `forum.mentions` | Menciones y citas de un mensaje tuyo | Al momento |
+| `forum.likes` | «Me gusta» de tus mensajes (agrupados por mensaje) | Nunca: solo en la web |
+
+- Cada persona recibe un solo aviso por mensaje: mención antes que cita y cita antes que seguimiento. Al editar un mensaje, solo avisa a quien menciona o cita por primera vez.
+- Todo pasa por la cola: `ForumWriter` entrega cada mensaje que recibe número (respuestas, temas nuevos, aprobaciones y los mensajes de la cuenta del sistema) a `DeliverPostNoticesJob`, que decide a quién avisar (`PostNoticePlanner`), y cada aviso vuelve a comprobar al entregarse (`PostNoticeContext`) que la persona puede leer el tema en ese momento (`ForumAccessInterface`), que el mensaje sigue visible y que la cuenta está activa.
+- Nunca se avisa a quien escribió el mensaje, a cuentas desactivadas o anonimizadas, ni a la cuenta del sistema.
+- Los avisos tratan del tema (los de temas nuevos y espacios, de la categoría), así que silenciarlo desde el correo los calla también en la web. Al borrar un tema o una categoría se llama a `forgetSubject()`, que borra sus silencios y sus avisos.
+- Los nombres que van al correo pasan por `EscapesMarkdown`.
+
 ## Editor de mensajes
 
 El editor es TipTap en el navegador. Lo que se envía y se guarda es su documento JSON, que el servidor comprueba contra un esquema propio antes de guardarlo. Si no encaja, responde 422 con un código (`reason`) y la ruta dentro del documento (`path`); nunca lo arregla a escondidas. Nunca se acepta HTML de quien escribe.
@@ -128,6 +150,10 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 | `GET /foro/mensajes/{mensaje}/versiones` | Versiones, para quien modera |
 | `GET /foro/temas/{tema}/menciones?q=` | Personas que pueden leer el tema |
 | `POST /foro/imagenes` | Subir una imagen |
+| `POST` / `DELETE /foro/mensajes/{mensaje}/me-gusta` | Dar y quitar «me gusta» |
+| `PUT /foro/temas/{tema}/seguimiento` | Nivel de seguimiento (`{"level": "following" \| "normal" \| "muted"}`) |
+| `PUT /foro/c/{categoría}/seguimiento` | Seguir una categoría (`{"follow": true}`) |
+| `GET` / `PUT /foro/preferencias` | Pestaña «Foro» del perfil: seguimiento automático y lo que se sigue |
 
 Lo que la persona no puede leer responde 404; lo que no puede hacer, 403.
 

@@ -5,12 +5,14 @@ import type { JSONContent } from '@tiptap/core';
 import { Link2, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
+import LikeButton from './LikeButton.vue';
 import { sendJson } from '../../forum/api';
 import type { ForumEditorSettings, ForumPost } from '../../types/forum';
 
 /**
  * One post of the conversation. Its author may edit or delete it while they may post in the
- * discussion; anyone who may reply can quote it (the selected text, or the whole post).
+ * discussion; anyone who may reply can quote it (the selected text, or the whole post); anyone
+ * signed in who reads it may like it, except its author.
  */
 const props = defineProps<{
     post: ForumPost;
@@ -38,6 +40,10 @@ const anchor = computed(() =>
     props.post.number === null ? `post-${props.post.id}` : `post-${props.post.number}`
 );
 const isPlaceholder = computed(() => props.post.html === null);
+const showsLikes = computed(
+    () =>
+        props.post.status === 'visible' && (props.post.likes.canLike || props.post.likes.count > 0)
+);
 
 function quote(): void {
     const selection = window.getSelection();
@@ -180,9 +186,20 @@ async function remove(): Promise<void> {
         </div>
 
         <footer
-            v-if="!editing && (canQuote || post.canEdit || post.canDelete) && post.html !== null"
-            class="flex flex-wrap justify-end gap-1 border-t border-default px-2 py-1"
+            v-if="
+                !editing &&
+                (canQuote || post.canEdit || post.canDelete || showsLikes) &&
+                post.html !== null
+            "
+            class="flex flex-wrap items-center justify-end gap-1 border-t border-default px-2 py-1"
         >
+            <LikeButton
+                v-if="showsLikes"
+                class="mr-auto"
+                :likes="post.likes"
+                :post-id="post.id"
+                :post-number="post.number"
+            />
             <button
                 v-if="canQuote && post.status === 'visible'"
                 type="button"

@@ -73,9 +73,11 @@ const { t } = useI18n();
                 :discussions="discussions"
                 show-category
                 :empty-description="
-                    filters.unread
-                        ? t('forum.discussions.noUnread')
-                        : t('forum.discussions.emptyForum')
+                    filters.following
+                        ? t('forum.discussions.noFollowed')
+                        : filters.unread
+                          ? t('forum.discussions.noUnread')
+                          : t('forum.discussions.emptyForum')
                 "
             />
         </section>

@@ -15,6 +15,7 @@ use Modules\Forum\Http\Controllers\PostImageController;
 use Modules\Forum\Http\Controllers\PostLikesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
+use Modules\Forum\Http\Controllers\SubjectConversationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,6 +38,13 @@ Route::prefix('foro')
         Route::get('t/{discussion}/{post?}', [DiscussionController::class, 'show'])
             ->where(['discussion' => '[1-9][0-9]{0,9}(?:-[a-z0-9-]*)?', 'post' => '[1-9][0-9]{0,9}'])
             ->name('discussions.show');
+
+        // The conversation a record's page shows (JSON). Any type and id reach the controller,
+        // which answers an empty conversation for what it cannot show, never an error
+        Route::get('fichas/{type}/{id}', [SubjectConversationController::class, 'show'])
+            ->where(['type' => '[^/]{1,64}', 'id' => '[^/]{1,100}'])
+            ->middleware('throttle:120,1,forum-subjects')
+            ->name('subjects.show');
 
         Route::middleware('auth')->group(function (): void {
             Route::get('nuevo', [DiscussionController::class, 'create'])->name('discussions.create');

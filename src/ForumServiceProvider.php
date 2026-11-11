@@ -284,6 +284,24 @@ final class ForumServiceProvider extends ModuleServiceProvider
     }
 
     /**
+     * The conversation of a record (game table, campaign, event) in its page: the page hands
+     * `subjectType` and `subjectId` to the slot, and the component asks for the rest.
+     *
+     * @return array<SlotRegistrationDTO>
+     */
+    public function registerSlots(): array
+    {
+        return [
+            new SlotRegistrationDTO(
+                slot: 'subject-discussion',
+                component: 'components/subjects/SubjectConversation.vue',
+                module: $this->moduleName(),
+                order: 10,
+            ),
+        ];
+    }
+
+    /**
      * @return array<class-string<Page>>
      */
     public function registerFilamentPages(): array

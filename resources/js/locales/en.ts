@@ -152,6 +152,23 @@ export default {
                 'This space is private, but the forum moderators may enter it to handle reports.',
             readOnlyNotice: 'Read only: this space takes no more posts.',
         },
+        subjects: {
+            title: 'Conversation',
+            viewAll: 'See the whole conversation',
+            older: 'See the previous post | See the {count} previous ones',
+            olderError: 'The previous posts could not be loaded. Please try again.',
+            empty: 'No comments yet. You can be the first to write.',
+            emptyReadOnly: 'No comments yet.',
+            replyLabel: 'Your comment',
+            send: 'Post comment',
+            signInToComment: 'to comment.',
+            closed: {
+                cancelled: 'It was cancelled: the conversation takes no more comments.',
+                withdrawn: 'It is no longer published: the conversation takes no more comments.',
+                moderation: 'The moderators closed this conversation.',
+                closed: 'This conversation is closed: it takes no more comments.',
+            },
+        },
         editor: {
             submit_hint: 'Ctrl + Enter to send',
             toolbar: {

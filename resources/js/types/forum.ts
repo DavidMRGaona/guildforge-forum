@@ -204,3 +204,29 @@ export interface ForumCategoryOption {
     parentName: string | null;
     canModerate: boolean;
 }
+
+export type ForumSubjectClosedReason = 'cancelled' | 'withdrawn' | 'moderation' | 'closed';
+
+/** The conversation a record's page shows (SubjectConversationController) */
+export interface ForumSubjectConversation {
+    discussion: {
+        id: string;
+        number: number;
+        title: string;
+        url: string;
+        isClosed: boolean;
+        closedReason: ForumSubjectClosedReason | null;
+    };
+    /** Its last posts (or a run before a number), without the forum's opening post */
+    posts: ForumPost[];
+    mentionNames: Record<string, string>;
+    /** Posts before the run, the opening post aside */
+    olderCount: number;
+    /** How many of those the next "earlier ones" brings */
+    olderNext: number;
+    olderUrl: string | null;
+    highestNumber: number;
+    lastReadNumber: number | null;
+    readUrl: string | null;
+    reply: ForumReplySettings;
+}

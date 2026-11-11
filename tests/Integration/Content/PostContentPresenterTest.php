@@ -56,7 +56,7 @@ final class PostContentPresenterTest extends ModuleTestCase
         $this->assertNull($forGuest[0]->placeholder);
         $this->assertFalse($forGuest[0]->canEdit);
         $this->assertNull($forGuest[1]->html);
-        $this->assertSame('Mensaje oculto', $forGuest[1]->placeholder);
+        $this->assertSame('Mensaje oculto por la moderación', $forGuest[1]->placeholder);
         $this->assertNull($forGuest[2]->html);
         $this->assertSame('Mensaje borrado', $forGuest[2]->placeholder);
         $this->assertSame(3, $forGuest[2]->number);

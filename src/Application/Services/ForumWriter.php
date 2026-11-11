@@ -149,7 +149,7 @@ final readonly class ForumWriter
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS);
+        }, self::ATTEMPTS));
     }
 
     /**
@@ -172,7 +172,7 @@ final readonly class ForumWriter
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS));
+        }, self::ATTEMPTS);
     }
 
     /**

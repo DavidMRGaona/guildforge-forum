@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Bus;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
+use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Publications\PublicationDiscussionSync;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -113,7 +114,7 @@ final class PublicationDiscussionQueueTest extends ModuleTestCase
 
         $this->expectException(RuntimeException::class);
 
-        (new SyncPublicationDiscussionJob(FakeGameTableSource::TYPE, 'a1'))->handle(app(PublicationDiscussionSync::class));
+        (new SyncPublicationDiscussionJob(FakeGameTableSource::TYPE, 'a1'))->handle(app(PublicationDiscussionSync::class), app(CampaignSpaceSync::class));
     }
 
     public function test_the_reconciliation_checks_published_ones_and_those_the_forum_still_follows(): void

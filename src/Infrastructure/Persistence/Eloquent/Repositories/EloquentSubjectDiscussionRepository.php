@@ -64,6 +64,7 @@ final readonly class EloquentSubjectDiscussionRepository implements SubjectDiscu
             'facts' => $record->facts(),
             'is_live' => $record->isLive(),
             'next_check_at' => $record->nextCheckAt(),
+            'space_open' => $record->spaceOpen(),
         ]);
         $model->save();
     }
@@ -101,6 +102,7 @@ final readonly class EloquentSubjectDiscussionRepository implements SubjectDiscu
             is_array($facts) ? $this->scalars($facts) : null,
             $model->is_live,
             $model->next_check_at,
+            $model->space_open,
         );
     }
 

@@ -9,12 +9,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Publications\PublicationDiscussionSync;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Throwable;
 
 /**
- * Brings one publication's discussion in step with the publication as its source gives it when
+ * Brings one publication's discussion (and a campaign's space) in step with the publication as its source gives it when
  * the job runs (never what was known when it was queued). A source that fails makes the job
  * fail and be retried later: it is never taken for a publication taken down.
  */
@@ -41,9 +42,12 @@ final class SyncPublicationDiscussionJob implements ShouldQueue
         return [30, 120, 600, 1800];
     }
 
-    public function handle(PublicationDiscussionSync $sync): void
+    public function handle(PublicationDiscussionSync $discussions, CampaignSpaceSync $spaces): void
     {
-        $sync->sync(new PublicationKey($this->type, $this->id), $this->removed);
+        $key = new PublicationKey($this->type, $this->id);
+
+        $discussions->sync($key, $this->removed);
+        $spaces->sync($key);
     }
 
     public function failed(Throwable $exception): void

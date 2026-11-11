@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property array<mixed>|null $moderators
  * @property string|null $subject_type
  * @property string|null $subject_id
+ * @property string|null $read_only_by
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -52,7 +53,7 @@ final class CategoryModel extends Model
      */
     protected $fillable = [
         'id', 'parent_id', 'name', 'slug', 'description', 'position', 'color', 'icon', 'system_key',
-        'view_rule', 'write_rule', 'moderators', 'subject_type', 'subject_id',
+        'view_rule', 'write_rule', 'moderators', 'subject_type', 'subject_id', 'read_only_by',
     ];
 
     /**

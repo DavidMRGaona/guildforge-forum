@@ -88,6 +88,8 @@ return [
 
     'spaces' => [
         'moderation_notice' => 'Este espacio es privado, pero la moderación del foro puede entrar en él para atender reportes.',
+        'read_only_notice' => 'Solo lectura: ya no se puede escribir en este espacio.',
+        'description' => 'Espacio privado de la plantilla y la dirección de la campaña.',
     ],
 
     'categories' => [
@@ -121,6 +123,9 @@ return [
             'roles' => 'Roles',
             'moderator_roles' => 'Roles que la moderan',
             'moderator_roster' => 'También la moderan',
+            'read_only' => 'Solo lectura',
+            'read_only_help' => 'Nadie escribe en ella salvo quien modera todo el foro. Quien la modera sigue moderándola.',
+            'read_only_by_system' => 'La ha puesto el foro porque la campaña terminó, se canceló o se retiró, y se quita sola si vuelve a estar en marcha. Si la apagas, se puede volver a escribir.',
             'discussions' => 'Temas',
             'system' => 'Sistema',
         ],

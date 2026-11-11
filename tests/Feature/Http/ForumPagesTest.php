@@ -9,6 +9,7 @@ use DateTimeImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -93,6 +94,8 @@ final class ForumPagesTest extends ModuleTestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Forum/Category', false)
                 ->where('category.name', 'General')
+                ->where('category.isPublicationSpace', false)
+                ->where('category.readOnly', false)
                 ->where('subcategories.0.name', 'Presentaciones')
                 ->where('discussions.pinned.0.title', 'Normas del foro')
                 ->has('discussions.items', 1)
@@ -102,6 +105,12 @@ final class ForumPagesTest extends ModuleTestCase
 
         $this->get('/foro/c/presentaciones')
             ->assertInertia(fn (Assert $page) => $page->where('category.parent.name', 'General'));
+
+        // A read-only parent makes its subcategories read-only too
+        $this->public->makeReadOnly();
+        app(CategoryManager::class)->save($this->public);
+        $this->get('/foro/c/presentaciones')
+            ->assertInertia(fn (Assert $page) => $page->where('category.readOnly', true));
     }
 
     public function test_what_a_reader_may_not_read_is_not_found(): void

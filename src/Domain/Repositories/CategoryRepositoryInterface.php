@@ -10,6 +10,7 @@ use Modules\Forum\Domain\Exceptions\CategoryNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
+use Modules\Forum\Domain\ValueObjects\CategorySubject;
 
 interface CategoryRepositoryInterface
 {
@@ -38,6 +39,20 @@ interface CategoryRepositoryInterface
      * @throws InvalidCategoryException when its stored rules cannot be read
      */
     public function findBySystemKey(SystemCategory $key): ?Category;
+
+    /**
+     * The space of a publication (a campaign's), the oldest one should there be more.
+     *
+     * @throws InvalidCategoryException when its stored rules cannot be read
+     */
+    public function findBySubject(CategorySubject $subject): ?Category;
+
+    /**
+     * Ids of the publications of a type whose spaces still take posts, for the daily reconciliation.
+     *
+     * @return list<string>
+     */
+    public function writableSubjectIds(string $subjectType): array;
 
     /**
      * Every category in reading order: each top-level one by position, followed by its

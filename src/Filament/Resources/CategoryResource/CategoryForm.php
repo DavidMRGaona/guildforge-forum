@@ -65,6 +65,7 @@ final readonly class CategoryForm
             'write_role_ids' => $write['role_ids'] ?? [],
             'moderator_role_ids' => is_array($moderators['role_ids'] ?? null) ? $moderators['role_ids'] : [],
             'moderator_roster' => is_string($moderators['roster'] ?? null) ? $moderators['roster'] : null,
+            'read_only' => $record->read_only_by !== null,
         ];
     }
 
@@ -91,6 +92,8 @@ final readonly class CategoryForm
                 new CategoryModerators($this->list($data, 'moderator_role_ids'), $roster === null ? null : RosterScope::from($roster)),
             );
 
+            $this->applyReadOnly($category, $data);
+
             $this->manager->save($category);
         } catch (InvalidCategoryException $exception) {
             throw ValidationException::withMessages([
@@ -101,6 +104,27 @@ final readonly class CategoryForm
         }
 
         return CategoryModel::query()->findOrFail($category->id()->value);
+    }
+
+    /**
+     * By hand, read-only is moderation's: switching it on makes the mark moderation's (the forum
+     * never lifts it), switching it off lifts it whoever set it. Saving without touching it
+     * leaves the mark and who set it as they are.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyReadOnly(Category $category, array $data): void
+    {
+        $wanted = $data['read_only'] ?? null;
+        if (! is_bool($wanted) || $wanted === $category->isReadOnly()) {
+            return;
+        }
+
+        if ($wanted) {
+            $category->makeReadOnly();
+        } else {
+            $category->allowWriting();
+        }
     }
 
     /**

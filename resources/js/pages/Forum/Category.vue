@@ -15,6 +15,7 @@ import DiscussionFilters from '../../components/forum/DiscussionFilters.vue';
 import DiscussionList from '../../components/forum/DiscussionList.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import MarkReadButton from '../../components/forum/MarkReadButton.vue';
+import SpaceNotices from '../../components/spaces/SpaceNotices.vue';
 
 const props = defineProps<{
     category: ForumCategoryHeader;
@@ -66,6 +67,11 @@ const breadcrumbs = computed(() => [
                     </Link>
                 </div>
             </div>
+            <SpaceNotices
+                class="mt-4"
+                :is-publication-space="category.isPublicationSpace"
+                :read-only="category.readOnly"
+            />
         </div>
     </div>
 

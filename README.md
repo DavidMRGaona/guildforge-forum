@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones y las páginas públicas.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña y las páginas públicas.
 
 ## Qué hay
 
@@ -73,6 +73,21 @@ Cada partida suelta, campaña y evento publicados tiene su tema en el foro sin q
   - Nunca recibe nada ni se puede mencionar: lo que avise a personas (menciones, seguimiento, «me gusta», citas, correo, resumen diario) la salta con `SystemAccountInterface::isSystemAccount()`.
   - Desinstalar el módulo con sus datos borra el ajuste.
 - **Quién cerró el tema**: cada tema sabe si lo cerró el propio foro (`closed_by_system`). Cerrarlo o abrirlo a mano lo borra, así que el foro nunca abre lo que cerró la moderación.
+
+## Espacios de campaña
+
+Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar por escrito y organizarse. Lo hace `CampaignSpaceSync`, en el mismo job que el tema automático.
+
+- **Una subcategoría privada por campaña** dentro de «Campañas», ligada a la campaña (`campaign.<id>`). Se crea cuando la campaña está publicada y en marcha, nunca para una que ya terminó o se canceló. La ven y escriben en ella la plantilla y la dirección, y la modera la dirección. El tema público de la campaña sigue en «Campañas». Su nombre sigue al título de la campaña.
+- **Sin copia de la plantilla**: el acceso se pregunta al roster del core (`PublicationRosterInterface`) cada vez, así que entrar o salir de la campaña cambia el acceso al momento. Si el roster no responde, solo entra la moderación del foro.
+- **Terminada o cancelada**: el espacio pasa a solo lectura. Su plantilla y su dirección lo siguen leyendo, y la dirección lo sigue moderando, pero solo escribe quien tiene `forum:forum.moderate`.
+- **Retirada o borrada**: sin roster no hay plantilla, así que solo lo ve la moderación del foro (y queda en solo lectura). Al volver a publicarla, se recupera tal cual. Nunca se borran mensajes.
+- **Solo lectura con origen** (`read_only_by` en `forum_categories`): la pone el foro (`system`) o la moderación (`moderation`, con el interruptor «Solo lectura» del panel).
+  - El foro solo actúa cuando la campaña cambia (de en marcha a terminada, cancelada o retirada, o al revés), según lo último que vio (`space_open`). Entre medias manda la moderación.
+  - Encender el interruptor hace la marca de la moderación: el foro ya no la quita al reactivar la campaña. Apagarlo la quita, aunque la pusiera el foro. Guardar sin tocarlo no cambia nada.
+  - En una categoría en solo lectura (o con la madre en solo lectura) solo escribe quien tiene `forum:forum.moderate`, también en sus temas ocultos.
+- **Cabecera**: la página de la categoría pinta `SpaceNotices.vue` (`resources/js/components/spaces`), que dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (`isPublicationSpace` y `readOnly` de la cabecera; una madre en solo lectura cuenta).
+- **Reconciliación diaria**: la de los temas automáticos comprueba también las campañas cuyo espacio aún admite mensajes.
 
 ## Editor de mensajes
 

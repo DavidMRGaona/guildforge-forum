@@ -18,6 +18,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -31,6 +32,7 @@ use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\CategoryIcon;
+use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -171,6 +173,13 @@ final class CategoryResource extends BaseResource
                             RosterScope::Roster->value => __('forum::messages.audiences.roster'),
                         ])
                         ->visible(fn (?CategoryModel $record): bool => self::isSpace($record)),
+                    // Switching it off lifts the forum's mark too; switching it on makes it moderation's
+                    Toggle::make('read_only')
+                        ->label(__('forum::messages.categories.fields.read_only'))
+                        ->helperText(fn (?CategoryModel $record): string => $record?->read_only_by === ReadOnlyOrigin::System->value
+                            ? __('forum::messages.categories.fields.read_only_by_system')
+                            : __('forum::messages.categories.fields.read_only_help'))
+                        ->columnSpanFull(),
                 ]),
         ]);
     }

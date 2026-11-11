@@ -108,6 +108,7 @@ export default {
         spaces: {
             moderationNotice:
                 'Este espacio es privado, pero la moderación del foro puede entrar en él para atender reportes.',
+            readOnlyNotice: 'Solo lectura: ya no se puede escribir en este espacio.',
         },
         editor: {
             submit_hint: 'Ctrl + Intro para enviar',

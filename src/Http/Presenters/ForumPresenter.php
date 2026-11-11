@@ -81,11 +81,13 @@ final readonly class ForumPresenter
     {
         $category = $access->category;
         $parent = null;
+        $readOnly = $category->isReadOnly();
         $parentId = $category->parentId();
         if ($parentId instanceof CategoryId) {
             foreach ($readable as $candidate) {
                 if ($candidate->category->id()->equals($parentId)) {
                     $parent = ['name' => $candidate->category->name(), 'url' => $this->urls->category($candidate->category)];
+                    $readOnly = $readOnly || $candidate->category->isReadOnly();
                 }
             }
         }
@@ -94,6 +96,9 @@ final readonly class ForumPresenter
             ...$this->categoryBasics($category),
             'parent' => $parent,
             'canModerate' => $access->canModerate,
+            // The header tells that the forum's moderators may enter a private space, and when it takes no posts
+            'isPublicationSpace' => $category->isPublicationSpace(),
+            'readOnly' => $readOnly,
         ];
     }
 

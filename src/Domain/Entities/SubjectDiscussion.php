@@ -29,6 +29,7 @@ final class SubjectDiscussion
         private ?array $facts = null,
         private bool $live = false,
         private ?DateTimeImmutable $nextCheckAt = null,
+        private ?bool $spaceOpen = null,
     ) {}
 
     /**
@@ -53,6 +54,19 @@ final class SubjectDiscussion
     {
         $this->facts = $facts;
         $this->live = $live;
+    }
+
+    /**
+     * Whether the publication was active when its space (a campaign's) was last checked.
+     */
+    public function spaceSeenOpen(bool $open): void
+    {
+        $this->spaceOpen = $open;
+    }
+
+    public function spaceOpen(): ?bool
+    {
+        return $this->spaceOpen;
     }
 
     public function checkAt(?DateTimeImmutable $at): void

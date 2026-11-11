@@ -8,6 +8,7 @@ use App\Application\Publications\Contracts\PublicationSourceInterface;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use InvalidArgumentException;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Throwable;
@@ -15,7 +16,8 @@ use Throwable;
 /**
  * The daily catch-up: queues a check of every publication its source lists as published and not
  * over (what was published before the module was enabled, or a change whose check was lost) and
- * of every one the forum still follows that the source no longer lists (taken down, over). The
+ * of every one the forum still follows that the source no longer lists (taken down, over), and
+ * of every campaign whose space still takes posts. The
  * checks read each publication again, so a listing that fails or comes back short never takes
  * anything down by itself: a type whose listing fails is skipped (and reported).
  */
@@ -24,6 +26,7 @@ final readonly class PublicationDiscussionReconciler
     public function __construct(
         private PublicationSourceRegistryInterface $publications,
         private SubjectDiscussionRepositoryInterface $records,
+        private CategoryRepositoryInterface $categories,
         private PublicationSyncQueueInterface $queue,
     ) {}
 
@@ -52,6 +55,10 @@ final readonly class PublicationDiscussionReconciler
             }
 
             foreach ($this->records->liveIds($type) as $id) {
+                $published[$id] = true;
+            }
+
+            foreach ($this->categories->writableSubjectIds($type) as $id) {
                 $published[$id] = true;
             }
 

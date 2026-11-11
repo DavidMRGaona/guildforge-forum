@@ -96,14 +96,18 @@ defineExpose({
             {{ signInSuffix }}
         </template>
         <template v-else-if="notice === 'verify'">{{ t('forum.posts.verifyToReply') }}</template>
-        <span v-else-if="notice === 'suspended' && reply.suspension" data-testid="reply-suspended">{{
-            reply.suspension.untilLabel
-                ? t('forum.suspensions.noticeUntil', {
-                      until: reply.suspension.untilLabel,
-                      reason: reply.suspension.reason,
-                  })
-                : t('forum.suspensions.noticeForever', { reason: reply.suspension.reason })
-        }}</span>
+        <span
+            v-else-if="notice === 'suspended' && reply.suspension"
+            data-testid="reply-suspended"
+            >{{
+                reply.suspension.untilLabel
+                    ? t('forum.suspensions.noticeUntil', {
+                          until: reply.suspension.untilLabel,
+                          reason: reply.suspension.reason,
+                      })
+                    : t('forum.suspensions.noticeForever', { reason: reply.suspension.reason })
+            }}</span
+        >
         <template v-else-if="notice === 'awaiting'">{{
             t('forum.moderation.awaitingReplies')
         }}</template>

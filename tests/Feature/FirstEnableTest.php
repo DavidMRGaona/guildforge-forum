@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Feature;
 
 use App\Application\Services\SettingsServiceInterface;
+use App\Infrastructure\Navigation\Persistence\Eloquent\Models\MenuItemModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Updates\Persistence\Eloquent\Models\ModuleSeederHistoryModel;
 use App\Modules\ModuleLoader;
 use Modules\Forum\Database\Seeders\DefaultCategoriesSeeder;
+use Modules\Forum\Database\Seeders\ForumMenuLinkSeeder;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
@@ -16,8 +18,8 @@ use Tests\Support\Modules\ModuleTestCase;
 
 /**
  * Enabling the forum for the first time runs its seeders before the module is enabled, while
- * its provider has not booted yet: they must still leave the default categories and the
- * system account in place (forum#27).
+ * its provider has not booted yet: they must still leave the default categories, the system
+ * account and the menu link, with the module's texts, in place (forum#27).
  */
 final class FirstEnableTest extends ModuleTestCase
 {
@@ -51,5 +53,7 @@ final class FirstEnableTest extends ModuleTestCase
         $accountId = app(SettingsServiceInterface::class)->get(EloquentSystemAccount::SETTING);
         $this->assertIsString($accountId);
         $this->assertTrue(UserModel::query()->whereKey($accountId)->exists());
+
+        $this->assertSame('Foro', MenuItemModel::query()->where('route', ForumMenuLinkSeeder::ROUTE)->sole()->label);
     }
 }

@@ -26,7 +26,6 @@ final class DefaultCategoriesSeeder extends Seeder
             return;
         }
 
-        // Resolved here, not in the constructor: seeders are built before the provider binds
         app(DefaultCategoriesInstaller::class)->install();
         app(SystemAccountInterface::class)->id();
     }

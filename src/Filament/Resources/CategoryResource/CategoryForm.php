@@ -9,6 +9,7 @@ use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\CategoryIcon;
+use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Exceptions\CategoryNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
@@ -65,6 +66,7 @@ final readonly class CategoryForm
             'write_role_ids' => $write['role_ids'] ?? [],
             'moderator_role_ids' => is_array($moderators['role_ids'] ?? null) ? $moderators['role_ids'] : [],
             'moderator_roster' => is_string($moderators['roster'] ?? null) ? $moderators['roster'] : null,
+            'read_only' => $record->read_only_by !== null,
         ];
     }
 
@@ -91,6 +93,8 @@ final readonly class CategoryForm
                 new CategoryModerators($this->list($data, 'moderator_role_ids'), $roster === null ? null : RosterScope::from($roster)),
             );
 
+            $this->applyReadOnly($category, $data);
+
             $this->manager->save($category);
         } catch (InvalidCategoryException $exception) {
             throw ValidationException::withMessages([
@@ -101,6 +105,25 @@ final readonly class CategoryForm
         }
 
         return CategoryModel::query()->findOrFail($category->id()->value);
+    }
+
+    /**
+     * By hand, read-only is moderation's. What the forum set is left to the forum (the field is
+     * disabled then, and a disabled field sends nothing).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyReadOnly(Category $category, array $data): void
+    {
+        if ($category->readOnlyBy() === ReadOnlyOrigin::System || ! array_key_exists('read_only', $data)) {
+            return;
+        }
+
+        if ($data['read_only'] === true) {
+            $category->makeReadOnly();
+        } else {
+            $category->allowWriting();
+        }
     }
 
     /**

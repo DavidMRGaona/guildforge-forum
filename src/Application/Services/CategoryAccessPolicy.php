@@ -28,7 +28,9 @@ use Throwable;
  *
  * - Reading a subcategory needs reading its parent as well.
  * - Writing needs an account that may read the category, has no email verification pending, and
- *   is let in by the write rule or moderates the category.
+ *   is let in by the write rule or moderates the category. In a read-only category (or under a
+ *   read-only parent) only whoever moderates the whole forum writes; its own moderators still
+ *   moderate it.
  * - A category is moderated by whoever moderates the whole forum (forum:forum.moderate), by its
  *   moderators (roles, or part of its publication's roster), and by its parent's.
  * - Whoever moderates the whole forum reads and writes everywhere, so reports can be handled in
@@ -75,6 +77,10 @@ final class CategoryAccessPolicy
                 return true;
             }
 
+            if ($category->isReadOnly() || $this->parentIsReadOnly($category)) {
+                return false;
+            }
+
             return $this->reads($user, $category)
                 && ($this->matches($user, $category->writeAudience(), $category->subject()) || $this->moderatesCategory($user, $category));
         });
@@ -114,6 +120,17 @@ final class CategoryAccessPolicy
 
         // Subcategories hold no subcategories: a parent with one of its own is a broken tree
         return $parent instanceof Category && $parent->isTopLevel() && $this->matches($user, $parent->viewAudience(), $parent->subject());
+    }
+
+    private function parentIsReadOnly(Category $category): bool
+    {
+        $parentId = $category->parentId();
+        if (! $parentId instanceof CategoryId) {
+            return false;
+        }
+
+        // A parent that cannot be read lets nobody write either
+        return $this->parent($parentId)?->isReadOnly() ?? true;
     }
 
     private function moderatesCategory(Authenticatable $user, Category $category): bool

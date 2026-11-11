@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Domain\Entities;
 
+use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
@@ -59,6 +60,7 @@ final class Category
         ?CategoryModerators $moderators = null,
         private ?CategorySubject $subject = null,
         private readonly ?SystemCategory $systemKey = null,
+        private ?ReadOnlyOrigin $readOnlyBy = null,
     ) {
         $this->name = $this->checkedName($name);
         $this->description = $this->checkedDescription($description);
@@ -148,6 +150,51 @@ final class Category
         }
 
         $this->subject = $subject;
+    }
+
+    /**
+     * Read-only by hand: nobody writes in it but the forum's moderators, and the forum never
+     * lifts it by itself.
+     */
+    public function makeReadOnly(): void
+    {
+        $this->readOnlyBy = ReadOnlyOrigin::Moderation;
+    }
+
+    /**
+     * Read-only because of its publication, unless it is read-only by hand already (that stays).
+     */
+    public function makeReadOnlyBySystem(): void
+    {
+        $this->readOnlyBy ??= ReadOnlyOrigin::System;
+    }
+
+    /**
+     * Takes posts again, whoever made it read-only.
+     */
+    public function allowWriting(): void
+    {
+        $this->readOnlyBy = null;
+    }
+
+    /**
+     * Takes posts again only if the forum made it read-only; read-only by hand stays.
+     */
+    public function allowWritingBySystem(): void
+    {
+        if ($this->readOnlyBy === ReadOnlyOrigin::System) {
+            $this->readOnlyBy = null;
+        }
+    }
+
+    public function isReadOnly(): bool
+    {
+        return $this->readOnlyBy instanceof ReadOnlyOrigin;
+    }
+
+    public function readOnlyBy(): ?ReadOnlyOrigin
+    {
+        return $this->readOnlyBy;
     }
 
     public function id(): CategoryId

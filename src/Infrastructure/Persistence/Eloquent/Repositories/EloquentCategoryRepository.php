@@ -7,6 +7,7 @@ namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryIcon;
+use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Exceptions\CategoryNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
@@ -38,6 +39,7 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
             'moderators' => $category->moderators()->toArray(),
             'subject_type' => $category->subject()?->type,
             'subject_id' => $category->subject()?->id,
+            'read_only_by' => $category->readOnlyBy()?->value,
         ]);
     }
 
@@ -58,6 +60,26 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
         $model = CategoryModel::query()->where('slug', $slug->value)->first();
 
         return $model instanceof CategoryModel ? $this->toEntity($model) : null;
+    }
+
+    public function findBySubject(CategorySubject $subject): ?Category
+    {
+        $model = CategoryModel::query()->where('subject_type', $subject->type)->where('subject_id', $subject->id)->orderBy('created_at')->first();
+
+        return $model instanceof CategoryModel ? $this->toEntity($model) : null;
+    }
+
+    public function writableSubjectIds(string $subjectType): array
+    {
+        /** @var list<string> */
+        return CategoryModel::query()
+            ->where('subject_type', $subjectType)
+            ->whereNotNull('subject_id')
+            ->whereNull('read_only_by')
+            ->orderBy('subject_id')
+            ->pluck('subject_id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
     }
 
     public function findBySystemKey(SystemCategory $key): ?Category
@@ -173,6 +195,8 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
             moderators: CategoryModerators::fromArray($model->moderators ?? []),
             subject: $model->subject_type === null || $model->subject_id === null ? null : new CategorySubject($model->subject_type, $model->subject_id),
             systemKey: $systemKey,
+            // An origin it cannot read keeps it read-only, and never lifted by the forum
+            readOnlyBy: $model->read_only_by === null ? null : (ReadOnlyOrigin::tryFrom($model->read_only_by) ?? ReadOnlyOrigin::Moderation),
         );
     }
 

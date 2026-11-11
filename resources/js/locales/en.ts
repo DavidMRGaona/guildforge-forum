@@ -107,6 +107,7 @@ export default {
         spaces: {
             moderationNotice:
                 'This space is private, but the forum moderators may enter it to handle reports.',
+            readOnlyNotice: 'Read only: this space takes no more posts.',
         },
         editor: {
             submit_hint: 'Ctrl + Enter to send',

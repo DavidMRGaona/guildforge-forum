@@ -7,17 +7,18 @@ namespace Modules\Forum\Application\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\ModerationLogEntry;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Entities\SubjectDiscussion;
 use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Enums\ReportResolution;
 use Modules\Forum\Domain\Events\ForumPostApproved;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
-use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
@@ -31,8 +32,6 @@ use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
-use Modules\Forum\Domain\Entities\SubjectDiscussion;
-use Modules\Forum\Application\Contracts\ForumAccessInterface;
 
 /**
  * What moderators do in a discussion: pin, close, hide, rename, move and delete it; hide or show
@@ -41,6 +40,8 @@ use Modules\Forum\Application\Contracts\ForumAccessInterface;
  * Each action checks first that the person moderates the discussion (what they may not even read
  * is not found), runs under the writer's locks, and logs who did it in the same transaction.
  * What moderation does is marked as theirs (a close, a title), so the forum never undoes it.
+ * Acting on something already in that state (closing a closed discussion, showing a shown
+ * post) throws the domain's InvalidDiscussionException or InvalidPostException.
  */
 final readonly class ForumModeration
 {
@@ -80,7 +81,6 @@ final readonly class ForumModeration
      *
      * @throws DiscussionNotFoundException
      * @throws ForumActionDeniedException
-     * @throws InvalidDiscussionException when it is closed already
      */
     public function close(Authenticatable $moderator, DiscussionId $id, ?string $reason = null): Discussion
     {
@@ -90,7 +90,6 @@ final readonly class ForumModeration
     /**
      * @throws DiscussionNotFoundException
      * @throws ForumActionDeniedException
-     * @throws InvalidDiscussionException when it is open already
      */
     public function reopen(Authenticatable $moderator, DiscussionId $id): Discussion
     {
@@ -257,7 +256,6 @@ final readonly class ForumModeration
     /**
      * @throws PostNotFoundException
      * @throws ForumActionDeniedException
-     * @throws InvalidPostException unless it is hidden
      */
     public function showPost(Authenticatable $moderator, PostId $id): Post
     {

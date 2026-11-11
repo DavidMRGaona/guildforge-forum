@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Http\Presenters;
 
 use App\Application\Services\TimezoneServiceInterface;
+use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumSuspensions;
@@ -57,6 +58,6 @@ final readonly class ModerationProps
 
         $endsAt = $suspension->endsAt();
 
-        return ['reason' => $suspension->reason(), 'untilLabel' => $endsAt === null ? null : $this->timezone->format($endsAt)];
+        return ['reason' => $suspension->reason(), 'untilLabel' => $endsAt instanceof DateTimeImmutable ? $this->timezone->format($endsAt) : null];
     }
 }

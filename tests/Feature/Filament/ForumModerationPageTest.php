@@ -14,11 +14,13 @@ use Filament\Actions\ActionGroup;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\ReportService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\ModerationAction;
+use Modules\Forum\Domain\Enums\PostStatus;
+use Modules\Forum\Domain\Enums\ReportReason;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
@@ -27,9 +29,6 @@ use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
-use Modules\Forum\Application\Services\ReportService;
-use Modules\Forum\Domain\Enums\ReportReason;
-use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\SuspensionModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
@@ -357,7 +356,6 @@ final class ForumModerationPageTest extends ModuleTestCase
 
     private function table(string $tab): Table
     {
-        /** @var Testable $page */
         $page = Livewire::test(ForumModerationPage::class)->set('activeTab', $tab);
         $instance = $page->instance();
         $this->assertInstanceOf(HasTable::class, $instance);

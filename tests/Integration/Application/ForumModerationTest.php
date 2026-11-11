@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Application;
 
-use App\Domain\Forum\Events\ForumDiscussionStarted;
 use App\Application\Authorization\Services\AuthorizationServiceInterface;
+use App\Domain\Forum\Events\ForumDiscussionStarted;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Illuminate\Support\Facades\Event;
@@ -139,7 +139,7 @@ final class ForumModerationTest extends ModuleTestCase
     {
         $leader = $this->anAccount();
         $team = $this->aCategoryFor(CategoryAudience::everyone(), 'equipo');
-        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)], null));
+        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)]));
         app(CategoryRepositoryInterface::class)->save($team);
 
         $this->moderation()->pin($leader, $this->started($team)->id());
@@ -211,7 +211,7 @@ final class ForumModerationTest extends ModuleTestCase
     {
         $leader = $this->anAccount();
         $team = $this->aCategoryFor(CategoryAudience::everyone(), 'equipo');
-        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)], null));
+        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)]));
         app(CategoryRepositoryInterface::class)->save($team);
         $discussion = $this->started($team);
 
@@ -238,7 +238,7 @@ final class ForumModerationTest extends ModuleTestCase
     {
         $leader = $this->anAccount();
         $team = $this->aCategoryFor(CategoryAudience::everyone(), 'equipo');
-        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)], null));
+        $team->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->roleOf($leader)]));
         app(CategoryRepositoryInterface::class)->save($team);
         $discussion = $this->started($team);
         $this->aReply($discussion, '2026-11-10 18:30:00');

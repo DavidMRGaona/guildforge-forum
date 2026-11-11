@@ -28,18 +28,18 @@ use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
+use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Infrastructure\Jobs\SyncPublicationDiscussionJob;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
+use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Modules\Forum\Tests\Support\FakePublicationSource;
 use RuntimeException;
-use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
-use Modules\Forum\Domain\ValueObjects\PostId;
-use Modules\Forum\Tests\Support\BuildsForumContent;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -349,7 +349,7 @@ final class PublicationDiscussionSyncTest extends ModuleTestCase
         $this->sync();
         app(ForumWriter::class)->changeDiscussion($this->discussion()->id(), static fn (Discussion $d) => $d->pin());
 
-        $this->publish(title: 'Mesa de Arrakis', state: PublicationState::Cancelled);
+        $this->publish(state: PublicationState::Cancelled, title: 'Mesa de Arrakis');
         $this->sync();
 
         $discussion = $this->discussion();

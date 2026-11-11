@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Application;
 
-use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
-use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Application\Authorization\Services\AuthorizationServiceInterface;
-use Modules\Forum\Domain\ValueObjects\CategoryModerators;
-use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Event;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
@@ -33,10 +31,12 @@ use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Exceptions\InvalidModerationRecordException;
 use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ReportRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SuspensionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
@@ -170,7 +170,7 @@ final class ReportsAndSuspensionsTest extends ModuleTestCase
         $role = RoleModel::query()->create(['name' => 'leaders-'.strtolower(uniqid()), 'display_name' => 'Leaders']);
         $leader->roles()->attach($role->id);
         app(AuthorizationServiceInterface::class)->invalidateCacheFor($leader);
-        $this->general->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([strtolower((string) $role->id)], null));
+        $this->general->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([strtolower((string) $role->id)]));
         app(CategoryRepositoryInterface::class)->save($this->general);
         $this->forgetRequestState();
         $this->assertTrue(app(ForumAccessInterface::class)->canModerate($leader, $this->discussion));

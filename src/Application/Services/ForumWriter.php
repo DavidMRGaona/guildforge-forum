@@ -310,7 +310,7 @@ final readonly class ForumWriter
     {
         return DB::transaction(function () use ($discussionId, $change, $moveTo): Discussion {
             $stored = $this->discussions->findOrFail($discussionId);
-            $categories = $this->lockCategories(array_values(array_filter([$stored->categoryId(), $moveTo])));
+            $categories = $this->lockCategories($moveTo instanceof CategoryId ? [$stored->categoryId(), $moveTo] : [$stored->categoryId()]);
             $discussion = $this->discussions->findForUpdate($discussionId);
 
             // Moved by someone else since it was read: that category changes too

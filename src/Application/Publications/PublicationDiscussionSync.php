@@ -26,6 +26,7 @@ use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 
@@ -180,7 +181,7 @@ final readonly class PublicationDiscussionSync
         // (pinning, closing, renaming it) is never written over
         $this->writer->changeDiscussion($discussion->id(), static function (Discussion $locked) use ($title, $wantsClosed): void {
             // A title moderation gave it is theirs: the forum stops following the publication's
-            if ($title !== null && ! $locked->isTitleSetByModeration()) {
+            if ($title instanceof DiscussionTitle && ! $locked->isTitleSetByModeration()) {
                 $locked->rename($title);
             }
 
@@ -249,7 +250,7 @@ final readonly class PublicationDiscussionSync
 
         // Once a moderator edited it, the first post is theirs: the forum no longer rewrites it
         $revisions = $this->revisions->ofPost($firstPostId);
-        $last = $revisions === [] ? null : $revisions[array_key_last($revisions)];
+        $last = $revisions === [] ? null : array_last($revisions);
         if ($last !== null && ! $this->systemAccount->isSystemAccount($last->editorId())) {
             return;
         }

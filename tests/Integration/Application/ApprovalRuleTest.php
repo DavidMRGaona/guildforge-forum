@@ -83,7 +83,7 @@ final class ApprovalRuleTest extends ModuleTestCase
         $role = RoleModel::query()->create(['name' => 'leaders-'.strtolower(uniqid()), 'display_name' => 'Leaders']);
         $leader->roles()->attach($role->id);
         app(AuthorizationServiceInterface::class)->invalidateCacheFor($leader);
-        $this->category->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([strtolower((string) $role->id)], null));
+        $this->category->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([strtolower((string) $role->id)]));
         app(CategoryRepositoryInterface::class)->save($this->category);
 
         $this->assertFalse($this->rule()->needsApproval($leader, $this->category));

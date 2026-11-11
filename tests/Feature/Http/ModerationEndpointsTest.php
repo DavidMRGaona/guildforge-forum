@@ -13,7 +13,6 @@ use Inertia\Testing\AssertableInertia;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
-use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;

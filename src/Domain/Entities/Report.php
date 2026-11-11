@@ -40,8 +40,8 @@ final class Report
         ?string $resolvedBy = null,
         private ?DateTimeImmutable $resolvedAt = null,
     ) {
-        $this->reporterId = self::account($reporterId);
-        $this->resolvedBy = self::account($resolvedBy);
+        $this->reporterId = $this->account($reporterId);
+        $this->resolvedBy = $this->account($resolvedBy);
 
         $note = $note === null ? '' : trim($note);
         if (mb_strlen($note) > self::MAX_NOTE_LENGTH) {
@@ -68,7 +68,7 @@ final class Report
         }
 
         $this->resolution = $resolution;
-        $this->resolvedBy = self::account($moderatorId);
+        $this->resolvedBy = $this->account($moderatorId);
         $this->resolvedAt = $at;
     }
 
@@ -125,7 +125,7 @@ final class Report
     /**
      * @throws InvalidModerationRecordException
      */
-    private static function account(?string $id): ?string
+    private function account(?string $id): ?string
     {
         return $id === null ? null : (AccountId::normalize($id) ?? throw InvalidModerationRecordException::invalidAccount($id));
     }

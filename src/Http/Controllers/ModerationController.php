@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Application\Services\TimezoneServiceInterface;
+use App\Http\Controllers\Controller;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
@@ -60,7 +60,7 @@ final class ModerationController extends Controller
         return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
             $user = $this->user($request);
             $id = DiscussionId::fromString($discussion);
-            $reason = self::text($input, 'reason');
+            $reason = $this->text($input, 'reason');
 
             $changed = match ($input['action']) {
                 'pin' => $this->moderation->pin($user, $id),
@@ -69,8 +69,9 @@ final class ModerationController extends Controller
                 'reopen' => $this->moderation->reopen($user, $id),
                 'hide' => $this->moderation->hide($user, $id, $reason),
                 'show' => $this->moderation->show($user, $id),
-                'rename' => $this->moderation->rename($user, $id, (string) self::text($input, 'title')),
-                'move' => $this->moderation->move($user, $id, CategoryId::fromString((string) self::text($input, 'category')), $reason),
+                'rename' => $this->moderation->rename($user, $id, (string) $this->text($input, 'title')),
+                'move' => $this->moderation->move($user, $id, CategoryId::fromString((string) $this->text($input, 'category')), $reason),
+                default => abort(422),
             };
 
             return response()->json(['discussion' => $this->presentDiscussion($changed)]);
@@ -90,7 +91,7 @@ final class ModerationController extends Controller
             $id = DiscussionId::fromString($discussion);
             $category = $this->categories->find($this->moderation->moderated($user, $id)->categoryId());
 
-            $this->moderation->delete($user, $id, self::text($input, 'reason'));
+            $this->moderation->delete($user, $id, $this->text($input, 'reason'));
 
             return response()->json(['url' => $category instanceof Category ? $this->urls->category($category) : $this->urls->index()]);
         });
@@ -106,7 +107,7 @@ final class ModerationController extends Controller
         return $this->refusals(function () use ($request, $post, $input): JsonResponse {
             $user = $this->user($request);
             $id = PostId::fromString($post);
-            $reason = self::text($input, 'reason');
+            $reason = $this->text($input, 'reason');
 
             if ($input['action'] === 'reject') {
                 $this->moderation->reject($user, $id, $reason);
@@ -118,6 +119,7 @@ final class ModerationController extends Controller
                 'hide' => $this->moderation->hidePost($user, $id, $reason),
                 'show' => $this->moderation->showPost($user, $id),
                 'approve' => $this->moderation->approve($user, $id),
+                default => abort(422),
             };
 
             return response()->json(['post' => $this->presentPost($changed, $user)]);
@@ -177,7 +179,7 @@ final class ModerationController extends Controller
     /**
      * @param  array<string, mixed>  $input
      */
-    private static function text(array $input, string $key): ?string
+    private function text(array $input, string $key): ?string
     {
         $value = $input[$key] ?? null;
 

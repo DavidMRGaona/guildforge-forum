@@ -42,8 +42,8 @@ final class Suspension
         ?string $liftedBy = null,
     ) {
         $this->userId = AccountId::normalize($userId) ?? throw InvalidModerationRecordException::invalidAccount($userId);
-        $this->suspendedBy = self::account($suspendedBy);
-        $this->liftedBy = self::account($liftedBy);
+        $this->suspendedBy = $this->account($suspendedBy);
+        $this->liftedBy = $this->account($liftedBy);
 
         $reason = trim($reason);
         if ($reason === '') {
@@ -81,7 +81,7 @@ final class Suspension
         }
 
         $this->liftedAt = $at;
-        $this->liftedBy = self::account($moderatorId);
+        $this->liftedBy = $this->account($moderatorId);
     }
 
     public function id(): SuspensionId
@@ -127,7 +127,7 @@ final class Suspension
     /**
      * @throws InvalidModerationRecordException
      */
-    private static function account(?string $id): ?string
+    private function account(?string $id): ?string
     {
         return $id === null ? null : (AccountId::normalize($id) ?? throw InvalidModerationRecordException::invalidAccount($id));
     }

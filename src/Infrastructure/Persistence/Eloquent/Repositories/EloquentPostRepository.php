@@ -6,6 +6,7 @@ namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Application\Services\TimezoneServiceInterface;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\DB;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
@@ -148,12 +149,15 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             return 0;
         }
 
-        return PostModel::query()
+        // Counted over the first rows only: past the limit the number does not matter
+        $first = PostModel::query()
             ->where('author_id', strtolower($authorId))
             ->whereIn('status', [PostStatus::Visible->value, PostStatus::Deleted->value])
+            ->select('id')
             ->limit($limit)
-            ->pluck('id')
-            ->count();
+            ->toBase();
+
+        return DB::query()->fromSub($first, 'published')->count();
     }
 
     public function delete(PostId $id): void

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Models;
 
 use App\Infrastructure\Persistence\Eloquent\Concerns\StoresInstantsInStorageTimezone;
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

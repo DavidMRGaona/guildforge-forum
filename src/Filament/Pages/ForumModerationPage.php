@@ -5,26 +5,17 @@ declare(strict_types=1);
 namespace Modules\Forum\Filament\Pages;
 
 use App\Application\Services\TimezoneServiceInterface;
-use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
-use Carbon\CarbonImmutable;
-use DateTimeImmutable;
-use Filament\Forms\Components\Select;
-use Modules\Forum\Application\Services\ReportService;
-use Modules\Forum\Application\Services\SuspensionService;
-use Modules\Forum\Domain\Entities\Post;
-use Modules\Forum\Domain\Entities\Suspension;
-use Modules\Forum\Domain\Enums\ReportReason;
-use Modules\Forum\Domain\Enums\ReportResolution;
-use Modules\Forum\Domain\ValueObjects\SuspensionId;
-use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
-use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\SuspensionModel;
 use App\Filament\Actions\RowDetailsAction;
 use App\Filament\Concerns\ChecksPermissions;
 use App\Filament\Support\PanelNavigationGroup;
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use BackedEnum;
+use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -40,16 +31,25 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\ReportService;
+use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\ModerationLogEntry;
+use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Entities\Suspension;
 use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Enums\PostStatus;
+use Modules\Forum\Domain\Enums\ReportReason;
+use Modules\Forum\Domain\Enums\ReportResolution;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Domain\ValueObjects\SuspensionId;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
-use Livewire\Attributes\Url;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\SuspensionModel;
 use Throwable;
 
 /**
@@ -300,7 +300,7 @@ final class ForumModerationPage extends Page implements HasTable
             ->columns([
                 TextColumn::make('discussion.title')
                     ->label(__('forum::messages.moderation.fields.discussion'))
-                    ->description(fn (PostModel $record): ?string => $record->discussion?->awaiting_approval === true ? __('forum::messages.moderation.fields.first_post') : null)
+                    ->description(fn (PostModel $record): ?string => $record->discussion?->awaiting_approval === true ? self::label('forum::messages.moderation.fields.first_post', '') : null)
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('author.name')
@@ -349,7 +349,7 @@ final class ForumModerationPage extends Page implements HasTable
                     ->label(__('forum::messages.moderation.fields.action'))
                     ->badge()
                     ->formatStateUsing(static fn (string $state): string => self::actionLabel($state))
-                    ->description(fn (ModerationLogModel $record): ?string => self::discussionTitle($record))
+                    ->description(fn (ModerationLogModel $record): ?string => $this->discussionTitle($record))
                     ->wrap(),
                 TextColumn::make('moderator.name')
                     ->label(__('forum::messages.moderation.fields.moderator'))
@@ -371,7 +371,7 @@ final class ForumModerationPage extends Page implements HasTable
                     ->visibleFrom('xl'),
                 TextColumn::make('details')
                     ->label(__('forum::messages.moderation.fields.details'))
-                    ->state(fn (ModerationLogModel $record): ?string => self::detailsOf($record))
+                    ->state(fn (ModerationLogModel $record): ?string => $this->detailsOf($record))
                     ->placeholder(__('forum::messages.moderation.nobody'))
                     ->wrap()
                     ->visibleFrom('2xl'),
@@ -379,7 +379,7 @@ final class ForumModerationPage extends Page implements HasTable
             ->filters([
                 SelectFilter::make('action')
                     ->label(__('forum::messages.moderation.filters.action'))
-                    ->options(self::actionOptions()),
+                    ->options($this->actionOptions()),
             ])
             ->recordActions([
                 RowDetailsAction::makeIconButton(),
@@ -431,7 +431,7 @@ final class ForumModerationPage extends Page implements HasTable
                     ->native(false)
                     ->required()
                     ->default('7')
-                    ->options(self::durationOptions()),
+                    ->options($this->durationOptions()),
             ])
             ->action(function (array $data): void {
                 $days = $data['days'] ?? null;
@@ -471,15 +471,15 @@ final class ForumModerationPage extends Page implements HasTable
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int|string, string> days, and «forever» for no end
      */
-    private static function durationOptions(): array
+    private function durationOptions(): array
     {
         $options = [];
         foreach (self::SUSPENSION_DAYS as $days) {
-            $options[(string) $days] = trans_choice('forum::messages.moderation.panel.suspend_days_option', $days, ['count' => $days]);
+            $options[$days] = trans_choice('forum::messages.moderation.panel.suspend_days_option', $days, ['count' => $days]);
         }
-        $options['forever'] = __('forum::messages.moderation.panel.suspend_forever');
+        $options['forever'] = self::label('forum::messages.moderation.panel.suspend_forever', 'forever');
 
         return $options;
     }
@@ -581,7 +581,7 @@ final class ForumModerationPage extends Page implements HasTable
     /**
      * @return array<string, string>
      */
-    private static function actionOptions(): array
+    private function actionOptions(): array
     {
         $options = [];
         foreach (ModerationAction::cases() as $action) {
@@ -599,7 +599,7 @@ final class ForumModerationPage extends Page implements HasTable
         return is_string($label) ? $label : $value;
     }
 
-    private static function discussionTitle(ModerationLogModel $record): ?string
+    private function discussionTitle(ModerationLogModel $record): ?string
     {
         $title = $record->details['discussion_title'] ?? null;
         $post = $record->details['post_number'] ?? null;
@@ -611,13 +611,13 @@ final class ForumModerationPage extends Page implements HasTable
         return is_int($post) ? $title.' · '.__('forum::messages.moderation.details.post_number', ['number' => $post]) : $title;
     }
 
-    private static function detailsOf(ModerationLogModel $record): ?string
+    private function detailsOf(ModerationLogModel $record): ?string
     {
         $details = $record->details ?? [];
         $from = $details['from'] ?? null;
         $to = $details['to'] ?? null;
 
-        return match ($record->action) {
+        $text = match ($record->action) {
             ModerationAction::DiscussionRenamed->value => __('forum::messages.moderation.details.renamed', ['from' => (string) $from, 'to' => (string) $to]),
             ModerationAction::DiscussionMoved->value => __('forum::messages.moderation.details.moved', ['from' => (string) $from, 'to' => (string) $to]),
             ModerationAction::DiscussionDeleted->value => __('forum::messages.moderation.details.posts', ['count' => (int) ($details['posts'] ?? 0)]),
@@ -631,5 +631,7 @@ final class ForumModerationPage extends Page implements HasTable
                 : __('forum::messages.moderation.details.no_end'),
             default => null,
         };
+
+        return is_string($text) ? $text : null;
     }
 }

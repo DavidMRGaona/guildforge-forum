@@ -43,14 +43,14 @@ final readonly class ModerationLogEntry
         public array $details,
         public DateTimeImmutable $at,
     ) {
-        $this->moderatorId = self::account($moderatorId);
-        $this->subjectUserId = self::account($subjectUserId);
+        $this->moderatorId = $this->account($moderatorId);
+        $this->subjectUserId = $this->account($subjectUserId);
 
         $reason = $reason === null ? '' : trim($reason);
         $this->reason = $reason === '' ? null : mb_substr($reason, 0, self::MAX_REASON_LENGTH);
     }
 
-    private static function account(?string $id): ?string
+    private function account(?string $id): ?string
     {
         return $id === null ? null : (AccountId::normalize($id) ?? throw new InvalidArgumentException("Not an account id: {$id}"));
     }

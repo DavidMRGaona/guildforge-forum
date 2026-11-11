@@ -8,7 +8,7 @@
     "description": "Foro de la comunidad: categorías, temas y mensajes",
     "author": "GuildForge",
     "requires": {
-        "core": "^3.54",
+        "core": "^3.55.4",
         "php": ">=8.5",
         "laravel": ">=13.0",
         "filament": "^5.0"

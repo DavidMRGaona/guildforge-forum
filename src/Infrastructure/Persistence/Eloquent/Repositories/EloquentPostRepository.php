@@ -85,6 +85,30 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function numberedFrom(DiscussionId $discussionId, PostNumber $from, int $limit): array
+    {
+        return array_values(PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->where('number', '>=', $from->value)
+            ->orderBy('number')
+            ->limit($limit)
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all());
+    }
+
+    public function pendingIn(DiscussionId $discussionId): array
+    {
+        return array_values(PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->whereNull('number')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all());
+    }
+
     public function deletedAwaitingPurge(DateTimeImmutable $deletedBefore, int $limit): array
     {
         return array_values(PostModel::query()

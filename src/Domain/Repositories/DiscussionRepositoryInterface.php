@@ -25,6 +25,16 @@ interface DiscussionRepositoryInterface
     public function findOrFail(DiscussionId $id): Discussion;
 
     /**
+     * The discussion with the public number, the one in its address.
+     */
+    public function findByNumber(int $number): ?Discussion;
+
+    /**
+     * The number after the highest one given out.
+     */
+    public function nextNumber(): int;
+
+    /**
      * The discussion with its row locked until the surrounding transaction ends.
      *
      * @throws DiscussionNotFoundException

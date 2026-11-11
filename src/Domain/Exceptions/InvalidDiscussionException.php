@@ -23,6 +23,16 @@ final class InvalidDiscussionException extends DomainException
         return new self("A discussion title has {$max} characters at most.");
     }
 
+    public static function titleOutOfBounds(int $min, int $max): self
+    {
+        return new self("A new discussion's title has {$min} to {$max} characters.");
+    }
+
+    public static function invalidNumber(int $number): self
+    {
+        return new self("{$number} cannot be the discussion's number.");
+    }
+
     public static function invalidAuthor(string $authorId): self
     {
         return new self("'{$authorId}' is not an account id.");

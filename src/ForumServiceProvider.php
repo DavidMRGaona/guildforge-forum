@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum;
 
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
+use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Domain\Publications\Events\PublicationChanged;
@@ -24,15 +25,19 @@ use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
 use Modules\Forum\Application\Content\DocumentSchema;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
+use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -52,14 +57,18 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostR
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubjectDiscussionRepository;
 use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
+use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
+use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
+use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
+use Modules\Forum\Infrastructure\Services\EloquentDiscussionReads;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 use Modules\Forum\Infrastructure\Services\JobPublicationSyncQueue;
-use Modules\Forum\Infrastructure\Services\NoPostLinks;
+use Modules\Forum\Infrastructure\Services\RouteForumUrls;
 use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
 use Modules\Forum\Policies\CategoryPolicy;
 
@@ -104,7 +113,11 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
         $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
-        $this->app->bindIf(PostLinksInterface::class, NoPostLinks::class);
+        $this->app->bind(PostLinksInterface::class, DiscussionPostLinks::class);
+        $this->app->bind(ForumUrlsInterface::class, RouteForumUrls::class);
+        $this->app->bind(DiscussionReadsInterface::class, EloquentDiscussionReads::class);
+        $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
+        $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
 
@@ -199,6 +212,23 @@ final class ForumServiceProvider extends ModuleServiceProvider
     {
         return [
             new PagePrefixDTO(prefix: 'Forum', module: $this->moduleName(), usesCoreLayout: true),
+        ];
+    }
+
+    /**
+     * The forum's front page, for the menu editor (Sitio web → Navegación). The link itself is
+     * added once, when the module is first enabled (ForumMenuLinkSeeder).
+     *
+     * @return array<ModuleRouteDTO>
+     */
+    public function registerRoutes(): array
+    {
+        return [
+            new ModuleRouteDTO(
+                routeName: 'forum.index',
+                label: __('forum::messages.title'),
+                module: $this->moduleName(),
+            ),
         ];
     }
 

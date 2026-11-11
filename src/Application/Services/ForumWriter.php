@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Services;
 
 use DateTimeImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -39,6 +40,9 @@ final readonly class ForumWriter
     /** Deadlocks are retried by the transaction this many times */
     private const int ATTEMPTS = 3;
 
+    /** Starting a discussion is retried this many times when its public number was taken */
+    private const int NUMBER_ATTEMPTS = 5;
+
     public function __construct(
         private CategoryRepositoryInterface $categories,
         private DiscussionRepositoryInterface $discussions,
@@ -49,23 +53,42 @@ final readonly class ForumWriter
 
     /**
      * Saves a new discussion with its first post, number 1 unless it awaits approval. The post
-     * is dated when the discussion started.
+     * is dated when the discussion started. The discussion gets the next public number; should
+     * another discussion take it at the same moment, the whole write is tried again with the
+     * following one.
      */
     public function startDiscussion(Discussion $discussion, PostId $firstPostId, PostBody $body, bool $needsApproval): Post
     {
-        return DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
-            $this->categories->lockForWrite($discussion->categoryId());
-            $this->discussions->save($discussion);
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $post = DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
+                    $this->categories->lockForWrite($discussion->categoryId());
 
-            $post = $needsApproval
-                ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $body, $discussion->createdAt())
-                : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $body, $discussion->createdAt());
-            $this->posts->save($post);
+                    // Numbered on a copy: a failed attempt leaves the caller's discussion as it was
+                    $numbered = clone $discussion;
+                    if ($numbered->number() === null) {
+                        $numbered->numberAs($this->discussions->nextNumber());
+                    }
+                    $this->discussions->save($numbered);
+                    $discussion->numberAs((int) $numbered->number());
 
-            $this->refresh($discussion->id(), [$discussion->categoryId()]);
+                    $post = $needsApproval
+                        ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $body, $discussion->createdAt())
+                        : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $body, $discussion->createdAt());
+                    $this->posts->save($post);
 
-            return $post;
-        }, self::ATTEMPTS);
+                    $this->refresh($discussion->id(), [$discussion->categoryId()]);
+
+                    return $post;
+                }, self::ATTEMPTS);
+
+                return $post;
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($attempt >= self::NUMBER_ATTEMPTS || $this->discussions->find($discussion->id()) instanceof Discussion) {
+                    throw $exception;
+                }
+            }
+        }
     }
 
     /**

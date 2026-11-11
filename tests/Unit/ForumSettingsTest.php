@@ -85,4 +85,17 @@ final class ForumSettingsTest extends TestCase
             [$settings->imageMaxKilobytes(), $settings->imageMaxDimension(), $settings->imagesPerPost(), $settings->imageUploadsPerHour()],
         );
     }
+
+    public function test_announced_categories_keep_only_well_formed_ids(): void
+    {
+        config(['modules.settings.forum' => []]);
+        $this->assertSame([], (new ForumSettings)->announcedCategoryIds());
+
+        $id = '0D2F3C4B-1A2B-4C3D-8E9F-0A1B2C3D4E5F';
+        config(['modules.settings.forum' => ['announced_categories' => [$id, 'general', 42, ['x'], $id]]]);
+        $this->assertSame([strtolower($id)], (new ForumSettings)->announcedCategoryIds());
+
+        config(['modules.settings.forum' => ['announced_categories' => 'todas']]);
+        $this->assertSame([], (new ForumSettings)->announcedCategoryIds());
+    }
 }

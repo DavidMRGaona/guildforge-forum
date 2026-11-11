@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property string $id
+ * @property int|null $number
  * @property string $category_id
  * @property string|null $author_id
  * @property string $title
@@ -40,7 +41,7 @@ final class DiscussionModel extends Model
      *
      * @var list<string>
      */
-    protected $fillable = ['id', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'closed_by_system', 'created_at'];
+    protected $fillable = ['id', 'number', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'closed_by_system', 'created_at'];
 
     /**
      * @return array<string, string>
@@ -48,6 +49,7 @@ final class DiscussionModel extends Model
     protected function casts(): array
     {
         return [
+            'number' => 'integer',
             'is_pinned' => 'boolean',
             'is_hidden' => 'boolean',
             'closed_by_system' => 'boolean',

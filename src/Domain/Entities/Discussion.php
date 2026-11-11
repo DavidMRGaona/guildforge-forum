@@ -35,7 +35,12 @@ final class Discussion
         private bool $hidden,
         private readonly DateTimeImmutable $createdAt,
         private bool $closedBySystem = false,
+        private ?int $number = null,
     ) {
+        if ($number !== null && $number < 1) {
+            throw InvalidDiscussionException::invalidNumber($number);
+        }
+
         $this->authorId = $authorId === null
             ? null
             : (AccountId::normalize($authorId) ?? throw InvalidDiscussionException::invalidAuthor($authorId));
@@ -49,6 +54,28 @@ final class Discussion
     public static function start(DiscussionId $id, CategoryId $categoryId, ?string $authorId, DiscussionTitle $title, DateTimeImmutable $createdAt): self
     {
         return new self($id, $categoryId, $authorId, $title, DiscussionStatus::Open, pinned: false, hidden: false, createdAt: $createdAt);
+    }
+
+    /**
+     * Gives it its public number (the "42" of its address), once, when it is first saved.
+     *
+     * @throws InvalidDiscussionException for a number below 1 or when it has one already
+     */
+    public function numberAs(int $number): void
+    {
+        if ($number < 1 || ($this->number !== null && $this->number !== $number)) {
+            throw InvalidDiscussionException::invalidNumber($number);
+        }
+
+        $this->number = $number;
+    }
+
+    /**
+     * Its public number; null until it is first saved.
+     */
+    public function number(): ?int
+    {
+        return $this->number;
     }
 
     public function rename(DiscussionTitle $title): void

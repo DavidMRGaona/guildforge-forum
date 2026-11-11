@@ -86,7 +86,7 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
   - El foro solo actúa cuando la campaña cambia (de en marcha a terminada, cancelada o retirada, o al revés), según lo último que vio (`space_open`). Entre medias manda la moderación.
   - Encender el interruptor hace la marca de la moderación: el foro ya no la quita al reactivar la campaña. Apagarlo la quita, aunque la pusiera el foro. Guardar sin tocarlo no cambia nada.
   - En una categoría en solo lectura (o con la madre en solo lectura) solo escribe quien tiene `forum:forum.moderate`, también en sus temas ocultos.
-- **Cabecera**: `SpaceNotices.vue` (`resources/js/components/spaces`) dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (props `isPublicationSpace` y `readOnly`).
+- **Cabecera**: la página de la categoría pinta `SpaceNotices.vue` (`resources/js/components/spaces`), que dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (`isPublicationSpace` y `readOnly` de la cabecera; una madre en solo lectura cuenta).
 - **Reconciliación diaria**: la de los temas automáticos comprueba también las campañas cuyo espacio aún admite mensajes.
 
 ## Editor de mensajes

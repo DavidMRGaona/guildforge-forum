@@ -39,6 +39,8 @@ export interface ForumCategoryHeader {
     icon: string | null;
     parent: { name: string; url: string } | null;
     canModerate: boolean;
+    isPublicationSpace: boolean;
+    readOnly: boolean;
 }
 
 export interface ForumDiscussionRow {

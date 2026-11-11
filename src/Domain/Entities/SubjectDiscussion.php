@@ -14,8 +14,8 @@ use Modules\Forum\Domain\ValueObjects\PublicationKey;
  *
  * - Its facts are null until the publication got a discussion. Once it had one they stay, even
  *   if a moderator deletes the discussion: then it is never opened again.
- * - It remembers whether the forum closed the discussion itself, so that it only ever opens
- *   what it closed, never what a moderator closed.
+ * - Whether the forum closed the discussion itself is the discussion's own business
+ *   (Discussion::closeBySystem()), so a moderator closing or opening it clears it.
  */
 final class SubjectDiscussion
 {
@@ -27,7 +27,6 @@ final class SubjectDiscussion
         private ?DiscussionId $discussionId = null,
         private ?PostId $firstPostId = null,
         private ?array $facts = null,
-        private bool $closedByForum = false,
         private bool $live = false,
         private ?DateTimeImmutable $nextCheckAt = null,
     ) {}
@@ -43,7 +42,6 @@ final class SubjectDiscussion
         $this->firstPostId = $firstPostId;
         $this->facts = $facts;
         $this->live = $live;
-        $this->closedByForum = false;
     }
 
     /**
@@ -55,11 +53,6 @@ final class SubjectDiscussion
     {
         $this->facts = $facts;
         $this->live = $live;
-    }
-
-    public function closedByForum(bool $closed): void
-    {
-        $this->closedByForum = $closed;
     }
 
     public function checkAt(?DateTimeImmutable $at): void
@@ -96,11 +89,6 @@ final class SubjectDiscussion
     public function wasAnnounced(): bool
     {
         return $this->facts !== null;
-    }
-
-    public function isClosedByForum(): bool
-    {
-        return $this->closedByForum;
     }
 
     /**

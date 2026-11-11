@@ -27,7 +27,6 @@ final readonly class EloquentSubjectDiscussionRepository implements SubjectDiscu
         SubjectDiscussionModel::query()->insertOrIgnore([
             'subject_type' => $key->type,
             'subject_id' => $key->id,
-            'closed_by_forum' => false,
             'is_live' => false,
             'created_at' => $now,
             'updated_at' => $now,
@@ -63,7 +62,6 @@ final readonly class EloquentSubjectDiscussionRepository implements SubjectDiscu
             'discussion_id' => $record->discussionId()?->value,
             'first_post_id' => $record->firstPostId()?->value,
             'facts' => $record->facts(),
-            'closed_by_forum' => $record->isClosedByForum(),
             'is_live' => $record->isLive(),
             'next_check_at' => $record->nextCheckAt(),
         ]);
@@ -101,7 +99,6 @@ final readonly class EloquentSubjectDiscussionRepository implements SubjectDiscu
             $model->discussion_id === null ? null : DiscussionId::fromString($model->discussion_id),
             $model->first_post_id === null ? null : PostId::fromString($model->first_post_id),
             is_array($facts) ? $this->scalars($facts) : null,
-            $model->closed_by_forum,
             $model->is_live,
             $model->next_check_at,
         );

@@ -182,18 +182,13 @@ final readonly class PublicationDiscussionSync
 
         if ($after->wantsClosed()) {
             if ($discussion->status() === DiscussionStatus::Open) {
-                $discussion->close();
-                $record->closedByForum(true);
+                $discussion->closeBySystem();
                 $changed = true;
             }
-        } elseif ($record->isClosedByForum()) {
-            // Only what the forum closed; reopened by a moderator meanwhile, it is left as it is
-            if ($discussion->status() === DiscussionStatus::Closed) {
-                $discussion->reopen();
-                $changed = true;
-            }
-
-            $record->closedByForum(false);
+        } elseif ($discussion->isClosedBySystem()) {
+            // Only what the forum closed: a moderator closing or opening it since clears the mark
+            $discussion->reopen();
+            $changed = true;
         }
 
         if ($changed) {

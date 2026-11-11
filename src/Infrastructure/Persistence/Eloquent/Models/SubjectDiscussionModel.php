@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $discussion_id
  * @property string|null $first_post_id
  * @property array<string, mixed>|null $facts
- * @property bool $closed_by_forum
  * @property bool $is_live
  * @property CarbonImmutable|null $next_check_at
  */
@@ -36,7 +35,7 @@ final class SubjectDiscussionModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['subject_type', 'subject_id', 'discussion_id', 'first_post_id', 'facts', 'closed_by_forum', 'is_live', 'next_check_at'];
+    protected $fillable = ['subject_type', 'subject_id', 'discussion_id', 'first_post_id', 'facts', 'is_live', 'next_check_at'];
 
     /**
      * @return array<string, string>
@@ -45,7 +44,6 @@ final class SubjectDiscussionModel extends Model
     {
         return [
             'facts' => 'array',
-            'closed_by_forum' => 'boolean',
             'is_live' => 'boolean',
             'next_check_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',

@@ -6,14 +6,19 @@ namespace Modules\Forum\Infrastructure\Services;
 
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Domain\ValueObjects\AccountId;
 
 /**
  * Accounts read from the core's users. Deactivated accounts are soft deleted; anonymized ones
- * keep a row with a generic name.
+ * keep a row with a generic name. The forum's system account is never mentionable.
  */
-final class EloquentAccountDirectory implements AccountDirectoryInterface
+final readonly class EloquentAccountDirectory implements AccountDirectoryInterface
 {
+    public function __construct(
+        private SystemAccountInterface $systemAccount,
+    ) {}
+
     public function namesOf(array $accountIds): array
     {
         $ids = $this->valid($accountIds);
@@ -36,9 +41,12 @@ final class EloquentAccountDirectory implements AccountDirectoryInterface
             return [];
         }
 
-        return array_values(array_map(
-            static fn (mixed $id): string => strtolower(is_scalar($id) ? (string) $id : ''),
-            UserModel::query()->whereKey($ids)->whereNull('anonymized_at')->pluck('id')->all(),
+        return array_values(array_filter(
+            array_map(
+                static fn (mixed $id): string => strtolower(is_scalar($id) ? (string) $id : ''),
+                UserModel::query()->whereKey($ids)->whereNull('anonymized_at')->pluck('id')->all(),
+            ),
+            fn (string $id): bool => ! $this->systemAccount->isSystemAccount($id),
         ));
     }
 

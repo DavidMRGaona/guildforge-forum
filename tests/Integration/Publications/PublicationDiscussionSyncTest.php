@@ -13,6 +13,9 @@ use App\Application\Services\TimezoneServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Publications\PublicationDiscussionSync;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
@@ -30,6 +33,7 @@ use Modules\Forum\Infrastructure\Jobs\SyncPublicationDiscussionJob;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
+use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Modules\Forum\Tests\Support\FakePublicationSource;
 use RuntimeException;
@@ -327,11 +331,81 @@ final class PublicationDiscussionSyncTest extends ModuleTestCase
         $account = UserModel::query()->findOrFail(app(SystemAccountInterface::class)->id());
         $this->assertSame([], $account->roles()->pluck('name')->all());
         $this->assertNull($account->email_verified_at);
+        $this->assertStringEndsWith('@system.invalid', $account->email);
         $this->assertSame(1, UserModel::query()->count());
+        $this->assertTrue(app(SystemAccountInterface::class)->isSystemAccount(strtoupper($account->id)));
 
         app(SettingsServiceInterface::class)->set('guild_name', 'Club de ejemplo');
         $this->assertSame($account->id, app(SystemAccountInterface::class)->id());
         $this->assertSame('Club de ejemplo', $account->fresh()?->name);
+    }
+
+    public function test_an_account_deleted_or_anonymized_from_the_panel_is_replaced_on_next_use(): void
+    {
+        $first = app(SystemAccountInterface::class)->id();
+        UserModel::query()->findOrFail($first)->delete();
+
+        $second = app(SystemAccountInterface::class)->id();
+        $this->assertNotSame($first, $second);
+        $this->assertSame($second, app(SettingsServiceInterface::class)->get(EloquentSystemAccount::SETTING));
+
+        UserModel::query()->findOrFail($second)->forceFill(['anonymized_at' => now()])->save();
+
+        $third = app(SystemAccountInterface::class)->id();
+        $this->assertNotSame($second, $third);
+        $this->assertFalse(app(SystemAccountInterface::class)->isSystemAccount($second));
+    }
+
+    public function test_an_account_somebody_registered_is_never_taken_for_the_system_account(): void
+    {
+        $someone = UserModel::factory()->create(['email' => 'forum-system@system.invalid']);
+
+        $this->assertNotSame($someone->id, app(SystemAccountInterface::class)->id());
+        $this->assertFalse(app(SystemAccountInterface::class)->isSystemAccount($someone->id));
+    }
+
+    public function test_the_system_account_is_never_mentionable(): void
+    {
+        $system = app(SystemAccountInterface::class)->id();
+        UserModel::query()->findOrFail($system)->forceFill(['name' => 'Asociación', 'display_name' => 'Asociación'])->saveQuietly();
+        $someone = UserModel::factory()->create(['name' => 'Asunción', 'display_name' => null]);
+
+        $this->assertSame([strtolower($someone->id)], app(AccountDirectoryInterface::class)->mentionable([$system, $someone->id]));
+
+        $this->publish();
+        $this->sync();
+        $names = array_map(static fn ($candidate): string => $candidate->id, app(MentionCandidatesInterface::class)->search($this->discussion(), 'As', 10));
+        $this->assertNotContains($system, $names);
+        $this->assertContains(strtolower($someone->id), $names);
+    }
+
+    public function test_a_moderator_who_reopens_and_closes_again_keeps_it_closed(): void
+    {
+        $this->publish();
+        $this->sync();
+        $this->publish(state: PublicationState::Cancelled);
+        $this->sync();
+
+        $discussion = $this->discussion();
+        $discussion->reopen();
+        app(ForumWriter::class)->saveDiscussion($discussion);
+        $this->moderatorCloses();
+
+        $this->publish();
+        $this->sync();
+
+        $this->assertSame(DiscussionStatus::Closed, $this->discussion()->status());
+    }
+
+    public function test_uninstalling_with_data_forgets_the_system_account_setting(): void
+    {
+        app(SystemAccountInterface::class)->id();
+        $migration = require dirname(__DIR__, 3).'/database/migrations/2026_11_13_000001_create_forum_subject_discussions.php';
+
+        $migration->down();
+        $this->assertSame(0, DB::table('settings')->where('key', EloquentSystemAccount::SETTING)->count());
+
+        $migration->up();
     }
 
     public function test_notices_are_visible_posts_with_the_next_numbers(): void

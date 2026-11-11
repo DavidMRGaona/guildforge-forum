@@ -7,22 +7,28 @@ namespace Modules\Forum\Infrastructure\Services;
 use App\Application\Services\SettingsServiceInterface;
 use App\Application\Services\SiteBrandingServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
-use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 
 /**
- * A local account with the site's name that the forum writes with. It is given no role (not even
- * the base one) and a random password nobody knows, and its address is on a reserved domain
- * (.invalid) that can never receive mail, so nobody signs in with it. Its id is kept in the
- * settings; should it be lost, the account is found again by its address. Its name follows the
- * site's name.
+ * A local account with the site's name that the forum writes with.
+ *
+ * - It is given no role (not even the base one) and a random password nobody knows, and its
+ *   address is a random one on a reserved domain (.invalid) that never receives mail, so nobody
+ *   signs in with it.
+ * - It is known only by the id kept in the settings, never by its address: an account somebody
+ *   registered is never taken for it.
+ * - Deleted or anonymized from the panel, a new one is created the next time it is needed.
+ * - Its name follows the site's name.
  */
 final readonly class EloquentSystemAccount implements SystemAccountInterface
 {
     public const string SETTING = 'forum_system_account_id';
 
-    public const string EMAIL = 'forum-system@system.invalid';
+    public const string EMAIL_DOMAIN = 'system.invalid';
+
+    private const string LOCK = 'forum-system-account';
 
     public function __construct(
         private SettingsServiceInterface $settings,
@@ -32,20 +38,25 @@ final readonly class EloquentSystemAccount implements SystemAccountInterface
     public function id(): string
     {
         $name = $this->branding->siteName();
-        $account = $this->stored() ?? UserModel::withTrashed()->where('email', self::EMAIL)->first() ?? $this->create($name);
+        $account = $this->stored() ?? $this->create($name);
 
         if ($account->name !== $name || $account->display_name !== $name) {
             $account->forceFill(['name' => $name, 'display_name' => $name])->saveQuietly();
         }
 
-        $id = (string) $account->getKey();
-        if ($this->settings->get(self::SETTING) !== $id) {
-            $this->settings->set(self::SETTING, $id);
-        }
-
-        return $id;
+        return strtolower((string) $account->getKey());
     }
 
+    public function isSystemAccount(?string $accountId): bool
+    {
+        $id = $this->settings->get(self::SETTING);
+
+        return $accountId !== null && is_string($id) && $id !== '' && strtolower($accountId) === strtolower($id);
+    }
+
+    /**
+     * The account the settings name, while it is there and not anonymized.
+     */
     private function stored(): ?UserModel
     {
         $id = $this->settings->get(self::SETTING);
@@ -53,22 +64,30 @@ final readonly class EloquentSystemAccount implements SystemAccountInterface
             return null;
         }
 
-        return UserModel::withTrashed()->whereKey($id)->first();
+        return UserModel::query()->whereKey($id)->whereNull('anonymized_at')->first();
     }
 
     private function create(string $name): UserModel
     {
-        try {
-            return UserModel::query()->create([
-                'id' => (string) Str::uuid(),
+        // Two checks at once create one account: the second finds the first's
+        return Cache::lock(self::LOCK, 10)->block(10, function () use ($name): UserModel {
+            $this->settings->clearCache();
+            $existing = $this->stored();
+            if ($existing instanceof UserModel) {
+                return $existing;
+            }
+
+            $id = (string) Str::uuid();
+            $account = UserModel::query()->create([
+                'id' => $id,
                 'name' => $name,
                 'display_name' => $name,
-                'email' => self::EMAIL,
+                'email' => "forum-system-{$id}@".self::EMAIL_DOMAIN,
                 'password' => Str::random(64),
             ]);
-        } catch (UniqueConstraintViolationException $exception) {
-            // Created by another check at the same time
-            return UserModel::withTrashed()->where('email', self::EMAIL)->first() ?? throw $exception;
-        }
+            $this->settings->set(self::SETTING, $id);
+
+            return $account;
+        });
     }
 }

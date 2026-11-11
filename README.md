@@ -45,7 +45,12 @@ Cada partida suelta, campaña y evento publicados tiene su tema en el foro sin q
 - **En cola**: cada cambio encola `SyncPublicationDiscussionJob`, que relee la publicación al ejecutarse. Si la fuente falla, el job falla y se reintenta: nunca se toma por una retirada. Si el tipo se queda sin fuente (su módulo deshabilitado), no se toca nada. Publicar en la web nunca falla por el foro.
 - **Cierre de inscripciones a su hora**: si la publicación dice cuándo se cierran, se encola una comprobación para ese momento (una sola vez por hora de cierre).
 - **Reconciliación diaria** (`forum:sync-publications`, a las 04:40): comprueba lo que cada fuente da por publicado (`publishedIds()`) y lo que el foro sigue, para lo publicado antes de habilitar el módulo y lo que se pierda por el camino.
-- **Cuenta del sistema**: una cuenta local con el nombre del sitio (`SiteBrandingServiceInterface::siteName()`, que sigue a cada cambio), creada al habilitar el módulo. No tiene ningún rol, su contraseña es aleatoria y su dirección (`forum-system@system.invalid`) no recibe correo, así que nadie puede entrar con ella. Su id se guarda en el ajuste `forum_system_account_id`.
+- **Cuenta del sistema**: una cuenta local con el nombre del sitio (`SiteBrandingServiceInterface::siteName()`, que sigue a cada cambio), creada al habilitar el módulo.
+  - No tiene ningún rol, su contraseña es aleatoria y su dirección (`forum-system-<uuid>@system.invalid`) no recibe correo, así que nadie puede entrar con ella. `users:assign-member-role` del core le pondría `member`, que no le da acceso a nada.
+  - Se reconoce solo por su id, guardado en el ajuste `forum_system_account_id`, nunca por su dirección: una cuenta que alguien registre no se toma por ella. Si se borra o se anonimiza desde el panel, se crea otra la siguiente vez que haga falta.
+  - Nunca recibe nada ni se puede mencionar: lo que avise a personas (menciones, seguimiento, «me gusta», citas, correo, resumen diario) la salta con `SystemAccountInterface::isSystemAccount()`.
+  - Desinstalar el módulo con sus datos borra el ajuste.
+- **Quién cerró el tema**: cada tema sabe si lo cerró el propio foro (`closed_by_system`). Cerrarlo o abrirlo a mano lo borra, así que el foro nunca abre lo que cerró la moderación.
 
 ## Editor de mensajes
 

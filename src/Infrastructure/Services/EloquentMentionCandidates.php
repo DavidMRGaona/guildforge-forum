@@ -7,13 +7,15 @@ namespace Modules\Forum\Infrastructure\Services;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\DTOs\AccountSummaryDTO;
 use Modules\Forum\Domain\Entities\Discussion;
 
 /**
  * Candidates are looked up by name among mentionable accounts and then filtered by the
  * discussion's access rules, one account at a time, so only people who may read it appear.
- * A few more than needed are read, since some may be filtered out.
+ * A few more than needed are read, since some may be filtered out. The forum's system account
+ * is never offered.
  */
 final readonly class EloquentMentionCandidates implements MentionCandidatesInterface
 {
@@ -23,6 +25,7 @@ final readonly class EloquentMentionCandidates implements MentionCandidatesInter
 
     public function __construct(
         private ForumAccessInterface $access,
+        private SystemAccountInterface $systemAccount,
     ) {}
 
     public function search(Discussion $discussion, string $query, int $limit): array
@@ -49,7 +52,7 @@ final readonly class EloquentMentionCandidates implements MentionCandidatesInter
                 if (count($found) >= $limit) {
                     break 2;
                 }
-                if ($this->access->canRead($user, $discussion)) {
+                if (! $this->systemAccount->isSystemAccount($user->id) && $this->access->canRead($user, $discussion)) {
                     $found[$user->id] = new AccountSummaryDTO(strtolower($user->id), EloquentAccountDirectory::nameOf($user), $user->getFilamentAvatarUrl());
                 }
             }

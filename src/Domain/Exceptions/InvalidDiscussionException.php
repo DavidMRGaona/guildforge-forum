@@ -52,4 +52,9 @@ final class InvalidDiscussionException extends DomainException
     {
         return new self("'{$key}' is not a discussion tag: a key of up to 64 characters from [a-z0-9._-] and a label of up to 120.");
     }
+
+    public static function notAwaitingApproval(string $discussionId): self
+    {
+        return new self("Discussion {$discussionId} is not awaiting approval.");
+    }
 }

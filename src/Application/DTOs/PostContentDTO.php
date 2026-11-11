@@ -10,6 +10,8 @@ use Modules\Forum\Domain\Enums\PostStatus;
 /**
  * A post's content as one reader sees it. `html` is null when the reader may not see what it
  * says (deleted by its author, hidden by a moderator); then `placeholder` says why.
+ * `hiddenReason` is why moderation hid it, only for its author and its moderators. A moderator
+ * may edit anyone's post (`canEdit`); only its author deletes it.
  */
 final readonly class PostContentDTO
 {
@@ -23,5 +25,6 @@ final readonly class PostContentDTO
         public ?DateTimeImmutable $editedAt,
         public bool $canEdit,
         public bool $canDelete,
+        public ?string $hiddenReason = null,
     ) {}
 }

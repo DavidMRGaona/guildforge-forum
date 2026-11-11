@@ -108,6 +108,41 @@ final class DiscussionTest extends TestCase
         Discussion::start(DiscussionId::generate(), CategoryId::generate(), 'nadie', new DiscussionTitle('Hola'), new DateTimeImmutable);
     }
 
+    public function test_a_discussion_whose_first_post_awaits_approval_waits_with_it(): void
+    {
+        $discussion = $this->discussion();
+        $this->assertFalse($discussion->isAwaitingApproval());
+
+        $discussion->awaitApproval();
+
+        $this->assertTrue($discussion->isAwaitingApproval());
+        $this->assertFalse($discussion->acceptsReplies());
+
+        $discussion->approve();
+
+        $this->assertFalse($discussion->isAwaitingApproval());
+        $this->assertTrue($discussion->acceptsReplies());
+    }
+
+    public function test_only_a_waiting_discussion_is_approved(): void
+    {
+        $this->expectException(InvalidDiscussionException::class);
+
+        $this->discussion()->approve();
+    }
+
+    public function test_a_title_moderation_gave_is_marked_as_theirs(): void
+    {
+        $discussion = $this->discussion();
+        $discussion->rename(new DiscussionTitle('Del sistema'));
+        $this->assertFalse($discussion->isTitleSetByModeration());
+
+        $discussion->renameByModeration(new DiscussionTitle('De la moderación'));
+
+        $this->assertSame('De la moderación', $discussion->title()->value);
+        $this->assertTrue($discussion->isTitleSetByModeration());
+    }
+
     private function discussion(): Discussion
     {
         return Discussion::start(DiscussionId::generate(), CategoryId::generate(), null, new DiscussionTitle('Sesión del viernes'), new DateTimeImmutable('2026-11-10 20:00:00'));

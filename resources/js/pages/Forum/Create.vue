@@ -7,7 +7,12 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import { sendJson } from '../../forum/api';
-import type { ForumCategoryOption, ForumEditorSettings, ForumTopic } from '../../types/forum';
+import type {
+    ForumCategoryOption,
+    ForumEditorSettings,
+    ForumSuspensionNotice,
+    ForumTopic,
+} from '../../types/forum';
 
 const props = defineProps<{
     categories: ForumCategoryOption[];
@@ -16,6 +21,7 @@ const props = defineProps<{
     storeUrl: string;
     cancelUrl: string;
     editor: ForumEditorSettings;
+    suspension: ForumSuspensionNotice | null;
     limits: { titleMin: number; titleMax: number; topicsMax: number };
 }>();
 
@@ -117,7 +123,21 @@ async function submit(document: JSONContent): Promise<void> {
 
     <div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <EmptyState
-            v-if="categories.length === 0"
+            v-if="suspension"
+            icon="document"
+            :title="t('forum.suspensions.title_self')"
+            :description="
+                suspension.untilLabel
+                    ? t('forum.suspensions.noticeUntil', {
+                          until: suspension.untilLabel,
+                          reason: suspension.reason,
+                      })
+                    : t('forum.suspensions.noticeForever', { reason: suspension.reason })
+            "
+            data-testid="create-suspended"
+        />
+        <EmptyState
+            v-else-if="categories.length === 0"
             icon="document"
             :title="t('forum.create.noCategories')"
             :description="t('forum.create.noCategoriesDescription')"

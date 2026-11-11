@@ -40,6 +40,7 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
             'subject_type' => $category->subject()?->type,
             'subject_id' => $category->subject()?->id,
             'read_only_by' => $category->readOnlyBy()?->value,
+            'approval_threshold' => $category->approvalThreshold(),
         ]);
     }
 
@@ -197,6 +198,8 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
             systemKey: $systemKey,
             // An origin it cannot read keeps it read-only, and never lifted by the forum
             readOnlyBy: $model->read_only_by === null ? null : (ReadOnlyOrigin::tryFrom($model->read_only_by) ?? ReadOnlyOrigin::Moderation),
+            // Brought within bounds, so one stored by hand never makes the category unreadable
+            approvalThreshold: max(0, min(Category::MAX_APPROVAL_THRESHOLD, (int) $model->approval_threshold)),
         );
     }
 

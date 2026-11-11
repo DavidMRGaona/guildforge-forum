@@ -24,7 +24,8 @@ use Modules\Forum\Domain\ValueObjects\PostId;
  * Likes: one per person and post, taken back with another click. Anyone signed in who reads a
  * visible post may like it, also in a closed discussion or a read-only space, except its own
  * author, the posts of the system account and anything in a hidden discussion (posts awaiting
- * approval are not visible either). The author hears about a new like on the site.
+ * approval are not visible either), and nobody suspended in the forum. The author hears about a
+ * new like on the site.
  */
 final readonly class PostLikeService
 {
@@ -39,6 +40,7 @@ final readonly class PostLikeService
         private AccountDirectoryInterface $accounts,
         private SystemAccountInterface $systemAccount,
         private ForumNoticesInterface $notices,
+        private ForumSuspensions $suspensions,
     ) {}
 
     /**
@@ -82,7 +84,9 @@ final readonly class PostLikeService
             && $authorId !== null
             && $authorId !== $userId
             && ! $this->systemAccount->isSystemAccount($authorId)
-            && $this->access->canRead($user, $discussion);
+            && $this->access->canRead($user, $discussion)
+            // Someone suspended in the forum reads, but does not like
+            && ! $this->suspensions->isSuspended($user);
     }
 
     /**

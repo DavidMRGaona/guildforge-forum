@@ -4,14 +4,17 @@ import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { EyeOff, Lock, Pin } from '@lucide/vue';
+import { useAuth } from '@/composables/useAuth';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import ReplyBox from '../../components/forum/ReplyBox.vue';
+import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
 import { useReadTracker } from '../../composables/useReadTracker';
 import { sendJson } from '../../forum/api';
 import type {
     ForumConversation,
+    ForumDiscussionModeration,
     ForumPagination,
     ForumPost,
     ForumReplySettings,
@@ -26,9 +29,11 @@ const props = defineProps<{
     mentionNames: Record<string, string>;
     reply: ForumReplySettings;
     readUrl: string | null;
+    moderation: ForumDiscussionModeration | null;
 }>();
 
 const { t } = useI18n();
+const { user } = useAuth();
 
 const list = ref<HTMLElement | null>(null);
 const editor = ref<InstanceType<typeof ReplyBox> | null>(null);
@@ -108,12 +113,29 @@ async function send(document: JSONContent): Promise<void> {
 <template>
     <div class="bg-surface shadow">
         <div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-            <ForumBreadcrumbs :items="breadcrumbs" />
+            <div class="flex flex-wrap items-start justify-between gap-2">
+                <ForumBreadcrumbs :items="breadcrumbs" />
+                <div v-if="moderation" class="flex flex-wrap items-center gap-1">
+                    <Link
+                        :href="moderation.queueUrl"
+                        class="inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
+                        >{{ t('forum.moderation.queueLink') }}</Link
+                    >
+                    <DiscussionModeration :discussion="discussion" :moderation="moderation" />
+                </div>
+            </div>
             <h1
                 class="mt-2 text-2xl font-bold tracking-tight break-words text-base-primary sm:text-3xl"
             >
                 {{ discussion.title }}
             </h1>
+            <p
+                v-if="discussion.isAwaitingApproval"
+                class="mt-3 rounded-md border border-default bg-muted px-3 py-2 text-sm text-base-secondary"
+                data-testid="discussion-awaiting-approval"
+            >
+                {{ t('forum.moderation.awaitingApproval') }}
+            </p>
             <div
                 v-if="
                     discussion.isPinned ||
@@ -212,6 +234,10 @@ async function send(document: JSONContent): Promise<void> {
                 :editor="reply"
                 :mentions-url="reply.mentionsUrl"
                 :mention-names="mentionNames"
+                :hidden-reason-max="moderation?.limits.hiddenReasonMax"
+                :reason-max="moderation?.limits.reasonMax"
+                :suspend-url="moderation?.suspendUrl ?? null"
+                :viewer-id="user?.id ?? null"
                 @quote="onQuote"
                 @changed="refresh"
             />
@@ -253,6 +279,7 @@ async function send(document: JSONContent): Promise<void> {
                 :reply="reply"
                 :draft-key="`forum-reply-${discussion.id}`"
                 :is-closed="discussion.isClosed"
+                :is-awaiting-approval="discussion.isAwaitingApproval"
                 :label="t('forum.posts.replyLabel')"
                 :submit-label="t('forum.posts.send')"
                 :sign-in-suffix="t('forum.posts.signInToReply')"

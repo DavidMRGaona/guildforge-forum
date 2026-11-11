@@ -184,6 +184,25 @@ final class CategoryTest extends TestCase
         $this->assertSame(2, $category->position());
     }
 
+    public function test_newcomers_post_freely_until_a_threshold_is_set(): void
+    {
+        $category = $this->category();
+        $this->assertSame(0, $category->approvalThreshold());
+
+        $category->requireApprovalFor(3);
+        $this->assertSame(3, $category->approvalThreshold());
+
+        $category->requireApprovalFor(0);
+        $this->assertSame(0, $category->approvalThreshold());
+    }
+
+    public function test_the_approval_threshold_has_bounds(): void
+    {
+        $this->expectException(InvalidCategoryException::class);
+
+        $this->category()->requireApprovalFor(Category::MAX_APPROVAL_THRESHOLD + 1);
+    }
+
     private function category(): Category
     {
         return new Category(CategoryId::generate(), 'General', new CategorySlug('general'));

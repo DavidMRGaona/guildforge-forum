@@ -8,6 +8,7 @@ use App\Infrastructure\Persistence\Eloquent\Concerns\StoresInstantsInStorageTime
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $is_pinned
  * @property bool $is_hidden
  * @property bool $closed_by_system
+ * @property bool $awaiting_approval
+ * @property bool $title_by_moderation
  * @property int $post_count
  * @property string|null $last_post_id
  * @property CarbonImmutable|null $last_activity_at
@@ -41,7 +44,15 @@ final class DiscussionModel extends Model
      *
      * @var list<string>
      */
-    protected $fillable = ['id', 'number', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'closed_by_system', 'created_at'];
+    protected $fillable = ['id', 'number', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'closed_by_system', 'awaiting_approval', 'title_by_moderation', 'created_at'];
+
+    /**
+     * @return BelongsTo<CategoryModel, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(CategoryModel::class, 'category_id');
+    }
 
     /**
      * @return array<string, string>
@@ -53,6 +64,8 @@ final class DiscussionModel extends Model
             'is_pinned' => 'boolean',
             'is_hidden' => 'boolean',
             'closed_by_system' => 'boolean',
+            'awaiting_approval' => 'boolean',
+            'title_by_moderation' => 'boolean',
             'post_count' => 'integer',
             'last_activity_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',

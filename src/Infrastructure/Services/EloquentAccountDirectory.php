@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Services;
 
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Domain\ValueObjects\AccountId;
@@ -18,6 +19,14 @@ final readonly class EloquentAccountDirectory implements AccountDirectoryInterfa
     public function __construct(
         private SystemAccountInterface $systemAccount,
     ) {}
+
+    public function active(string $accountId): ?Authenticatable
+    {
+        $id = AccountId::normalize($accountId);
+        $user = $id === null ? null : UserModel::query()->find($id);
+
+        return $user instanceof UserModel && $user->anonymized_at === null ? $user : null;
+    }
 
     public function namesOf(array $accountIds): array
     {

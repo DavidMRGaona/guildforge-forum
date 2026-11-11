@@ -173,6 +173,14 @@ final class CategoryResource extends BaseResource
                             RosterScope::Roster->value => __('forum::messages.audiences.roster'),
                         ])
                         ->visible(fn (?CategoryModel $record): bool => self::isSpace($record)),
+                    TextInput::make('approval_threshold')
+                        ->label(__('forum::messages.categories.fields.approval_threshold'))
+                        ->helperText(__('forum::messages.categories.fields.approval_threshold_help'))
+                        ->integer()
+                        ->minValue(0)
+                        ->maxValue(Category::MAX_APPROVAL_THRESHOLD)
+                        ->required()
+                        ->default(0),
                     // Switching it off lifts the forum's mark too; switching it on makes it moderation's
                     Toggle::make('read_only')
                         ->label(__('forum::messages.categories.fields.read_only'))

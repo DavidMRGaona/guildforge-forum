@@ -35,6 +35,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             'edited_at' => $post->editedAt(),
             'deleted_at' => $post->deletedAt(),
             'content_purged_at' => $post->contentPurgedAt(),
+            'hidden_reason' => $post->hiddenReason(),
             'created_at' => $post->createdAt(),
         ]);
     }
@@ -141,6 +142,20 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function countPublishedBy(string $authorId, int $limit): int
+    {
+        if ($limit < 1) {
+            return 0;
+        }
+
+        return PostModel::query()
+            ->where('author_id', strtolower($authorId))
+            ->whereIn('status', [PostStatus::Visible->value, PostStatus::Deleted->value])
+            ->limit($limit)
+            ->pluck('id')
+            ->count();
+    }
+
     public function delete(PostId $id): void
     {
         PostModel::query()->whereKey($id->value)->delete();
@@ -160,6 +175,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             editedAt: $model->edited_at?->toDateTimeImmutable(),
             deletedAt: $model->deleted_at?->toDateTimeImmutable(),
             contentPurgedAt: $model->content_purged_at?->toDateTimeImmutable(),
+            hiddenReason: $model->status === PostStatus::Hidden->value ? $model->hidden_reason : null,
         );
     }
 }

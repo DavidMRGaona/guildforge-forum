@@ -15,7 +15,8 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
 /**
  * Who may do what in a discussion, by its category's access rules (CategoryAccessPolicy). A
  * hidden discussion is read and written only by its moderators. A discussion whose category
- * cannot be read answers no to everything. Bound per request, like the policy.
+ * cannot be read answers no to everything. One whose first post awaits approval is read only by
+ * its author and its moderators. Bound per request, like the policy.
  */
 final class CategoryForumAccess implements ForumAccessInterface
 {
@@ -34,7 +35,16 @@ final class CategoryForumAccess implements ForumAccessInterface
             return false;
         }
 
-        return $discussion->isHidden() ? $this->policy->canModerate($user, $category) : $this->policy->canView($user, $category);
+        if ($discussion->isHidden()) {
+            return $this->policy->canModerate($user, $category);
+        }
+
+        // Awaiting approval, only its author (who still reads the category) and its moderators see it
+        if ($discussion->isAwaitingApproval() && ! $this->isAuthor($user, $discussion)) {
+            return $this->policy->canModerate($user, $category);
+        }
+
+        return $this->policy->canView($user, $category);
     }
 
     public function canWrite(?Authenticatable $user, Discussion $discussion): bool
@@ -54,6 +64,13 @@ final class CategoryForumAccess implements ForumAccessInterface
         $category = $this->categoryOf($discussion);
 
         return $category instanceof Category && $this->policy->canModerate($user, $category);
+    }
+
+    private function isAuthor(?Authenticatable $user, Discussion $discussion): bool
+    {
+        $id = $user?->getAuthIdentifier();
+
+        return $discussion->authorId() !== null && is_string($id) && strtolower($id) === $discussion->authorId();
     }
 
     private function categoryOf(Discussion $discussion): ?Category

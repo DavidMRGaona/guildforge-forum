@@ -27,12 +27,14 @@ use Throwable;
  * (reported) all mean no.
  *
  * - Reading a subcategory needs reading its parent as well.
- * - Writing needs an account that may read the category, has no email verification pending, and
+ * - Writing needs an account that may read the category, has no email verification pending, is
+ *   not suspended in the forum (ForumSuspensions), and
  *   is let in by the write rule or moderates the category. In a read-only category (or under a
  *   read-only parent) only whoever moderates the whole forum writes; its own moderators still
  *   moderate it.
  * - A category is moderated by whoever moderates the whole forum (forum:forum.moderate), by its
- *   moderators (roles, or part of its publication's roster), and by its parent's.
+ *   moderators (roles, or part of its publication's roster), and by its parent's; never by
+ *   someone suspended in the forum.
  * - Whoever moderates the whole forum reads and writes everywhere, so reports can be handled in
  *   any category.
  *
@@ -59,6 +61,7 @@ final class CategoryAccessPolicy
         private readonly PublicationSourceRegistryInterface $publications,
         private readonly RoleRepositoryInterface $roles,
         private readonly EmailVerificationPolicyInterface $emailVerification,
+        private readonly ForumSuspensions $suspensions,
     ) {}
 
     public function canView(?Authenticatable $user, Category $category): bool
@@ -69,7 +72,7 @@ final class CategoryAccessPolicy
     public function canWrite(?Authenticatable $user, Category $category): bool
     {
         return $this->decide(function () use ($user, $category): bool {
-            if (! $user instanceof Authenticatable || $this->emailVerification->mustVerify($user)) {
+            if (! $user instanceof Authenticatable || $this->emailVerification->mustVerify($user) || $this->suspensions->isSuspended($user)) {
                 return false;
             }
 
@@ -88,8 +91,9 @@ final class CategoryAccessPolicy
 
     public function canModerate(?Authenticatable $user, Category $category): bool
     {
+        // Someone suspended in the forum moderates nothing (whoever moderates all of it is never suspended)
         return $this->decide(fn (): bool => $user instanceof Authenticatable
-            && ($this->moderatesForum($user) || ($this->reads($user, $category) && $this->moderatesCategory($user, $category))));
+            && ($this->moderatesForum($user) || (! $this->suspensions->isSuspended($user) && $this->reads($user, $category) && $this->moderatesCategory($user, $category))));
     }
 
     /**

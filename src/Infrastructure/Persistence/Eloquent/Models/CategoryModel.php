@@ -32,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $subject_type
  * @property string|null $subject_id
  * @property string|null $read_only_by
+ * @property int $approval_threshold
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -53,7 +54,7 @@ final class CategoryModel extends Model
      */
     protected $fillable = [
         'id', 'parent_id', 'name', 'slug', 'description', 'position', 'color', 'icon', 'system_key',
-        'view_rule', 'write_rule', 'moderators', 'subject_type', 'subject_id', 'read_only_by',
+        'view_rule', 'write_rule', 'moderators', 'subject_type', 'subject_id', 'read_only_by', 'approval_threshold',
     ];
 
     /**
@@ -69,6 +70,7 @@ final class CategoryModel extends Model
             'view_rule' => 'array',
             'write_rule' => 'array',
             'moderators' => 'array',
+            'approval_threshold' => 'integer',
         ];
     }
 

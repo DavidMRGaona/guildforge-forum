@@ -28,6 +28,9 @@ final class Category
 
     public const int MAX_DESCRIPTION_LENGTH = 300;
 
+    /** The most posts a newcomer may need approved before posting freely */
+    public const int MAX_APPROVAL_THRESHOLD = 50;
+
     private string $name;
 
     private ?string $description;
@@ -61,7 +64,9 @@ final class Category
         private ?CategorySubject $subject = null,
         private readonly ?SystemCategory $systemKey = null,
         private ?ReadOnlyOrigin $readOnlyBy = null,
+        private int $approvalThreshold = 0,
     ) {
+        $this->requireApprovalFor($approvalThreshold);
         $this->name = $this->checkedName($name);
         $this->description = $this->checkedDescription($description);
         $this->position = $this->checkedPosition($position);
@@ -185,6 +190,26 @@ final class Category
         if ($this->readOnlyBy === ReadOnlyOrigin::System) {
             $this->readOnlyBy = null;
         }
+    }
+
+    /**
+     * The posts of someone with fewer than this many published in the forum wait for a
+     * moderator's approval here (0: nobody waits). Its moderators never wait.
+     *
+     * @throws InvalidCategoryException out of 0 to MAX_APPROVAL_THRESHOLD
+     */
+    public function requireApprovalFor(int $posts): void
+    {
+        if ($posts < 0 || $posts > self::MAX_APPROVAL_THRESHOLD) {
+            throw InvalidCategoryException::approvalThresholdOutOfBounds(self::MAX_APPROVAL_THRESHOLD);
+        }
+
+        $this->approvalThreshold = $posts;
+    }
+
+    public function approvalThreshold(): int
+    {
+        return $this->approvalThreshold;
     }
 
     public function isReadOnly(): bool

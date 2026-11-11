@@ -7,6 +7,7 @@ namespace Modules\Forum\Http\Controllers;
 use App\Application\Seo\DTOs\SeoPageDTO;
 use App\Application\Seo\Services\SeoMetadataFactoryInterface;
 use App\Http\Controllers\Controller;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,17 +20,23 @@ use Modules\Forum\Application\DTOs\StartDiscussionDTO;
 use Modules\Forum\Application\Services\ConversationReader;
 use Modules\Forum\Application\Services\DiscussionStarter;
 use Modules\Forum\Application\Services\ForumBrowser;
+use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\SuspensionService;
+use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\ModerationLogEntry;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\DiscussionNotStartedException;
 use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
+use Modules\Forum\Http\Presenters\ModerationProps;
 use Modules\Forum\Http\Requests\StoreDiscussionRequest;
 
 /**
@@ -51,6 +58,10 @@ final class DiscussionController extends Controller
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
         private readonly EngagementPresenter $engagement,
+        private readonly ForumModeration $moderation,
+        private readonly CategoryRepositoryInterface $categories,
+        private readonly SuspensionService $suspensionService,
+        private readonly ModerationProps $moderationProps,
     ) {}
 
     public function show(Request $request, string $discussion, ?string $post = null): Response|RedirectResponse
@@ -82,17 +93,56 @@ final class DiscussionController extends Controller
         // Each page of posts is one address, whichever of its posts was asked for
         $seo['canonicalUrl'] = $this->urls->discussion($found, $page->pageStart, absolute: true);
 
+        $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
+        $conversation['posts'] = $this->moderationProps->withReportLinks($conversation['posts'], $user);
+
         return Inertia::render('Forum/Discussion', [
-            ...$this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user),
+            ...$conversation,
             'reply' => [
                 'canPost' => $page->canPost,
                 'postUrl' => route('forum.posts.store', ['discussion' => $found->id()->value]),
                 'mentionsUrl' => $user === null ? null : route('forum.mentions.index', ['discussion' => $found->id()->value]),
                 ...$this->editor->for($user),
+                'suspension' => $this->moderationProps->suspensionNotice($user),
             ],
             'readUrl' => $user === null ? null : route('forum.discussions.read', ['discussion' => $found->id()->value]),
+            'moderation' => $page->canModerate && $user !== null ? $this->moderationMenu($user, $page->discussion) : null,
             'seo' => $seo,
         ]);
+    }
+
+    /**
+     * What the discussion's moderation menu offers this moderator.
+     *
+     * @return array<string, mixed>
+     */
+    private function moderationMenu(Authenticatable $moderator, Discussion $discussion): array
+    {
+        $targets = $this->moderation->moveTargets($moderator, $discussion);
+        $names = [];
+        foreach ($this->categories->all() as $category) {
+            $names[$category->id()->value] = $category->name();
+        }
+
+        return [
+            'queueUrl' => route('forum.moderation.index'),
+            'suspendUrl' => $this->suspensionService->canSuspend($moderator) ? route('forum.suspensions.store') : null,
+            'actionsUrl' => route('forum.moderation.discussions', ['discussion' => $discussion->id()->value]),
+            'deleteUrl' => $this->moderation->canDelete($moderator, $discussion)
+                ? route('forum.moderation.discussions.destroy', ['discussion' => $discussion->id()->value])
+                : null,
+            'moveTargets' => array_map(static fn (Category $category): array => [
+                'id' => $category->id()->value,
+                'name' => $category->name(),
+                'parentName' => ($parentId = $category->parentId()) instanceof CategoryId ? ($names[$parentId->value] ?? null) : null,
+            ], $targets),
+            'limits' => [
+                'titleMin' => DiscussionStarter::MIN_TITLE_LENGTH,
+                'titleMax' => DiscussionStarter::MAX_TITLE_LENGTH,
+                'reasonMax' => ModerationLogEntry::MAX_REASON_LENGTH,
+                'hiddenReasonMax' => Post::MAX_HIDDEN_REASON_LENGTH,
+            ],
+        ];
     }
 
     public function create(Request $request): Response
@@ -121,6 +171,7 @@ final class DiscussionController extends Controller
             'storeUrl' => route('forum.discussions.store'),
             'cancelUrl' => $this->urls->index(),
             'editor' => $this->editor->for($user),
+            'suspension' => $this->moderationProps->suspensionNotice($user),
             'limits' => ['titleMin' => DiscussionStarter::MIN_TITLE_LENGTH, 'titleMax' => DiscussionStarter::MAX_TITLE_LENGTH, 'topicsMax' => DiscussionStarter::MAX_TOPICS],
             'seo' => $this->seo->forPage(new SeoPageDTO(title: __('forum::messages.pages.create_title'), noindex: true))->toArray(),
         ]);

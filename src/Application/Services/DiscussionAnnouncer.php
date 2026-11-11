@@ -17,7 +17,8 @@ use Throwable;
 
 /**
  * Tells the site's channel modules about a discussion someone started, through the core event
- * ForumDiscussionStarted, once it is saved. It fails closed: only a discussion that is shown,
+ * ForumDiscussionStarted, once it is saved (or, if it awaited approval, once approved). It fails
+ * closed: only a discussion that is shown and approved,
  * in a category guests can read and the settings chose, and that no publication opened (the
  * categories of tables, campaigns and events and the publication spaces announce through
  * their publication). Nothing personal goes out: no author.
@@ -65,6 +66,7 @@ final readonly class DiscussionAnnouncer
     private function isDue(Discussion $discussion, Category $category): bool
     {
         return ! $discussion->isHidden()
+            && ! $discussion->isAwaitingApproval()
             && ! $category->isSystem()
             && ! $category->isPublicationSpace()
             && in_array($category->id()->value, $this->settings->announcedCategoryIds(), true)

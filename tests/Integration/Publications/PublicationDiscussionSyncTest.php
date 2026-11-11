@@ -37,6 +37,9 @@ use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Modules\Forum\Tests\Support\FakePublicationSource;
 use RuntimeException;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
+use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Tests\Support\BuildsForumContent;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -46,6 +49,7 @@ use Tests\Support\Time\UsesUtcStorage;
  */
 final class PublicationDiscussionSyncTest extends ModuleTestCase
 {
+    use BuildsForumContent;
     use UsesUtcStorage;
 
     private const string ID = '0b1f8a52-5c43-4c1b-9f43-7a3a8f0a1c11';
@@ -309,6 +313,48 @@ final class PublicationDiscussionSyncTest extends ModuleTestCase
         $this->assertStringStartsWith('Partida en Arrakis.', $this->texts()[0]);
         $this->assertCount(1, $this->texts());
         $this->assertSame(1, PostRevisionModel::query()->count());
+    }
+
+    public function test_a_title_moderation_gave_is_kept_when_the_publication_is_renamed(): void
+    {
+        $this->publish();
+        $this->sync();
+        $discussion = $this->discussion();
+        app(ForumWriter::class)->changeDiscussion($discussion->id(), static fn (Discussion $d) => $d->renameByModeration(new DiscussionTitle('Título de la moderación')));
+
+        $this->publish(title: 'Mesa de Arrakis');
+        $this->sync();
+
+        $this->assertSame('Título de la moderación', $this->discussion()->title()->value);
+    }
+
+    public function test_a_first_post_a_moderator_edited_is_never_rewritten(): void
+    {
+        $this->publish();
+        $this->sync();
+        $firstPostId = app(SubjectDiscussionRepositoryInterface::class)->find($this->key())?->firstPostId();
+        $this->assertInstanceOf(PostId::class, $firstPostId);
+        $moderator = UserModel::factory()->create();
+        app(ForumWriter::class)->editPost($firstPostId, self::aBody('Corregido por la moderación'), strtolower($moderator->id), new DateTimeImmutable);
+
+        $this->publish(summary: 'Partida en Arrakis.');
+        $this->sync();
+
+        $this->assertSame('Corregido por la moderación', $this->texts()[0]);
+    }
+
+    public function test_what_a_moderator_did_meanwhile_is_never_written_over(): void
+    {
+        $this->publish();
+        $this->sync();
+        app(ForumWriter::class)->changeDiscussion($this->discussion()->id(), static fn (Discussion $d) => $d->pin());
+
+        $this->publish(title: 'Mesa de Arrakis', state: PublicationState::Cancelled);
+        $this->sync();
+
+        $discussion = $this->discussion();
+        $this->assertTrue($discussion->isPinned());
+        $this->assertTrue($discussion->isClosedBySystem());
     }
 
     public function test_a_discussion_a_moderator_deleted_is_never_opened_again(): void

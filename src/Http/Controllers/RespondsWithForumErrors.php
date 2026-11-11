@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Modules\Forum\Application\Content\DocumentLimits;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
+use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostingTooFastException;
@@ -20,7 +21,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * How the editor's JSON endpoints answer what went wrong: what the person may not read is not
  * found (404), what they may not do is forbidden (403), a document the schema refuses is 422
  * with its reason, posting too fast is 429 with Retry-After, and a post in the wrong state
- * (already deleted) is 409.
+ * (already deleted) or a discussion in the wrong state (already closed) is 409.
  */
 trait RespondsWithForumErrors
 {
@@ -43,13 +44,19 @@ trait RespondsWithForumErrors
                 'errors' => ['document' => [__("forum::messages.errors.document.{$exception->reason}")]],
             ], 422);
         } catch (PostingTooFastException $exception) {
+            $message = $exception->discussions
+                ? __('forum::messages.errors.too_many_discussions', ['minutes' => (int) ceil($exception->retryAfterSeconds / 60)])
+                : __('forum::messages.errors.too_fast', ['seconds' => $exception->retryAfterSeconds]);
+
             return response()->json(
-                ['message' => __('forum::messages.errors.too_fast', ['seconds' => $exception->retryAfterSeconds])],
+                ['message' => $message],
                 429,
                 ['Retry-After' => (string) $exception->retryAfterSeconds],
             );
         } catch (InvalidPostException) {
             return response()->json(['message' => __('forum::messages.errors.post_state')], 409);
+        } catch (InvalidDiscussionException) {
+            return response()->json(['message' => __('forum::messages.errors.discussion_state')], 409);
         }
     }
 

@@ -21,13 +21,16 @@ use Modules\Forum\Domain\ValueObjects\PostNumber;
  */
 final class Post
 {
+    public const int MAX_HIDDEN_REASON_LENGTH = 300;
+
     private readonly ?string $authorId;
 
     /**
      * @param  string|null  $authorId  the account that wrote it; null once that account is gone
      * @param  DateTimeImmutable|null  $publishedAt  when it became readable: when it was written, or approved
+     * @param  string|null  $hiddenReason  why moderation hid it, shown to its author and its moderators
      *
-     * @throws InvalidPostException when the number or publication time does not match the status, or for an author id that is not a UUID
+     * @throws InvalidPostException when the number or publication time does not match the status, for an author id that is not a UUID, or for a reason on a post that is not hidden
      */
     public function __construct(
         private readonly PostId $id,
@@ -41,7 +44,12 @@ final class Post
         private ?DateTimeImmutable $editedAt = null,
         private ?DateTimeImmutable $deletedAt = null,
         private ?DateTimeImmutable $contentPurgedAt = null,
+        private ?string $hiddenReason = null,
     ) {
+        if ($hiddenReason !== null && $status !== PostStatus::Hidden) {
+            throw InvalidPostException::reasonWithoutHiding($status);
+        }
+
         if ($status->isNumbered() !== ($number instanceof PostNumber) || $status->isNumbered() !== ($publishedAt instanceof DateTimeImmutable)) {
             throw InvalidPostException::numberMismatch($status);
         }
@@ -86,18 +94,27 @@ final class Post
     }
 
     /**
-     * Hidden by a moderator. A pending post is rejected instead (it never had a place).
+     * Hidden by a moderator, with the reason its author and moderators read (blank means none).
+     * A pending post is rejected instead (it never had a place).
      *
-     * @throws InvalidPostException unless it is visible
+     * @throws InvalidPostException unless it is visible, or for a reason too long
      */
-    public function hide(): void
+    public function hide(?string $reason = null): void
     {
         $this->assertStatus([PostStatus::Visible], 'be hidden');
 
+        $reason = $reason === null ? '' : trim($reason);
+        if (mb_strlen($reason) > self::MAX_HIDDEN_REASON_LENGTH) {
+            throw InvalidPostException::hiddenReasonTooLong(self::MAX_HIDDEN_REASON_LENGTH);
+        }
+
         $this->status = PostStatus::Hidden;
+        $this->hiddenReason = $reason === '' ? null : $reason;
     }
 
     /**
+     * Shown again: the reason it was hidden goes with it.
+     *
      * @throws InvalidPostException unless a moderator hid it
      */
     public function restore(): void
@@ -105,6 +122,13 @@ final class Post
         $this->assertStatus([PostStatus::Hidden], 'be restored');
 
         $this->status = PostStatus::Visible;
+        $this->hiddenReason = null;
+    }
+
+    /** Why moderation hid it; null unless hidden with a reason */
+    public function hiddenReason(): ?string
+    {
+        return $this->hiddenReason;
     }
 
     /**

@@ -23,7 +23,6 @@ final class ForumMenuLinkSeeder extends Seeder
 
     public function run(): void
     {
-        // Resolved here, not in the constructor: seeders are built before the providers bind
         $menu = app(MenuItemRepositoryInterface::class);
 
         foreach ($menu->all() as $item) {
@@ -31,9 +30,6 @@ final class ForumMenuLinkSeeder extends Seeder
                 return;
             }
         }
-
-        // Seeders may run before the module's translations are registered
-        app('translator')->addNamespace('forum', dirname(__DIR__, 2).'/lang');
 
         $menu->save(new MenuItem(
             id: MenuItemId::generate(),

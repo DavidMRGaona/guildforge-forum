@@ -101,6 +101,19 @@ describe('PostEditor', () => {
         ]);
     });
 
+    it('quotes into an empty editor without a blank line before the quote', async () => {
+        const wrapper = mountEditor();
+        await settle();
+        const exposed = wrapper.vm as unknown as Exposed;
+
+        exposed.quote({ postId: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', text: 'Lo que dijo' });
+
+        expect(exposed.getDocument()?.content?.map((node) => node.type)).toEqual([
+            'postQuote',
+            'paragraph',
+        ]);
+    });
+
     it('keeps a draft while writing, restores it and forgets it once cleared', async () => {
         vi.useFakeTimers();
         const first = mountEditor({ draftKey: 'discussion-1' });

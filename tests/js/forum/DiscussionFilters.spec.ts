@@ -18,7 +18,9 @@ describe('DiscussionFilters', () => {
     });
 
     it('loads the unread discussions keeping the tag', async () => {
-        const wrapper = mount(DiscussionFilters, { props: { filters: { ...FILTERS, topic: 'game-system.x' } } });
+        const wrapper = mount(DiscussionFilters, {
+            props: { filters: { ...FILTERS, topic: 'game-system.x' } },
+        });
 
         await wrapper.findAll('button')[1]?.trigger('click');
 
@@ -34,11 +36,17 @@ describe('DiscussionFilters', () => {
 
         await wrapper.find('select').setValue('game-system.x');
 
-        expect(router.get).toHaveBeenCalledWith('/foro/c/general', { etiqueta: 'game-system.x' }, expect.anything());
+        expect(router.get).toHaveBeenCalledWith(
+            '/foro/c/general',
+            { etiqueta: 'game-system.x' },
+            expect.anything()
+        );
     });
 
     it('offers no unread filter without a session', () => {
-        const wrapper = mount(DiscussionFilters, { props: { filters: { ...FILTERS, canFilterUnread: false } } });
+        const wrapper = mount(DiscussionFilters, {
+            props: { filters: { ...FILTERS, canFilterUnread: false } },
+        });
 
         expect(wrapper.find('[role="group"]').exists()).toBe(false);
         expect(wrapper.find('select').exists()).toBe(true);

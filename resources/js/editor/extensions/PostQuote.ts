@@ -48,14 +48,20 @@ export const PostQuote = Node.create({
                 (postId, content) =>
                 ({ chain, state }) =>
                     chain()
-                        .insertContentAt(state.doc.content.size, [
-                            {
-                                type: this.name,
-                                attrs: { postId },
-                                content: content.length > 0 ? content : [{ type: 'paragraph' }],
-                            },
-                            { type: 'paragraph' },
-                        ])
+                        // In an empty editor the quote takes the place of its blank paragraph
+                        .insertContentAt(
+                            state.doc.childCount === 1 && state.doc.firstChild?.content.size === 0
+                                ? { from: 0, to: state.doc.content.size }
+                                : state.doc.content.size,
+                            [
+                                {
+                                    type: this.name,
+                                    attrs: { postId },
+                                    content: content.length > 0 ? content : [{ type: 'paragraph' }],
+                                },
+                                { type: 'paragraph' },
+                            ]
+                        )
                         .focus('end')
                         .run(),
         };

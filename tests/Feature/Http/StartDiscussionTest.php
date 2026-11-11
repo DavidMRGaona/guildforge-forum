@@ -23,6 +23,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -130,8 +131,9 @@ final class StartDiscussionTest extends ModuleTestCase
         $this->start(['pinned' => true, 'closed' => true], as: $moderator)->assertCreated();
 
         $discussion = app(DiscussionRepositoryInterface::class)->findByNumber(1);
-        $this->assertTrue($discussion?->isPinned());
-        $this->assertSame(DiscussionStatus::Closed, $discussion?->status());
+        $this->assertInstanceOf(Discussion::class, $discussion);
+        $this->assertTrue($discussion->isPinned());
+        $this->assertSame(DiscussionStatus::Closed, $discussion->status());
     }
 
     public function test_a_discussion_guests_can_read_in_a_chosen_category_is_announced_once(): void
@@ -176,6 +178,7 @@ final class StartDiscussionTest extends ModuleTestCase
     /**
      * @param  array<string, mixed>  $fields
      * @param  array<string, mixed>|null  $document
+     * @return TestResponse<Response>
      */
     private function start(array $fields = [], ?array $document = null, ?UserModel $as = null): TestResponse
     {

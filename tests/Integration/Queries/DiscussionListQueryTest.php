@@ -137,10 +137,12 @@ final class DiscussionListQueryTest extends ModuleTestCase
 
         // Marking the category read covers what came before; later activity is unread again
         $reads->markCategoriesRead($reader->id, [$this->category->id()], new DateTimeImmutable('2026-11-06 00:00:00'));
-        $this->assertSame([], $this->lists()->page($this->criteria(readerId: $reader->id, onlyUnread: true))->items);
+        $this->assertSame(0, count($this->lists()->page($this->criteria(readerId: $reader->id, onlyUnread: true))->items));
 
         $this->aReply($read, '2026-11-07 10:00:00');
-        $unread = $this->lists()->page($this->criteria(readerId: $reader->id, onlyUnread: true))->items;
+        // A fresh criteria object: the same call as above now answers something else
+        $unreadOnly = $this->criteria(readerId: $reader->id, onlyUnread: true);
+        $unread = $this->lists()->page($unreadOnly)->items;
         $this->assertSame(['Leído'], $this->titles($unread));
         $this->assertSame(1, $unread[0]->lastReadNumber);
 

@@ -54,7 +54,7 @@ final readonly class ConversationReader
         }
 
         $perPage = $this->settings->postsPerPage();
-        $highest = $this->posts->highestNumber($id)?->value ?? 0;
+        $highest = $this->posts->highestNumber($id)->value ?? 0;
         $readerId = ForumBrowser::accountId($reader);
         $lastRead = $readerId === null ? null : $this->reads->readThrough($readerId, $id, $discussion->categoryId());
 
@@ -101,7 +101,7 @@ final readonly class ConversationReader
         $this->readable($reader, $id);
 
         $readerId = ForumBrowser::accountId($reader);
-        $highest = $this->posts->highestNumber($id)?->value ?? 0;
+        $highest = $this->posts->highestNumber($id)->value ?? 0;
         if ($readerId === null || $highest === 0) {
             return;
         }

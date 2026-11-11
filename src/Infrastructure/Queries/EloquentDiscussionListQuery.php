@@ -163,7 +163,7 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
     private function rows(iterable $rows): array
     {
         $rows = is_array($rows) ? $rows : iterator_to_array($rows, false);
-        $topics = $this->topicsOf(array_map(static fn (stdClass $row): string => (string) $row->id, $rows));
+        $topics = $this->topicsOf(array_values(array_map(static fn (stdClass $row): string => (string) $row->id, $rows)));
 
         return array_values(array_map(fn (stdClass $row): DiscussionRowDTO => new DiscussionRowDTO(
             id: strtolower((string) $row->id),

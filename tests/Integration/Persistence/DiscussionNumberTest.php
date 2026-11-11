@@ -46,8 +46,10 @@ final class DiscussionNumberTest extends ModuleTestCase
 
         $this->assertSame(1, $first->number());
         $this->assertSame(2, $second->number());
-        $this->assertSame(2, app(DiscussionRepositoryInterface::class)->findByNumber(2)?->number());
-        $this->assertTrue(app(DiscussionRepositoryInterface::class)->findByNumber(2)?->id()->equals($second->id()));
+        $found = app(DiscussionRepositoryInterface::class)->findByNumber(2);
+        $this->assertInstanceOf(Discussion::class, $found);
+        $this->assertSame(2, $found->number());
+        $this->assertTrue($found->id()->equals($second->id()));
         $this->assertNull(app(DiscussionRepositoryInterface::class)->findByNumber(3));
     }
 

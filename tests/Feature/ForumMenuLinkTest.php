@@ -29,12 +29,12 @@ final class ForumMenuLinkTest extends ModuleTestCase
         (new ForumMenuLinkSeeder)->run();
         (new ForumMenuLinkSeeder)->run();
 
-        $links = MenuItemModel::query()->where('route', ForumMenuLinkSeeder::ROUTE)->get();
-        $this->assertCount(1, $links);
-        $this->assertSame('forum', $links[0]->module);
-        $this->assertSame('Foro', $links[0]->label);
-        $this->assertSame('header', $links[0]->location->value);
-        $this->assertTrue($links[0]->is_active);
+        // sole() fails unless there is exactly one
+        $link = MenuItemModel::query()->where('route', ForumMenuLinkSeeder::ROUTE)->sole();
+        $this->assertSame('forum', $link->module);
+        $this->assertSame('Foro', $link->label);
+        $this->assertSame('header', $link->location->value);
+        $this->assertTrue($link->is_active);
     }
 
     public function test_a_link_moved_or_relabelled_by_an_admin_is_left_alone(): void

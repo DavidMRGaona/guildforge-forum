@@ -56,9 +56,9 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscu
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubjectDiscussionRepository;
-use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
+use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;

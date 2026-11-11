@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Exceptions\CategoryNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
@@ -24,6 +25,7 @@ final readonly class CategoryManager
         private CategoryRepositoryInterface $categories,
         private DiscussionRepositoryInterface $discussions,
         private ForumWriter $writer,
+        private ForumNoticesInterface $notices,
     ) {}
 
     /**
@@ -97,5 +99,7 @@ final readonly class CategoryManager
 
             $this->categories->delete($id);
         });
+
+        $this->notices->forgetCategory($id);
     }
 }

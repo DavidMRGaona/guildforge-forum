@@ -54,6 +54,7 @@ final readonly class CampaignSpaceSync
         private CategoryRepositoryInterface $categories,
         private CategoryManager $manager,
         private SubjectDiscussionRepositoryInterface $records,
+        private SpaceRosterFollows $rosterFollows,
     ) {}
 
     public function sync(PublicationKey $key): void
@@ -71,7 +72,7 @@ final readonly class CampaignSpaceSync
         $publication = $source->find($key->id);
         $subject = new CategorySubject($key->type, $key->id);
 
-        DB::transaction(function () use ($key, $subject, $publication): void {
+        $created = DB::transaction(function () use ($key, $subject, $publication): bool {
             $record = $this->records->lockOrCreate($key);
 
             $active = $publication instanceof PublicationDTO && $publication->state === PublicationState::Active;
@@ -83,7 +84,7 @@ final readonly class CampaignSpaceSync
                     $this->seen($record, true);
                 }
 
-                return;
+                return $active;
             }
 
             $before = [$space->readOnlyBy(), $space->name()];
@@ -105,7 +106,14 @@ final readonly class CampaignSpaceSync
             }
 
             $this->seen($record, $active);
+
+            return false;
         });
+
+        // Its roster follows the new space; later changes of the roster arrive as their own events
+        if ($created) {
+            $this->rosterFollows->welcomeRoster($key->type, $key->id);
+        }
     }
 
     private function seen(SubjectDiscussion $record, bool $open): void

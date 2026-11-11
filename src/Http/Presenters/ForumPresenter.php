@@ -10,6 +10,7 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\PostLikesDTO;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
@@ -228,6 +229,25 @@ final readonly class ForumPresenter
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
             'mentionNames' => array_intersect_key($names, $mentioned),
+        ];
+    }
+
+    /**
+     * A post's likes as the page shows them: the count, whether the reader gave one and the
+     * names of the latest ones, with how many more there are.
+     *
+     * @param  array<string, string>  $names  by account id
+     * @return array{count: int, liked: bool, names: list<string>, others: int}
+     */
+    public static function likes(PostLikesDTO $likes, array $names): array
+    {
+        $shown = array_values(array_filter(array_map(static fn (string $id): ?string => $names[$id] ?? null, $likes->latestAccountIds), is_string(...)));
+
+        return [
+            'count' => $likes->count,
+            'liked' => $likes->likedByViewer,
+            'names' => $shown,
+            'others' => max(0, $likes->count - count($shown)),
         ];
     }
 

@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Forum\Http\Presenters;
+
+use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\PostLikesDTO;
+use Modules\Forum\Application\Services\FollowService;
+use Modules\Forum\Application\Services\PostLikeService;
+use Modules\Forum\Domain\Entities\Category;
+
+/**
+ * Likes and follows on the forum's pages: each post's likes, how the reader follows the
+ * discussion and whether they follow a category. Guests see the likes but follow nothing.
+ */
+final readonly class EngagementPresenter
+{
+    public function __construct(
+        private PostLikeService $likes,
+        private FollowService $follows,
+    ) {}
+
+    /**
+     * Adds `likes` to each post and `follow` to the discussion of the conversation's props.
+     *
+     * @param  array<string, mixed>  $props  as ForumPresenter::conversation() built them
+     * @return array<string, mixed>
+     */
+    public function conversation(array $props, ConversationPageDTO $page, ?Authenticatable $reader): array
+    {
+        $likes = $this->likes->forPosts($reader, $page->posts);
+        $names = $this->likes->namesOf($likes);
+
+        /** @var list<array<string, mixed>> $posts */
+        $posts = is_array($props['posts'] ?? null) ? $props['posts'] : [];
+        foreach ($page->posts as $index => $post) {
+            if (! isset($posts[$index])) {
+                continue;
+            }
+
+            $canLike = $this->likes->canLike($reader, $post, $page->discussion);
+            $posts[$index]['likes'] = [
+                ...ForumPresenter::likes($likes[$post->id()->value] ?? PostLikesDTO::none(), $names),
+                'canLike' => $canLike,
+                'url' => $canLike || ($likes[$post->id()->value] ?? null)?->likedByViewer === true
+                    ? route('forum.posts.like', ['post' => $post->id()->value])
+                    : null,
+            ];
+        }
+        $props['posts'] = $posts;
+
+        /** @var array<string, mixed> $discussion */
+        $discussion = is_array($props['discussion'] ?? null) ? $props['discussion'] : [];
+        $discussion['follow'] = $reader instanceof Authenticatable ? [
+            'level' => $this->follows->levelOf($reader, $page->discussion)->value,
+            'url' => route('forum.discussions.follow', ['discussion' => $page->discussion->id()->value]),
+        ] : null;
+        $props['discussion'] = $discussion;
+
+        return $props;
+    }
+
+    /**
+     * @return array{following: bool, url: string}|null
+     */
+    public function categoryFollow(?Authenticatable $reader, Category $category): ?array
+    {
+        return $reader instanceof Authenticatable ? [
+            'following' => $this->follows->followsCategory($reader, $category),
+            'url' => route('forum.categories.follow', ['category' => $category->slug()->value]),
+        ] : null;
+    }
+}

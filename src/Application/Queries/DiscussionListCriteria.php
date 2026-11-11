@@ -19,6 +19,7 @@ final readonly class DiscussionListCriteria
      * @param  list<string>  $moderatedCategoryIds
      * @param  string|null  $readerId  the signed-in reader, whose read marks are joined in
      * @param  bool  $pinnedFirst  pinned discussions come apart, before the others, on the first page
+     * @param  bool  $onlyFollowed  only the discussions the reader follows («Siguiendo»)
      */
     public function __construct(
         public array $categoryIds,
@@ -29,6 +30,7 @@ final readonly class DiscussionListCriteria
         public ?string $topicKey = null,
         public bool $pinnedFirst = false,
         public ?DiscussionCursor $after = null,
+        public bool $onlyFollowed = false,
     ) {
         if ($limit < 1) {
             throw new InvalidArgumentException('A discussion list needs a positive limit.');
@@ -36,6 +38,10 @@ final readonly class DiscussionListCriteria
 
         if ($onlyUnread && $readerId === null) {
             throw new InvalidArgumentException('Only a signed-in reader has unread discussions.');
+        }
+
+        if ($onlyFollowed && $readerId === null) {
+            throw new InvalidArgumentException('Only a signed-in reader follows discussions.');
         }
     }
 }

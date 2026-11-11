@@ -49,6 +49,7 @@ final readonly class PostingService
         private AccountDirectoryInterface $accounts,
         private MentionCandidatesInterface $mentionCandidates,
         private DiscussionReadsInterface $reads,
+        private FollowService $follows,
     ) {}
 
     /**
@@ -68,11 +69,12 @@ final readonly class PostingService
         $now = CarbonImmutable::now();
         $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: false);
 
-        // Whoever replies has read the discussion up to their reply
+        // Whoever replies has read the discussion up to their reply, and follows it from now on
         $number = $post->number()?->value;
         if ($number !== null) {
             $this->reads->advance($this->accountId($author), $discussionId, $number, $now);
         }
+        $this->follows->followAfterPosting($this->accountId($author), $discussionId);
 
         return $post;
     }

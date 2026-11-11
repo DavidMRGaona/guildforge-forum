@@ -252,4 +252,57 @@ return [
             'republished' => 'Se ha vuelto a publicar en la web.',
         ],
     ],
+
+    'notices' => [
+        'someone' => 'Alguien',
+        'categories' => [
+            'section' => 'Foro',
+            'replies' => [
+                'label' => 'Respuestas en temas que sigues',
+                'description' => 'Cuando alguien responde en un tema que sigues. Por correo, uno por tema hasta que lo vuelvas a leer.',
+            ],
+            'discussions' => [
+                'label' => 'Temas nuevos y espacios de campaña',
+                'description' => 'Temas nuevos en las categorías que sigues y los espacios de campaña en los que puedes entrar.',
+            ],
+            'mentions' => [
+                'label' => 'Menciones y citas',
+                'description' => 'Cuando alguien te menciona o cita un mensaje tuyo.',
+            ],
+            'likes' => [
+                'label' => 'Me gusta',
+                'description' => 'Cuando a alguien le gusta un mensaje tuyo. Solo en la web.',
+            ],
+        ],
+        'subjects' => [
+            'discussion' => 'Tema del foro',
+            'category' => 'Categoría del foro',
+        ],
+        'mail' => [
+            'greeting' => 'Hola:',
+            'action' => 'Ver el mensaje',
+        ],
+        'reply' => [
+            'title' => ':author ha respondido en «:discussion»',
+            'grouped' => '{1} :author y otra persona han respondido en «:discussion»|[2,*] :author y :count personas más han respondido en «:discussion»',
+            'grouped_same' => '{1} :author ha respondido en «:discussion»|[2,*] :author ha escrito :count respuestas en «:discussion»',
+        ],
+        'discussion' => [
+            'title' => ':author ha abierto «:discussion» en :category',
+            'grouped' => '{1} Hay un tema nuevo en :category|[2,*] Hay :count temas nuevos en :category',
+        ],
+        'mention' => [
+            'title' => ':author te ha mencionado en «:discussion»',
+        ],
+        'quote' => [
+            'title' => ':author ha citado tu mensaje en «:discussion»',
+        ],
+        'like' => [
+            'title' => 'A :liker le ha gustado tu mensaje en «:discussion»',
+            'grouped' => '{1} A :liker y a otra persona les ha gustado tu mensaje en «:discussion»|[2,*] A :liker y a :count personas más les ha gustado tu mensaje en «:discussion»',
+        ],
+        'space' => [
+            'title' => 'Te han añadido a la campaña «:campaign»: ya puedes entrar en su espacio del foro',
+        ],
+    ],
 ];

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Forum;
 
+use App\Application\Mail\DTOs\MailCategoryDTO;
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
 use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
+use App\Application\Modules\DTOs\SlotRegistrationDTO;
 use App\Domain\Publications\Events\PublicationChanged;
 use App\Domain\Publications\Events\PublicationRemoved;
+use App\Domain\Publications\Events\PublicationRosterChanged;
 use App\Infrastructure\Media\Observers\RefreshMediaUsagesObserver;
 use App\Modules\ModuleServiceProvider;
 use Filament\Pages\Page;
@@ -26,12 +29,15 @@ use Modules\Forum\Application\Content\DocumentSchema;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
+use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
+use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
+use Modules\Forum\Application\Contracts\PostLikesInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
@@ -48,6 +54,7 @@ use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
+use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
@@ -63,13 +70,17 @@ use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
 use Modules\Forum\Infrastructure\Services\EloquentDiscussionReads;
+use Modules\Forum\Infrastructure\Services\EloquentFollows;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
+use Modules\Forum\Infrastructure\Services\EloquentPostLikes;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 use Modules\Forum\Infrastructure\Services\JobPublicationSyncQueue;
+use Modules\Forum\Infrastructure\Services\QueuedForumNotices;
 use Modules\Forum\Infrastructure\Services\RouteForumUrls;
 use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
+use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Policies\CategoryPolicy;
 
 final class ForumServiceProvider extends ModuleServiceProvider
@@ -116,6 +127,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostLinksInterface::class, DiscussionPostLinks::class);
         $this->app->bind(ForumUrlsInterface::class, RouteForumUrls::class);
         $this->app->bind(DiscussionReadsInterface::class, EloquentDiscussionReads::class);
+        $this->app->bind(PostLikesInterface::class, EloquentPostLikes::class);
+        $this->app->bind(FollowsInterface::class, EloquentFollows::class);
+        $this->app->bind(ForumNoticesInterface::class, QueuedForumNotices::class);
         $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
         // The category rules, per request like the policy they read
@@ -150,6 +164,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // Game tables, campaigns and events get their discussion; each change is checked in the queue
         Event::listen(PublicationChanged::class, [QueuePublicationDiscussionSync::class, 'handle']);
         Event::listen(PublicationRemoved::class, [QueuePublicationDiscussionSync::class, 'handle']);
+        // Joining a campaign follows its space (and tells so); leaving it ends that follow
+        Event::listen(PublicationRosterChanged::class, [QueueSpaceRosterSync::class, 'handle']);
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
@@ -173,6 +189,41 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerMediaSources(): array
     {
         return [PostImageMediaSource::class];
+    }
+
+    /**
+     * The «Foro» section of the profile's notices: replies, new discussions, mentions and likes.
+     *
+     * @return list<MailCategoryDTO>
+     */
+    public function registerMailCategories(): array
+    {
+        return ForumMailCategories::all();
+    }
+
+    /**
+     * The «Foro» tab of the profile: following after posting, and what the person follows. The
+     * section loads GET /foro/preferencias itself.
+     *
+     * @return array<SlotRegistrationDTO>
+     */
+    public function registerSlots(): array
+    {
+        return [
+            new SlotRegistrationDTO(
+                slot: 'profile-sections',
+                component: 'components/profile/ForumPreferences.vue',
+                module: $this->moduleName(),
+                order: 40,
+                props: [],
+                dataKeys: [],
+                profileTab: [
+                    'tabId' => 'forum',
+                    'icon' => 'cog',
+                    'labelKey' => 'forum.preferences.tabLabel',
+                ],
+            ),
+        ];
     }
 
     /**

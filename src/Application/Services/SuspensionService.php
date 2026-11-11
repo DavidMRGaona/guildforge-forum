@@ -124,9 +124,9 @@ final readonly class SuspensionService
         // Nobody lifts their own suspension, and only an admin lifts one an admin made or one of
         // someone who moderates the whole forum
         $target = $this->accounts->active($suspension->userId());
-        $suspendedByAdmin = $suspension->suspendedBy() !== null
-            && ($by = $this->accounts->active($suspension->suspendedBy())) instanceof Authenticatable
-            && $this->isAdmin($by);
+        // Fails closed: a suspender who cannot be told any more (account gone) counts as an admin
+        $suspender = $suspension->suspendedBy() === null ? null : $this->accounts->active($suspension->suspendedBy());
+        $suspendedByAdmin = ! $suspender instanceof Authenticatable || $this->isAdmin($suspender);
         if ($suspension->userId() === ForumBrowser::accountId($moderator)
             || (! $this->isAdmin($moderator) && ($suspendedByAdmin || ($target instanceof Authenticatable && $this->holdsForumModeration($target))))) {
             throw ForumActionDeniedException::because('lift this suspension');

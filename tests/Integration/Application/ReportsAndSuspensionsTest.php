@@ -330,6 +330,17 @@ final class ReportsAndSuspensionsTest extends ModuleTestCase
         $this->suspensions()->lift($admin, $byAdmin->id());
         $this->assertNotNull(app(SuspensionRepositoryInterface::class)->find($byAdmin->id())?->liftedAt());
 
+        // One whose suspender is gone counts as an admin's
+        $gone = $this->anAccount(self::MODERATE);
+        $orphan = $this->suspensions()->suspend($gone, $member->id, 'Spam', null);
+        $gone->delete();
+        try {
+            $this->suspensions()->lift($this->moderator, $orphan->id());
+            $this->fail('A moderator lifted a suspension whose suspender is gone.');
+        } catch (ForumActionDeniedException) {
+        }
+        $this->suspensions()->lift($admin, $orphan->id());
+
         // What a moderator decided, another moderator may lift
         $byModerator = $this->suspensions()->suspend($this->moderator, $member->id, 'Spam', null);
         $this->suspensions()->lift($this->anAccount(self::MODERATE), $byModerator->id());

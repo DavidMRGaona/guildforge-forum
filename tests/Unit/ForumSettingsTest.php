@@ -38,4 +38,24 @@ final class ForumSettingsTest extends TestCase
         $this->assertSame($expected, (new ForumSettings)->discussionsPerPage());
         $this->assertSame($expected, (new ForumSettings)->postsPerPage());
     }
+
+    /**
+     * @return iterable<string, array{mixed, int}>
+     */
+    public static function storedPostRates(): iterable
+    {
+        yield 'unset' => [null, ForumSettings::DEFAULT_POSTS_PER_MINUTE];
+        yield 'within bounds' => [10, 10];
+        yield 'below the minimum' => [0, ForumSettings::MIN_POSTS_PER_MINUTE];
+        yield 'above the maximum' => [1000, ForumSettings::MAX_POSTS_PER_MINUTE];
+        yield 'not a number' => ['muchos', ForumSettings::DEFAULT_POSTS_PER_MINUTE];
+    }
+
+    #[DataProvider('storedPostRates')]
+    public function test_the_posts_per_minute_are_kept_within_bounds(mixed $stored, int $expected): void
+    {
+        config(['modules.settings.forum' => ['posts_per_minute' => $stored]]);
+
+        $this->assertSame($expected, (new ForumSettings)->postsPerMinute());
+    }
 }

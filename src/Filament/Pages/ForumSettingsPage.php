@@ -82,6 +82,17 @@ final class ForumSettingsPage extends Page implements HasForms
                         $this->pageSizeField('discussions_per_page'),
                         $this->pageSizeField('posts_per_page'),
                     ]),
+                Section::make(__('forum::messages.settings.posting'))
+                    ->schema([
+                        TextInput::make('posts_per_minute')
+                            ->label(__('forum::messages.settings.posts_per_minute'))
+                            ->helperText(__('forum::messages.settings.posts_per_minute_help', ['min' => ForumSettings::MIN_POSTS_PER_MINUTE, 'max' => ForumSettings::MAX_POSTS_PER_MINUTE]))
+                            ->integer()
+                            ->minValue(ForumSettings::MIN_POSTS_PER_MINUTE)
+                            ->maxValue(ForumSettings::MAX_POSTS_PER_MINUTE)
+                            ->required()
+                            ->default(ForumSettings::DEFAULT_POSTS_PER_MINUTE),
+                    ]),
             ])
             ->statePath('data');
     }

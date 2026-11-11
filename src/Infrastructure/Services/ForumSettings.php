@@ -19,6 +19,12 @@ final readonly class ForumSettings implements ForumSettingsInterface
 
     public const int MAX_PAGE_SIZE = 100;
 
+    public const int DEFAULT_POSTS_PER_MINUTE = 6;
+
+    public const int MIN_POSTS_PER_MINUTE = 1;
+
+    public const int MAX_POSTS_PER_MINUTE = 60;
+
     public function discussionsPerPage(): int
     {
         return $this->pageSize('discussions_per_page');
@@ -29,12 +35,20 @@ final readonly class ForumSettings implements ForumSettingsInterface
         return $this->pageSize('posts_per_page');
     }
 
+    public function postsPerMinute(): int
+    {
+        return $this->bounded('posts_per_minute', self::MIN_POSTS_PER_MINUTE, self::MAX_POSTS_PER_MINUTE, self::DEFAULT_POSTS_PER_MINUTE);
+    }
+
     private function pageSize(string $key): int
+    {
+        return $this->bounded($key, self::MIN_PAGE_SIZE, self::MAX_PAGE_SIZE, self::DEFAULT_PAGE_SIZE);
+    }
+
+    private function bounded(string $key, int $min, int $max, int $default): int
     {
         $value = config("modules.settings.forum.{$key}");
 
-        return is_numeric($value)
-            ? max(self::MIN_PAGE_SIZE, min(self::MAX_PAGE_SIZE, (int) $value))
-            : self::DEFAULT_PAGE_SIZE;
+        return is_numeric($value) ? max($min, min($max, (int) $value)) : $default;
     }
 }

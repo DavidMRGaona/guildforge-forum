@@ -1,0 +1,446 @@
+<script setup lang="ts">
+import type { AnyExtension, JSONContent } from '@tiptap/core';
+import { EditorContent, useEditor } from '@tiptap/vue-3';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import { buildImageUrl } from '@/utils/cloudinary';
+import { csrfHeaders, isCsrfFailure } from '@/utils/csrf';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { isDocumentEmpty, MAX_IMAGES, normalizeHref, storedImageUrl } from '../../editor/document';
+import { postDraft } from '../../editor/draft';
+import EditorToolbar from '../../editor/EditorToolbar.vue';
+import { createForumExtensions } from '../../editor/extensions';
+import { paragraphsFromText } from '../../editor/extensions/PostQuote';
+import { mentionSuggestion } from '../../editor/mentionSuggestion';
+import type { MentionCandidate, QuoteSource, ToolbarItem, UploadedImage } from '../../editor/types';
+
+/**
+ * The forum's post editor. It edits the document the server stores (TipTap JSON checked
+ * against the server's schema, never HTML) and leaves sending it to the page: `submit` gives
+ * the document, and the page calls `clear()` once it is published.
+ *
+ * Other features add nodes through `extensions` (with their node type registered on the
+ * server) and buttons through `toolbarItems`.
+ */
+const props = withDefaults(
+    defineProps<{
+        /** Accessible name of the writing area («Tu respuesta») */
+        label: string;
+        /** The document to start from (editing a post); a saved draft wins over it */
+        modelValue?: JSONContent | null;
+        placeholder?: string;
+        /** Where the draft is kept in this browser (one per discussion, or per post being edited); null keeps none */
+        draftKey?: string | null;
+        /** The discussion's mention candidates endpoint; null offers no mentions */
+        mentionsUrl?: string | null;
+        /** The image upload endpoint; null offers no images */
+        uploadUrl?: string | null;
+        /** Names of the accounts the starting document mentions, by id */
+        mentionNames?: Record<string, string>;
+        extensions?: AnyExtension[];
+        toolbarItems?: ToolbarItem[];
+        /** Text of the send button; without it the page brings its own */
+        submitLabel?: string | null;
+        submitting?: boolean;
+        disabled?: boolean;
+        /** An error from the page (the server refused the post) */
+        error?: string | null;
+    }>(),
+    {
+        modelValue: null,
+        placeholder: '',
+        draftKey: null,
+        mentionsUrl: null,
+        uploadUrl: null,
+        mentionNames: () => ({}),
+        extensions: () => [],
+        toolbarItems: () => [],
+        submitLabel: null,
+        submitting: false,
+        disabled: false,
+        error: null,
+    }
+);
+
+const emit = defineEmits<{
+    'update:modelValue': [document: JSONContent];
+    submit: [document: JSONContent];
+}>();
+
+const { t } = useI18n();
+
+const DRAFT_DELAY_MS = 600;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+const names = reactive(new Map<string, string>(Object.entries(props.mentionNames)));
+watch(
+    () => props.mentionNames,
+    (value) => Object.entries(value).forEach(([id, name]) => names.set(id, name))
+);
+
+const draft = postDraft(props.draftKey);
+const restored = draft.load();
+const draftRestored = ref(restored !== null);
+const localError = ref<string | null>(null);
+const status = ref('');
+const uploading = ref(0);
+const fileInput = ref<HTMLInputElement | null>(null);
+const linkOpen = ref(false);
+const linkInput = ref('');
+const linkField = ref<HTMLInputElement | null>(null);
+let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+const editor = useEditor({
+    content: restored ?? props.modelValue ?? '',
+    editable: !props.disabled,
+    extensions: createForumExtensions({
+        placeholder: props.placeholder,
+        imageUrl: (path) => storedImageUrl(path, (publicId) => buildImageUrl(publicId)),
+        mentionNames: { nameOf: (id) => names.get(id) ?? null },
+        mentionSuggestion:
+            props.mentionsUrl === null
+                ? null
+                : mentionSuggestion({
+                      url: props.mentionsUrl,
+                      onPick: (candidate: MentionCandidate) =>
+                          names.set(candidate.id, candidate.name),
+                  }),
+        extra: props.extensions,
+    }),
+    editorProps: {
+        attributes: {
+            class: 'forum-editor__content prose dark:prose-invert max-w-none min-h-32 px-3 py-2 focus:outline-none',
+            role: 'textbox',
+            'aria-multiline': 'true',
+            'aria-label': props.label,
+        },
+        handleKeyDown: (_view, event) => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                submit();
+
+                return true;
+            }
+            if (event.key.toLowerCase() === 'k' && (event.ctrlKey || event.metaKey)) {
+                openLink();
+
+                return true;
+            }
+
+            return false;
+        },
+        handlePaste: (_view, event) => uploadFiles(event.clipboardData?.files),
+        handleDrop: (_view, event) => uploadFiles((event as DragEvent).dataTransfer?.files),
+    },
+    onUpdate: ({ editor: current }) => {
+        const document = current.getJSON();
+        localError.value = null;
+        emit('update:modelValue', document);
+        scheduleDraft(document);
+    },
+});
+
+watch(
+    () => props.disabled,
+    (disabled) => editor.value?.setEditable(!disabled)
+);
+
+function scheduleDraft(document: JSONContent): void {
+    if (draftTimer !== null) {
+        clearTimeout(draftTimer);
+    }
+    draftTimer = setTimeout(() => {
+        draftTimer = null;
+        if (isDocumentEmpty(document)) {
+            draft.clear();
+        } else {
+            draft.save(document);
+        }
+    }, DRAFT_DELAY_MS);
+}
+
+onBeforeUnmount(() => {
+    if (draftTimer !== null) {
+        clearTimeout(draftTimer);
+    }
+});
+
+const shownError = computed(() => localError.value ?? props.error);
+const imageSelected = computed(() => editor.value?.isActive('image') ?? false);
+const imageAlt = computed({
+    get: () => String(editor.value?.getAttributes('image')['alt'] ?? ''),
+    set: (alt: string) =>
+        editor.value
+            ?.chain()
+            .updateAttributes('image', { alt: alt === '' ? null : alt })
+            .run(),
+});
+
+function getDocument(): JSONContent | null {
+    return editor.value?.getJSON() ?? null;
+}
+
+function submit(): void {
+    const document = getDocument();
+    if (document === null || props.submitting || props.disabled || uploading.value > 0) {
+        return;
+    }
+    if (isDocumentEmpty(document)) {
+        localError.value = t('forum.editor.errors.empty');
+
+        return;
+    }
+
+    emit('submit', document);
+}
+
+/** Empties the editor and forgets the draft: call it once the post is published */
+function clear(): void {
+    editor.value?.commands.clearContent(true);
+    draft.clear();
+    draftRestored.value = false;
+    localError.value = null;
+}
+
+function clearDraft(): void {
+    draft.clear();
+    draftRestored.value = false;
+}
+
+function discardDraft(): void {
+    clearDraft();
+    editor.value?.commands.setContent(props.modelValue ?? '', { emitUpdate: true });
+}
+
+function focus(): void {
+    editor.value?.commands.focus('end');
+}
+
+/** Quotes a post (all of it, or the text selected in it) at the end, with room to answer below */
+function quote(source: QuoteSource): void {
+    const content = source.content ?? paragraphsFromText(source.text ?? '');
+    editor.value?.commands.insertPostQuote(source.postId, content);
+}
+
+function openLink(): void {
+    linkInput.value = String(editor.value?.getAttributes('link')['href'] ?? '');
+    linkOpen.value = true;
+    localError.value = null;
+    requestAnimationFrame(() => linkField.value?.focus());
+}
+
+function applyLink(): void {
+    const href = normalizeHref(linkInput.value);
+    if (href === null) {
+        localError.value = t('forum.editor.errors.link');
+
+        return;
+    }
+
+    const chain = editor.value?.chain().focus().extendMarkRange('link');
+    if (editor.value?.state.selection.empty && !editor.value.isActive('link')) {
+        chain
+            ?.insertContent({
+                type: 'text',
+                text: href,
+                marks: [{ type: 'link', attrs: { href } }],
+            })
+            .run();
+    } else {
+        chain?.setLink({ href }).run();
+    }
+    linkOpen.value = false;
+}
+
+function removeLink(): void {
+    editor.value?.chain().focus().extendMarkRange('link').unsetLink().run();
+    linkOpen.value = false;
+}
+
+function closeLink(): void {
+    linkOpen.value = false;
+    editor.value?.commands.focus();
+}
+
+function chooseImage(): void {
+    fileInput.value?.click();
+}
+
+function onFilesChosen(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    uploadFiles(input.files);
+    input.value = '';
+}
+
+function imageCount(): number {
+    let count = 0;
+    editor.value?.state.doc.descendants((node) => {
+        count += node.type.name === 'image' ? 1 : 0;
+    });
+
+    return count;
+}
+
+/** Uploads the images among the files; true when it took them (so a paste or drop stops there) */
+function uploadFiles(files: FileList | null | undefined): boolean {
+    const images = Array.from(files ?? []).filter((file) => IMAGE_TYPES.includes(file.type));
+    if (props.uploadUrl === null || images.length === 0) {
+        return false;
+    }
+
+    if (imageCount() + uploading.value + images.length > MAX_IMAGES) {
+        localError.value = t('forum.editor.errors.too_many_images', { max: MAX_IMAGES });
+
+        return true;
+    }
+
+    images.forEach((file) => void upload(file, props.uploadUrl as string));
+
+    return true;
+}
+
+async function upload(file: File, url: string): Promise<void> {
+    uploading.value++;
+    status.value = t('forum.editor.images.uploading');
+    localError.value = null;
+
+    try {
+        const body = new FormData();
+        body.append('image', file);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { ...csrfHeaders(), Accept: 'application/json' },
+            credentials: 'same-origin',
+            body,
+        });
+
+        if (!response.ok) {
+            const answer = (await response.json().catch(() => ({}))) as { message?: string };
+            localError.value = isCsrfFailure(response)
+                ? t('forum.editor.errors.session')
+                : (answer.message ?? t('forum.editor.errors.upload'));
+
+            return;
+        }
+
+        const image = (await response.json()) as UploadedImage;
+        editor.value?.chain().focus().setImage({ src: image.path }).run();
+        status.value = t('forum.editor.images.uploaded');
+    } catch {
+        localError.value = t('forum.editor.errors.upload');
+    } finally {
+        uploading.value--;
+    }
+}
+
+defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
+</script>
+
+<template>
+    <div
+        class="forum-editor bg-surface border-default overflow-hidden rounded-lg border"
+        :aria-busy="uploading > 0 || submitting"
+    >
+        <EditorToolbar
+            v-if="editor"
+            :editor="editor"
+            :items="toolbarItems"
+            :can-upload-images="uploadUrl !== null"
+            :disabled="disabled"
+            @link="openLink"
+            @image="chooseImage"
+        />
+
+        <form
+            v-if="linkOpen"
+            class="border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"
+            @submit.prevent="applyLink"
+            @keydown.escape.prevent="closeLink"
+        >
+            <label for="forum-editor-link" class="text-base-secondary text-sm">{{
+                t('forum.editor.link.label')
+            }}</label>
+            <input
+                id="forum-editor-link"
+                ref="linkField"
+                v-model="linkInput"
+                type="url"
+                inputmode="url"
+                autocomplete="url"
+                :placeholder="t('forum.editor.link.placeholder')"
+                class="bg-page border-default text-base-primary min-w-0 flex-1 rounded-md border px-2 py-1 text-sm"
+            />
+            <BaseButton type="submit" size="sm">{{ t('forum.editor.link.apply') }}</BaseButton>
+            <BaseButton
+                v-if="editor?.isActive('link')"
+                variant="ghost"
+                size="sm"
+                @click="removeLink"
+            >
+                {{ t('forum.editor.link.remove') }}
+            </BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="closeLink">{{
+                t('forum.editor.link.cancel')
+            }}</BaseButton>
+        </form>
+
+        <div
+            v-if="imageSelected"
+            class="border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"
+        >
+            <label for="forum-editor-alt" class="text-base-secondary text-sm">{{
+                t('forum.editor.images.alt')
+            }}</label>
+            <input
+                id="forum-editor-alt"
+                v-model.lazy="imageAlt"
+                type="text"
+                maxlength="300"
+                class="bg-page border-default text-base-primary min-w-0 flex-1 rounded-md border px-2 py-1 text-sm"
+            />
+        </div>
+
+        <p
+            v-if="draftRestored"
+            class="bg-info-light text-info flex flex-wrap items-center gap-2 px-3 py-1.5 text-sm"
+        >
+            {{ t('forum.editor.draft.restored') }}
+            <button type="button" class="underline underline-offset-2" @click="discardDraft">
+                {{ t('forum.editor.draft.discard') }}
+            </button>
+        </p>
+
+        <EditorContent :editor="editor" />
+
+        <input
+            ref="fileInput"
+            type="file"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+            :accept="IMAGE_TYPES.join(',')"
+            multiple
+            @change="onFilesChosen"
+        />
+
+        <p class="sr-only" role="status" aria-live="polite">{{ status }}</p>
+        <p v-if="shownError" class="text-error px-3 pb-2 text-sm" role="alert">{{ shownError }}</p>
+
+        <div
+            v-if="submitLabel !== null || $slots['actions']"
+            class="border-default flex flex-wrap items-center justify-end gap-2 border-t px-3 py-2"
+        >
+            <span class="text-base-muted mr-auto hidden text-xs sm:inline">{{
+                t('forum.editor.submit_hint')
+            }}</span>
+            <slot name="actions" />
+            <BaseButton
+                v-if="submitLabel !== null"
+                :loading="submitting"
+                :disabled="disabled || uploading > 0"
+                @click="submit"
+            >
+                {{ submitLabel }}
+            </BaseButton>
+        </div>
+    </div>
+</template>

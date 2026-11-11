@@ -22,6 +22,14 @@ interface PostRepositoryInterface
     public function findOrFail(PostId $id): Post;
 
     /**
+     * The posts that exist among the ids, in no particular order.
+     *
+     * @param  list<PostId>  $ids
+     * @return list<Post>
+     */
+    public function findMany(array $ids): array;
+
+    /**
      * The highest number given out in the discussion, whatever the post's status now; null
      * when none has one yet.
      */

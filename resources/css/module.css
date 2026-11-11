@@ -76,3 +76,56 @@
 
 @source '../js/**/*.vue';
 @source '../js/**/*.ts';
+
+/* Post content, in the editor and as the server renders it (Application/Content) */
+.forum-mention {
+    border-radius: 0.25rem;
+    padding: 0 0.15rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background-color: var(--color-primary-50);
+}
+
+.dark .forum-mention {
+    color: var(--color-primary-300);
+    background-color: var(--color-primary-950);
+}
+
+.forum-quote {
+    border-left-color: var(--color-primary-500);
+}
+
+.forum-quote__source {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-style: normal;
+    font-weight: 600;
+}
+
+.forum-image img {
+    max-height: 32rem;
+    border-radius: 0.5rem;
+}
+
+/* The editor's placeholder, on its first empty paragraph */
+.forum-editor .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: var(--color-text-muted);
+}
+
+.forum-editor .tiptap img[data-path] {
+    max-height: 20rem;
+    border-radius: 0.5rem;
+}
+
+.forum-editor .tiptap img.ProseMirror-selectednode {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+}
+
+.forum-editor:focus-within {
+    border-color: var(--color-primary-500);
+}

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Entities\PostRevision;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
@@ -16,6 +17,7 @@ use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
@@ -42,6 +44,7 @@ final readonly class ForumWriter
         private DiscussionRepositoryInterface $discussions,
         private PostRepositoryInterface $posts,
         private ForumCountersInterface $counters,
+        private PostRevisionRepositoryInterface $revisions,
     ) {}
 
     /**
@@ -123,6 +126,58 @@ final readonly class ForumWriter
             $this->posts->save($post);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+        }, self::ATTEMPTS);
+    }
+
+    /**
+     * Replaces what a post says, first keeping what it said as its next revision. The post is
+     * read again under the lock, so two edits at once keep both versions. A body that holds the
+     * same document changes nothing.
+     *
+     * @param  string|null  $editorId  who edits it: its author, or a moderator
+     *
+     * @throws PostNotFoundException
+     * @throws InvalidPostException once its author deleted it
+     */
+    public function editPost(PostId $postId, PostBody $body, ?string $editorId, DateTimeImmutable $at): Post
+    {
+        return DB::transaction(function () use ($postId, $body, $editorId, $at): Post {
+            $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
+
+            $post = $this->posts->findOrFail($postId);
+            if ($post->body()->sameDocumentAs($body)) {
+                return $post;
+            }
+
+            $replaced = $post->body();
+            $post->edit($body, $at);
+
+            $this->revisions->save(new PostRevision($postId, $this->revisions->nextNumber($postId), $replaced, $editorId, $at));
+            $this->posts->save($post);
+
+            return $post;
+        }, self::ATTEMPTS);
+    }
+
+    /**
+     * Deletes a post on its author's behalf: it keeps its number, its body and its revisions
+     * (for moderators), and readers see a placeholder in its place.
+     *
+     * @throws PostNotFoundException
+     * @throws InvalidPostException unless it is visible or hidden
+     */
+    public function deletePostByAuthor(PostId $postId): Post
+    {
+        return DB::transaction(function () use ($postId): Post {
+            $discussion = $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
+
+            $post = $this->posts->findOrFail($postId);
+            $post->deleteByAuthor();
+            $this->posts->save($post);
+
+            $this->refresh($discussion->id(), [$discussion->categoryId()]);
+
+            return $post;
         }, self::ATTEMPTS);
     }
 

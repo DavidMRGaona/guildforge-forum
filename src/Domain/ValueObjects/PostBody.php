@@ -37,4 +37,12 @@ final readonly class PostBody
 
         $this->plainText = $plainText;
     }
+
+    /**
+     * Whether both hold the same document (the plain text follows from it).
+     */
+    public function sameDocumentAs(self $other): bool
+    {
+        return $this->document === $other->document;
+    }
 }

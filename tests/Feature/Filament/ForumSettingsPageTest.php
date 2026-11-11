@@ -68,14 +68,17 @@ final class ForumSettingsPageTest extends ModuleTestCase
         Livewire::test(ForumSettingsPage::class)
             ->assertSet('data.discussions_per_page', 20)
             ->assertSet('data.posts_per_page', 20)
+            ->assertSet('data.posts_per_minute', 6)
             ->set('data.discussions_per_page', 30)
             ->set('data.posts_per_page', 15)
+            ->set('data.posts_per_minute', 3)
             ->call('save')
             ->assertHasNoErrors();
 
         $settings = app(ForumSettingsInterface::class);
         $this->assertSame(30, $settings->discussionsPerPage());
         $this->assertSame(15, $settings->postsPerPage());
+        $this->assertSame(3, $settings->postsPerMinute());
     }
 
     public function test_page_sizes_stay_within_bounds(): void
@@ -85,8 +88,9 @@ final class ForumSettingsPageTest extends ModuleTestCase
         Livewire::test(ForumSettingsPage::class)
             ->set('data.discussions_per_page', 4)
             ->set('data.posts_per_page', 101)
+            ->set('data.posts_per_minute', 0)
             ->call('save')
-            ->assertHasErrors(['data.discussions_per_page', 'data.posts_per_page']);
+            ->assertHasErrors(['data.discussions_per_page', 'data.posts_per_page', 'data.posts_per_minute']);
     }
 
     public function test_saving_is_refused_without_the_permission(): void

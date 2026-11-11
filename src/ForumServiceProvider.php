@@ -4,23 +4,47 @@ declare(strict_types=1);
 
 namespace Modules\Forum;
 
+use App\Application\Media\Contracts\MediaUsageSourceInterface;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
+use App\Infrastructure\Media\Observers\RefreshMediaUsagesObserver;
 use App\Modules\ModuleServiceProvider;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Eloquent\Model;
+use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
+use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
+use Modules\Forum\Application\Content\DocumentSchema;
+use Modules\Forum\Application\Content\Nodes\ImageNode;
+use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
+use Modules\Forum\Application\Contracts\PostImageStorageInterface;
+use Modules\Forum\Application\Contracts\PostLinksInterface;
+use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
+use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
+use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
+use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
+use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
+use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
+use Modules\Forum\Infrastructure\Services\NoPostLinks;
+use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
 use Modules\Forum\Policies\CategoryPolicy;
 
 final class ForumServiceProvider extends ModuleServiceProvider
@@ -29,6 +53,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
      * Permission names, stored by the loader as "forum:<name>".
      */
     private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage'];
+
+    /**
+     * Container tags for the post document's extra node and mark types: a feature that adds a
+     * node (dice rolls, asides) tags its class here and the schema takes it in.
+     */
+    public const string NODE_TYPES_TAG = 'forum.content.nodes';
+
+    public const string MARK_TYPES_TAG = 'forum.content.marks';
 
     public function moduleName(): string
     {
@@ -42,10 +74,51 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(CategoryRepositoryInterface::class, EloquentCategoryRepository::class);
         $this->app->bind(DiscussionRepositoryInterface::class, EloquentDiscussionRepository::class);
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
+        $this->app->bind(PostRevisionRepositoryInterface::class, EloquentPostRevisionRepository::class);
         $this->app->bind(ForumCountersInterface::class, EloquentForumCounters::class);
         $this->app->bind(ForumSettingsInterface::class, ForumSettings::class);
         // Roles and rosters are read once per request (or queue job)
         $this->app->scoped(CategoryAccessPolicy::class);
+        $this->app->bind(AccountDirectoryInterface::class, EloquentAccountDirectory::class);
+        $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
+        $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
+        $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
+        $this->app->bindIf(PostLinksInterface::class, NoPostLinks::class);
+        // The category rules, per request like the policy they read
+        $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
+
+        $this->app->singleton(DocumentSchema::class, static function (Application $app): DocumentSchema {
+            /** @var iterable<NodeTypeInterface> $nodes */
+            $nodes = $app->tagged(self::NODE_TYPES_TAG);
+            /** @var iterable<MarkTypeInterface> $marks */
+            $marks = $app->tagged(self::MARK_TYPES_TAG);
+
+            return new DocumentSchema(
+                [...DocumentSchema::coreNodes(), ...$nodes],
+                [...DocumentSchema::coreMarks(), ...$marks],
+            );
+        });
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        // The media library learns at once which images a post started or stopped using
+        $observer = new RefreshMediaUsagesObserver(
+            PostImageMediaSource::TYPE,
+            static fn (Model $post): array => $post instanceof PostModel && self::touchesImages($post) ? [$post->id] : [],
+        );
+        PostModel::saved($observer->saved(...));
+        PostModel::deleted($observer->deleted(...));
+    }
+
+    /**
+     * @return array<class-string<MediaUsageSourceInterface>>
+     */
+    public function registerMediaSources(): array
+    {
+        return [PostImageMediaSource::class];
     }
 
     /**
@@ -94,5 +167,20 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerFilamentPages(): array
     {
         return [ForumSettingsPage::class];
+    }
+
+    /**
+     * Whether a saved or deleted post had or has images, so most posts queue no refresh.
+     */
+    private static function touchesImages(PostModel $post): bool
+    {
+        foreach ([$post->getOriginal('body'), $post->getAttribute('body')] as $body) {
+            $json = json_encode($body, JSON_UNESCAPED_SLASHES);
+            if (is_string($json) && str_contains($json, ImageNode::FOLDER)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

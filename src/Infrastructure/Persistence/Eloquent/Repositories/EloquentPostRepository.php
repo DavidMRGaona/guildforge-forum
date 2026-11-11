@@ -43,6 +43,19 @@ final class EloquentPostRepository implements PostRepositoryInterface
         return $this->find($id) ?? throw PostNotFoundException::withId($id->value);
     }
 
+    public function findMany(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return array_values(PostModel::query()
+            ->whereKey(array_map(static fn (PostId $id): string => $id->value, $ids))
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all());
+    }
+
     public function highestNumber(DiscussionId $discussionId): ?PostNumber
     {
         $highest = PostModel::query()->where('discussion_id', $discussionId->value)->max('number');

@@ -15,4 +15,9 @@ interface ForumSettingsInterface
      * Posts per page in a discussion.
      */
     public function postsPerPage(): int;
+
+    /**
+     * Posts one person may publish per minute (replies and first posts of new discussions).
+     */
+    public function postsPerMinute(): int;
 }

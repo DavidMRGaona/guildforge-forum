@@ -13,6 +13,7 @@ use Modules\Forum\Application\DTOs\SubjectConversationDTO;
 use Modules\Forum\Application\Services\SubjectConversationReader;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
 use Modules\Forum\Http\Presenters\EditorProps;
+use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 
 /**
@@ -27,6 +28,7 @@ final class SubjectConversationController extends Controller
         private readonly ForumPresenter $presenter,
         private readonly EditorProps $editor,
         private readonly ForumUrlsInterface $urls,
+        private readonly EngagementPresenter $engagement,
     ) {}
 
     public function show(Request $request, string $type, string $id): JsonResponse
@@ -52,6 +54,7 @@ final class SubjectConversationController extends Controller
         $discussionId = $discussion->id()->value;
         $olderBefore = $conversation->olderBefore();
         $signedIn = $user instanceof Authenticatable;
+        ['posts' => $posts, 'mentionNames' => $mentionNames] = $this->presenter->posts($discussion, $conversation->posts, $conversation->contents);
 
         return [
             'discussion' => [
@@ -62,7 +65,8 @@ final class SubjectConversationController extends Controller
                 'isClosed' => $discussion->status() === DiscussionStatus::Closed,
                 'closedReason' => $conversation->closedReason?->value,
             ],
-            ...$this->presenter->posts($discussion, $conversation->posts, $conversation->contents),
+            'posts' => $this->engagement->withLikes($posts, $conversation->posts, $discussion, $user),
+            'mentionNames' => $mentionNames,
             'olderCount' => $conversation->olderCount,
             'olderNext' => min(SubjectConversationReader::EARLIER, $conversation->olderCount),
             'olderUrl' => $olderBefore === null ? null : route('forum.subjects.show', [

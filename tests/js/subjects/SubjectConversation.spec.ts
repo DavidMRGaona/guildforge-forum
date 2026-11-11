@@ -27,6 +27,7 @@ function aPost(number: number): ForumPost {
         document: null,
         updateUrl: null,
         deleteUrl: null,
+        likes: { count: 0, liked: false, names: [], others: 0, canLike: false, url: null },
     };
 }
 

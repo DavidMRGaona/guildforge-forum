@@ -111,7 +111,10 @@ final class SubjectConversationTest extends ModuleTestCase
             ->assertJsonPath('conversation.highestNumber', 8)
             ->assertJsonPath('conversation.reply.canPost', false)
             ->assertJsonPath('conversation.readUrl', null)
-            ->assertJsonPath('conversation.lastReadNumber', null);
+            ->assertJsonPath('conversation.lastReadNumber', null)
+            // Likes as the discussion page shows them; a guest gives none
+            ->assertJsonPath('conversation.posts.4.likes.count', 0)
+            ->assertJsonPath('conversation.posts.4.likes.canLike', false);
         self::assertStringContainsString('Mensaje 8', (string) $response->json('conversation.posts.4.html'));
     }
 

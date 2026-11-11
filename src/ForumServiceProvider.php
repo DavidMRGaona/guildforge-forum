@@ -202,8 +202,10 @@ final class ForumServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * The «Foro» tab of the profile: following after posting, and what the person follows. The
-     * section loads GET /foro/preferencias itself.
+     * - The «Foro» tab of the profile: following after posting, and what the person follows.
+     *   The section loads GET /foro/preferencias itself.
+     * - The conversation of a record (game table, campaign, event) in its page: the page hands
+     *   `subjectType` and `subjectId` to the slot, and the component asks for the rest.
      *
      * @return array<SlotRegistrationDTO>
      */
@@ -222,6 +224,12 @@ final class ForumServiceProvider extends ModuleServiceProvider
                     'icon' => 'cog',
                     'labelKey' => 'forum.preferences.tabLabel',
                 ],
+            ),
+            new SlotRegistrationDTO(
+                slot: 'subject-discussion',
+                component: 'components/subjects/SubjectConversation.vue',
+                module: $this->moduleName(),
+                order: 10,
             ),
         ];
     }
@@ -279,24 +287,6 @@ final class ForumServiceProvider extends ModuleServiceProvider
                 routeName: 'forum.index',
                 label: __('forum::messages.title'),
                 module: $this->moduleName(),
-            ),
-        ];
-    }
-
-    /**
-     * The conversation of a record (game table, campaign, event) in its page: the page hands
-     * `subjectType` and `subjectId` to the slot, and the component asks for the rest.
-     *
-     * @return array<SlotRegistrationDTO>
-     */
-    public function registerSlots(): array
-    {
-        return [
-            new SlotRegistrationDTO(
-                slot: 'subject-discussion',
-                component: 'components/subjects/SubjectConversation.vue',
-                module: $this->moduleName(),
-                order: 10,
             ),
         ];
     }

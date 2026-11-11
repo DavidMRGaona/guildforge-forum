@@ -153,6 +153,25 @@ export default {
                 'Este espacio es privado, pero la moderación del foro puede entrar en él para atender reportes.',
             readOnlyNotice: 'Solo lectura: ya no se puede escribir en este espacio.',
         },
+        subjects: {
+            title: 'Conversación',
+            viewAll: 'Ver conversación completa',
+            older: 'Ver el mensaje anterior | Ver los {count} anteriores',
+            loadError: 'No se ha podido cargar la conversación.',
+            retry: 'Reintentar',
+            olderError: 'No se han podido cargar los mensajes anteriores. Inténtalo de nuevo.',
+            empty: 'Todavía no hay comentarios. Puedes ser la primera persona en escribir.',
+            emptyReadOnly: 'Todavía no hay comentarios.',
+            replyLabel: 'Tu comentario',
+            send: 'Publicar comentario',
+            signInToComment: 'para comentar.',
+            closed: {
+                cancelled: 'Se ha cancelado: la conversación ya no admite comentarios.',
+                withdrawn: 'Ya no está publicada: la conversación ya no admite comentarios.',
+                moderation: 'La moderación ha cerrado esta conversación.',
+                closed: 'Esta conversación está cerrada: ya no admite comentarios.',
+            },
+        },
         editor: {
             submit_hint: 'Ctrl + Intro para enviar',
             toolbar: {

@@ -52,6 +52,14 @@ interface PostRepositoryInterface
     public function numberedFrom(DiscussionId $discussionId, PostNumber $from, int $limit): array;
 
     /**
+     * The last `limit` numbered posts of the discussion from `from` on and below `before` (to
+     * the end when null), in order, whatever their status: a conversation read from its end.
+     *
+     * @return list<Post>
+     */
+    public function lastNumbered(DiscussionId $discussionId, PostNumber $from, ?PostNumber $before, int $limit): array;
+
+    /**
      * The discussion's posts awaiting approval, by when they were written.
      *
      * @return list<Post>

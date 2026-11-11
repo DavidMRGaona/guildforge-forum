@@ -15,7 +15,7 @@ export interface JsonAnswer<T> {
  */
 export async function sendJson<T>(
     url: string,
-    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     body?: unknown
 ): Promise<JsonAnswer<T>> {
     let response: Response;
@@ -56,4 +56,9 @@ export async function sendJson<T>(
         message: typeof record.message === 'string' ? record.message : null,
         errors,
     };
+}
+
+/** Where a record's page asks for its conversation (SubjectConversationController) */
+export function subjectConversationUrl(subjectType: string, subjectId: string): string {
+    return `/foro/fichas/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectId)}`;
 }

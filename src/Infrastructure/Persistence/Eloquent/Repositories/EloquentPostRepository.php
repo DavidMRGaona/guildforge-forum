@@ -97,6 +97,23 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function lastNumbered(DiscussionId $discussionId, PostNumber $from, ?PostNumber $before, int $limit): array
+    {
+        $query = PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->where('number', '>=', $from->value);
+        if ($before instanceof PostNumber) {
+            $query->where('number', '<', $before->value);
+        }
+
+        return array_values(array_reverse($query
+            ->orderByDesc('number')
+            ->limit($limit)
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all()));
+    }
+
     public function pendingIn(DiscussionId $discussionId): array
     {
         return array_values(PostModel::query()

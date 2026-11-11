@@ -41,7 +41,8 @@ final class ModuleBootsTest extends ModuleTestCase
         $this->assertSame('forum', $manifest['name']);
         $this->assertSame('Foro', $manifest['displayName']);
         $this->assertSame('DavidMRGaona/guildforge-forum', $manifest['repository']);
-        // The site notifications (HasSiteNotification, site categories) came with 3.54
+        // The site notifications (HasSiteNotification, site categories) and the props of the
+        // subject-discussion slot came with 3.54
         $this->assertSame('^3.54', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }

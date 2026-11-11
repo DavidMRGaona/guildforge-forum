@@ -10,6 +10,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Livewire\Livewire;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\ForumServiceProvider;
 use Tests\Support\Modules\InteractsWithModulePanel;
@@ -68,14 +69,23 @@ final class ForumSettingsPageTest extends ModuleTestCase
         Livewire::test(ForumSettingsPage::class)
             ->assertSet('data.discussions_per_page', 20)
             ->assertSet('data.posts_per_page', 20)
+            ->assertSet('data.posts_per_minute', 6)
+            ->assertSet('data.image_types', ['jpeg', 'png', 'webp', 'gif'])
+            ->assertSet('data.images_per_post', 10)
+            ->set('data.image_types', ['jpeg', 'webp'])
+            ->set('data.image_max_dimension', 1600)
             ->set('data.discussions_per_page', 30)
             ->set('data.posts_per_page', 15)
+            ->set('data.posts_per_minute', 3)
             ->call('save')
             ->assertHasNoErrors();
 
         $settings = app(ForumSettingsInterface::class);
         $this->assertSame(30, $settings->discussionsPerPage());
         $this->assertSame(15, $settings->postsPerPage());
+        $this->assertSame(3, $settings->postsPerMinute());
+        $this->assertSame([PostImageType::Jpeg, PostImageType::Webp], $settings->imageTypes());
+        $this->assertSame(1600, $settings->imageMaxDimension());
     }
 
     public function test_page_sizes_stay_within_bounds(): void
@@ -85,8 +95,11 @@ final class ForumSettingsPageTest extends ModuleTestCase
         Livewire::test(ForumSettingsPage::class)
             ->set('data.discussions_per_page', 4)
             ->set('data.posts_per_page', 101)
+            ->set('data.posts_per_minute', 0)
+            ->set('data.images_per_post', 21)
+            ->set('data.image_types', ['jpeg', 'svg'])
             ->call('save')
-            ->assertHasErrors(['data.discussions_per_page', 'data.posts_per_page']);
+            ->assertHasErrors(['data.discussions_per_page', 'data.posts_per_page', 'data.posts_per_minute', 'data.images_per_post', 'data.image_types']);
     }
 
     public function test_saving_is_refused_without_the_permission(): void

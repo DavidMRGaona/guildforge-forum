@@ -12,7 +12,9 @@ use App\Filament\Clusters\SettingsCluster;
 use App\Filament\Concerns\ChecksPermissions;
 use App\Filament\Concerns\SafeModuleNavigation;
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -20,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 
 /**
@@ -82,6 +85,38 @@ final class ForumSettingsPage extends Page implements HasForms
                         $this->pageSizeField('discussions_per_page'),
                         $this->pageSizeField('posts_per_page'),
                     ]),
+                Section::make(__('forum::messages.settings.posting'))
+                    ->schema([
+                        TextInput::make('posts_per_minute')
+                            ->label(__('forum::messages.settings.posts_per_minute'))
+                            ->helperText(__('forum::messages.settings.posts_per_minute_help', ['min' => ForumSettings::MIN_POSTS_PER_MINUTE, 'max' => ForumSettings::MAX_POSTS_PER_MINUTE]))
+                            ->integer()
+                            ->minValue(ForumSettings::MIN_POSTS_PER_MINUTE)
+                            ->maxValue(ForumSettings::MAX_POSTS_PER_MINUTE)
+                            ->required()
+                            ->default(ForumSettings::DEFAULT_POSTS_PER_MINUTE),
+                    ]),
+                Section::make(__('forum::messages.settings.images'))
+                    ->description(__('forum::messages.settings.images_help'))
+                    ->schema([
+                        CheckboxList::make('image_types')
+                            ->label(__('forum::messages.settings.image_types'))
+                            ->helperText(__('forum::messages.settings.image_types_help'))
+                            ->options(self::imageTypeOptions())
+                            // Filament checks only single selects against their options
+                            ->rules([static fn (): Closure => static function (string $attribute, mixed $value, Closure $fail): void {
+                                if (! is_array($value) || array_diff($value, array_keys(self::imageTypeOptions())) !== []) {
+                                    $fail(__('forum::messages.settings.image_types_invalid'));
+                                }
+                            }])
+                            ->columns(4)
+                            ->default(array_keys(self::imageTypeOptions())),
+                        $this->boundedField('image_max_kilobytes', ForumSettings::MIN_IMAGE_MAX_KILOBYTES, ForumSettings::MAX_IMAGE_MAX_KILOBYTES, ForumSettings::DEFAULT_IMAGE_MAX_KILOBYTES),
+                        $this->boundedField('image_max_dimension', ForumSettings::MIN_IMAGE_MAX_DIMENSION, ForumSettings::MAX_IMAGE_MAX_DIMENSION, ForumSettings::DEFAULT_IMAGE_MAX_DIMENSION)
+                            ->helperText(__('forum::messages.settings.image_max_dimension_help').' '.__('forum::messages.settings.range_help', ['min' => ForumSettings::MIN_IMAGE_MAX_DIMENSION, 'max' => ForumSettings::MAX_IMAGE_MAX_DIMENSION])),
+                        $this->boundedField('images_per_post', ForumSettings::MIN_IMAGES_PER_POST, ForumSettings::MAX_IMAGES_PER_POST, ForumSettings::DEFAULT_IMAGES_PER_POST),
+                        $this->boundedField('image_uploads_per_hour', ForumSettings::MIN_IMAGE_UPLOADS_PER_HOUR, ForumSettings::MAX_IMAGE_UPLOADS_PER_HOUR, ForumSettings::DEFAULT_IMAGE_UPLOADS_PER_HOUR),
+                    ]),
             ])
             ->statePath('data');
     }
@@ -110,6 +145,31 @@ final class ForumSettingsPage extends Page implements HasForms
                 ->label(__('common.save'))
                 ->submit('save'),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function imageTypeOptions(): array
+    {
+        $options = [];
+        foreach (PostImageType::cases() as $type) {
+            $options[$type->value] = $type->label();
+        }
+
+        return $options;
+    }
+
+    private function boundedField(string $key, int $min, int $max, int $default): TextInput
+    {
+        return TextInput::make($key)
+            ->label(__("forum::messages.settings.{$key}"))
+            ->helperText(__('forum::messages.settings.range_help', ['min' => $min, 'max' => $max]))
+            ->integer()
+            ->minValue($min)
+            ->maxValue($max)
+            ->required()
+            ->default($default);
     }
 
     private function pageSizeField(string $key): TextInput

@@ -18,6 +18,10 @@ return [
             'manage' => 'Configurar el foro',
             'manage_description' => 'Cambiar los ajustes del foro.',
         ],
+        'posts' => [
+            'upload_images' => 'Subir imágenes al foro',
+            'upload_images_description' => 'Añadir imágenes a los mensajes, con los formatos y límites de los ajustes del foro.',
+        ],
     ],
 
     'settings' => [
@@ -27,6 +31,20 @@ return [
         'discussions_per_page' => 'Temas por página',
         'posts_per_page' => 'Mensajes por página',
         'page_size_help' => 'De :min a :max.',
+        'posting' => 'Publicación',
+        'posts_per_minute' => 'Mensajes por minuto y persona',
+        'posts_per_minute_help' => 'Cuántos mensajes puede publicar una persona en un minuto, de :min a :max. Al pasarse, espera antes de volver a publicar.',
+        'images' => 'Imágenes',
+        'images_help' => 'Solo suben imágenes quienes tengan el permiso «Subir imágenes al foro».',
+        'image_types' => 'Formatos admitidos',
+        'image_types_help' => 'SVG nunca se admite: puede llevar código.',
+        'image_types_invalid' => 'Elige solo entre JPEG, PNG, WebP y GIF.',
+        'image_max_kilobytes' => 'Peso máximo de cada imagen (KB)',
+        'image_max_dimension' => 'Lado máximo (píxeles)',
+        'image_max_dimension_help' => 'Las imágenes más grandes se reducen a este tamaño.',
+        'images_per_post' => 'Imágenes por mensaje',
+        'image_uploads_per_hour' => 'Subidas por hora y persona',
+        'range_help' => 'De :min a :max.',
         'saved' => 'Ajustes guardados',
     ],
 
@@ -127,5 +145,58 @@ return [
         'Flag' => 'Bandera',
         'Lock' => 'Candado',
         'Question' => 'Interrogación',
+    ],
+
+    'posts' => [
+        'deleted' => 'Mensaje borrado',
+        'hidden' => 'Mensaje oculto',
+        'pending' => 'Pendiente de aprobación',
+    ],
+
+    'media' => [
+        'source' => 'Mensajes del foro',
+        'role' => 'Imagen del mensaje',
+        'post_title' => ':discussion, mensaje :number',
+        'pending_post_title' => ':discussion, mensaje pendiente',
+    ],
+
+    'content' => [
+        'quote' => 'Cita',
+        'quote_by' => ':name escribió:',
+        'unknown_account' => 'cuenta eliminada',
+    ],
+
+    'errors' => [
+        'forbidden' => 'No puedes hacer eso en este tema.',
+        'too_fast' => 'Has publicado muchos mensajes seguidos. Espera :seconds segundos y vuelve a intentarlo.',
+        'post_state' => 'Este mensaje ya no se puede cambiar.',
+        'image_upload' => 'No se ha podido subir la imagen. Inténtalo de nuevo más tarde.',
+        'document' => [
+            'not_a_document' => 'El mensaje no tiene un formato válido.',
+            'too_large' => 'El mensaje es demasiado grande.',
+            'too_deep' => 'El mensaje tiene demasiados niveles anidados (citas o listas dentro de otras).',
+            'too_many_nodes' => 'El mensaje tiene demasiados elementos.',
+            'too_long' => 'El mensaje es demasiado largo.',
+            'empty' => 'El mensaje está vacío.',
+            'unknown_node' => 'El mensaje tiene un elemento que el foro no admite.',
+            'unknown_mark' => 'El mensaje tiene un formato de texto que el foro no admite.',
+            'unexpected_key' => 'El mensaje no tiene un formato válido.',
+            'not_allowed_here' => 'El mensaje tiene un elemento en un sitio donde no puede ir.',
+            'missing_content' => 'El mensaje tiene una lista o una cita vacía.',
+            'invalid_text' => 'El mensaje tiene un texto no válido.',
+            'invalid_attribute' => 'El mensaje tiene un elemento con un valor no válido.',
+            'invalid_link' => 'Los enlaces solo pueden ir a direcciones http, https o mailto.',
+            'invalid_image' => 'Las imágenes deben ser de un formato que admita el foro y estar subidas a él.',
+            'too_many_images' => 'El mensaje lleva más imágenes de las que permite el foro.',
+            'too_many_mentions' => 'Un mensaje puede mencionar a 20 personas como mucho.',
+            'too_many_quotes' => 'Un mensaje puede citar 10 mensajes como mucho.',
+            'unknown_account' => 'Mencionas a una cuenta que ya no existe.',
+            'unknown_post' => 'Citas un mensaje que no existe o que no puedes ver.',
+            'invalid_quote' => 'La cita no coincide con el mensaje citado.',
+        ],
+    ],
+
+    'editor' => [
+        'image_attribute' => 'imagen',
     ],
 ];

@@ -120,7 +120,7 @@ final class ForumWriterTest extends ModuleTestCase
         $this->writer()->savePost($reply);
         $this->assertSame(2, $this->counters()->discussion($discussion->id())?->postCount);
 
-        $reply->deleteByAuthor();
+        $reply->deleteByAuthor(new DateTimeImmutable);
         $this->writer()->savePost($reply);
         $this->assertSame(1, $this->counters()->discussion($discussion->id())->postCount);
         $this->assertSame(2, app(PostRepositoryInterface::class)->findOrFail($reply->id())->number()?->value);

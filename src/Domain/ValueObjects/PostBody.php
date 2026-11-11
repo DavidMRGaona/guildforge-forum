@@ -37,4 +37,20 @@ final readonly class PostBody
 
         $this->plainText = $plainText;
     }
+
+    /**
+     * A body with nothing in it: what is left of a post whose content was purged.
+     */
+    public static function empty(): self
+    {
+        return new self(['type' => 'doc', 'content' => []], '');
+    }
+
+    /**
+     * Whether both hold the same document (the plain text follows from it).
+     */
+    public function sameDocumentAs(self $other): bool
+    {
+        return $this->document === $other->document;
+    }
 }

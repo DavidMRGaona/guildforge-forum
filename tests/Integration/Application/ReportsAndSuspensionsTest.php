@@ -289,6 +289,64 @@ final class ReportsAndSuspensionsTest extends ModuleTestCase
         $this->assertFalse(app(ForumAccessInterface::class)->canWrite($peer, $this->discussion));
     }
 
+    public function test_a_suspended_forum_moderator_moderates_nothing_and_cannot_lift_it(): void
+    {
+        $admin = UserModel::factory()->admin()->create();
+        $peer = $this->anAccount(self::MODERATE);
+        $suspension = $this->suspensions()->suspend($admin, $peer->id, 'Abuso de la moderación', null);
+        $this->forgetRequestState();
+
+        $this->assertFalse(app(ForumAccessInterface::class)->canModerate($peer, $this->discussion));
+        $this->assertFalse($this->suspensions()->canSuspend($peer));
+
+        foreach ([
+            fn () => app(ForumModeration::class)->pin($peer, $this->discussion->id()),
+            fn () => $this->suspensions()->suspend($peer, $this->anAccount()->id, 'Venganza', null),
+            fn () => $this->suspensions()->lift($peer, $suspension->id()),
+        ] as $attempt) {
+            try {
+                $attempt();
+                $this->fail('A suspended forum moderator still moderated.');
+            } catch (ForumActionDeniedException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        $this->assertNull(app(SuspensionRepositoryInterface::class)->find($suspension->id())?->liftedAt());
+    }
+
+    public function test_only_an_admin_lifts_what_an_admin_decided(): void
+    {
+        $admin = UserModel::factory()->admin()->create();
+        $member = $this->anAccount();
+        $byAdmin = $this->suspensions()->suspend($admin, $member->id, 'Insultos', null);
+
+        try {
+            $this->suspensions()->lift($this->moderator, $byAdmin->id());
+            $this->fail('A moderator lifted what an admin decided.');
+        } catch (ForumActionDeniedException) {
+        }
+
+        $this->suspensions()->lift($admin, $byAdmin->id());
+        $this->assertNotNull(app(SuspensionRepositoryInterface::class)->find($byAdmin->id())?->liftedAt());
+
+        // One whose suspender is gone counts as an admin's
+        $gone = $this->anAccount(self::MODERATE);
+        $orphan = $this->suspensions()->suspend($gone, $member->id, 'Spam', null);
+        $gone->delete();
+        try {
+            $this->suspensions()->lift($this->moderator, $orphan->id());
+            $this->fail('A moderator lifted a suspension whose suspender is gone.');
+        } catch (ForumActionDeniedException) {
+        }
+        $this->suspensions()->lift($admin, $orphan->id());
+
+        // What a moderator decided, another moderator may lift
+        $byModerator = $this->suspensions()->suspend($this->moderator, $member->id, 'Spam', null);
+        $this->suspensions()->lift($this->anAccount(self::MODERATE), $byModerator->id());
+        $this->assertNotNull(app(SuspensionRepositoryInterface::class)->find($byModerator->id())?->liftedAt());
+    }
+
     public function test_suspensions_that_cannot_be_read_keep_everyone_from_writing(): void
     {
         $repository = $this->createStub(SuspensionRepositoryInterface::class);

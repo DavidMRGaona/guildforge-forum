@@ -25,7 +25,9 @@ use Modules\Forum\Domain\ValueObjects\SuspensionId;
 /**
  * Suspending someone in the forum and lifting it. Only whoever moderates the whole forum does
  * either, since it reaches every category. Nobody suspends themselves or the system account,
- * and only an admin suspends someone who moderates the whole forum. A new suspension of
+ * and only an admin suspends someone who moderates the whole forum. Nobody lifts their own
+ * suspension, and only an admin lifts one an admin made or one of a forum moderator. Someone
+ * suspended moderates nothing, so they neither suspend nor lift. A new suspension of
  * someone already suspended takes the old one's place. Both are logged.
  */
 final readonly class SuspensionService
@@ -39,6 +41,19 @@ final readonly class SuspensionService
         private ForumSuspensions $current,
         private ModerationLogger $logger,
     ) {}
+
+    /**
+     * Whether the account holds the permission to moderate the whole forum, suspended or not.
+     */
+    private function holdsForumModeration(Authenticatable $user): bool
+    {
+        return $this->authorization->can($user, CategoryAccessPolicy::MODERATE_FORUM);
+    }
+
+    private function isAdmin(Authenticatable $user): bool
+    {
+        return $this->authorization->hasRole($user, UserRole::Admin->value);
+    }
 
     public function canSuspend(?Authenticatable $moderator): bool
     {
@@ -64,7 +79,7 @@ final readonly class SuspensionService
             || $userId === ForumBrowser::accountId($moderator)
             || $this->systemAccount->isSystemAccount($userId)
             // Whoever moderates the whole forum is suspended only by an admin: two moderators never suspend each other
-            || ($this->policy->canModerateForum($user) && ! $this->authorization->hasRole($moderator, UserRole::Admin->value))) {
+            || ($this->holdsForumModeration($user) && ! $this->isAdmin($moderator))) {
             throw ModerationRefusedException::notSuspendable($userId);
         }
 
@@ -105,6 +120,17 @@ final readonly class SuspensionService
         }
 
         $suspension = $this->suspensions->find($id) ?? throw ModerationRefusedException::notSuspendable($id->value);
+
+        // Nobody lifts their own suspension, and only an admin lifts one an admin made or one of
+        // someone who moderates the whole forum
+        $target = $this->accounts->active($suspension->userId());
+        // Fails closed: a suspender who cannot be told any more (account gone) counts as an admin
+        $suspender = $suspension->suspendedBy() === null ? null : $this->accounts->active($suspension->suspendedBy());
+        $suspendedByAdmin = ! $suspender instanceof Authenticatable || $this->isAdmin($suspender);
+        if ($suspension->userId() === ForumBrowser::accountId($moderator)
+            || (! $this->isAdmin($moderator) && ($suspendedByAdmin || ($target instanceof Authenticatable && $this->holdsForumModeration($target))))) {
+            throw ForumActionDeniedException::because('lift this suspension');
+        }
 
         DB::transaction(function () use ($moderator, $suspension, $reason): void {
             $suspension->lift(ForumBrowser::accountId($moderator), CarbonImmutable::now());

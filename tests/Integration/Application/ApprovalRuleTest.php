@@ -8,6 +8,8 @@ use App\Application\Authorization\Services\AuthorizationServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
+use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\ApprovalRule;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
@@ -88,6 +90,15 @@ final class ApprovalRuleTest extends ModuleTestCase
 
         $this->assertFalse($this->rule()->needsApproval($leader, $this->category));
         $this->assertFalse($this->rule()->needsApproval($this->anAccount('forum:forum.moderate'), $this->category));
+    }
+
+    public function test_the_system_account_never_waits(): void
+    {
+        $this->threshold(5);
+        $system = app(AccountDirectoryInterface::class)->active(app(SystemAccountInterface::class)->id());
+        $this->assertNotNull($system);
+
+        $this->assertFalse($this->rule()->needsApproval($system, $this->category));
     }
 
     public function test_a_count_that_cannot_be_read_holds_the_post(): void

@@ -74,5 +74,12 @@ interface PostRepositoryInterface
      */
     public function deletedAwaitingPurge(DateTimeImmutable $deletedBefore, int $limit): array;
 
+    /**
+     * How many posts the account has published in the forum that are still up (shown, or
+     * deleted by themselves; never the ones moderation hid or that await approval), counted up
+     * to the limit: past it the exact number does not matter.
+     */
+    public function countPublishedBy(string $authorId, int $limit): int;
+
     public function delete(PostId $id): void;
 }

@@ -10,12 +10,16 @@ use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
+use Modules\Forum\Http\Controllers\ModerationController;
+use Modules\Forum\Http\Controllers\ModerationQueueController;
 use Modules\Forum\Http\Controllers\PostController;
 use Modules\Forum\Http\Controllers\PostImageController;
 use Modules\Forum\Http\Controllers\PostLikesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
+use Modules\Forum\Http\Controllers\ReportController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
+use Modules\Forum\Http\Controllers\SuspensionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,6 +52,8 @@ Route::prefix('foro')
 
         Route::middleware('auth')->group(function (): void {
             Route::get('nuevo', [DiscussionController::class, 'create'])->name('discussions.create');
+            // What awaits whoever moderates something: reports and posts awaiting approval
+            Route::get('moderacion', ModerationQueueController::class)->name('moderation.index');
             // Starting a discussion counts against the posts-per-minute limit too
             Route::post('temas', [DiscussionController::class, 'store'])
                 ->middleware('throttle:20,1,forum-discussions')
@@ -87,6 +93,29 @@ Route::prefix('foro')
                 ->whereUuid('discussion')
                 ->middleware('throttle:120,1,forum-mentions')
                 ->name('mentions.index');
+            // Moderation menus of a discussion and of each post; every action is logged
+            Route::middleware('throttle:60,1,forum-moderation')->group(function (): void {
+                Route::post('temas/{discussion}/moderacion', [ModerationController::class, 'discussion'])
+                    ->whereUuid('discussion')
+                    ->name('moderation.discussions');
+                Route::delete('temas/{discussion}', [ModerationController::class, 'destroyDiscussion'])
+                    ->whereUuid('discussion')
+                    ->name('moderation.discussions.destroy');
+                Route::post('mensajes/{post}/moderacion', [ModerationController::class, 'post'])
+                    ->whereUuid('post')
+                    ->name('moderation.posts');
+                Route::post('mensajes/{post}/denuncias/resolver', [ReportController::class, 'resolve'])
+                    ->whereUuid('post')
+                    ->name('reports.resolve');
+                Route::post('suspensiones', [SuspensionController::class, 'store'])->name('suspensions.store');
+                Route::delete('suspensiones/{suspension}', [SuspensionController::class, 'destroy'])
+                    ->whereUuid('suspension')
+                    ->name('suspensions.destroy');
+            });
+            Route::post('mensajes/{post}/denuncias', [ReportController::class, 'store'])
+                ->whereUuid('post')
+                ->middleware('throttle:10,1,forum-reports')
+                ->name('reports.store');
             Route::post('imagenes', [PostImageController::class, 'store'])
                 ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
                 ->name('images.store');

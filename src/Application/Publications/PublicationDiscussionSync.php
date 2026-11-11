@@ -23,8 +23,10 @@ use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 
@@ -68,6 +70,7 @@ final readonly class PublicationDiscussionSync
         private ForumWriter $writer,
         private SystemAccountInterface $systemAccount,
         private PublicationPosts $posts,
+        private PostRevisionRepositoryInterface $revisions,
         private PublicationSyncQueueInterface $queue,
     ) {}
 
@@ -171,29 +174,26 @@ final readonly class PublicationDiscussionSync
             $this->discussions->replaceTopics($discussion->id(), $this->posts->topics($publication));
         }
 
-        // Read again: replies refreshed it, and a moderator may have changed it meanwhile
-        $discussion = $this->discussions->findOrFail($discussion->id());
-        $changed = false;
+        $title = $publication instanceof PublicationDTO && $before->title !== $after->title ? $this->posts->title($publication) : null;
+        $wantsClosed = $after->wantsClosed();
 
-        if ($publication instanceof PublicationDTO && $before->title !== $after->title) {
-            $discussion->rename($this->posts->title($publication));
-            $changed = true;
-        }
-
-        if ($after->wantsClosed()) {
-            if ($discussion->status() === DiscussionStatus::Open) {
-                $discussion->closeBySystem();
-                $changed = true;
+        // Decided on the discussion as it is under the lock, so what a moderator did meanwhile
+        // (pinning, closing, renaming it) is never written over
+        $this->writer->changeDiscussion($discussion->id(), static function (Discussion $locked) use ($title, $wantsClosed): void {
+            // A title moderation gave it is theirs: the forum stops following the publication's
+            if ($title instanceof DiscussionTitle && ! $locked->isTitleSetByModeration()) {
+                $locked->rename($title);
             }
-        } elseif ($discussion->isClosedBySystem()) {
-            // Only what the forum closed: a moderator closing or opening it since clears the mark
-            $discussion->reopen();
-            $changed = true;
-        }
 
-        if ($changed) {
-            $this->writer->saveDiscussion($discussion);
-        }
+            if ($wantsClosed) {
+                if ($locked->status() === DiscussionStatus::Open) {
+                    $locked->closeBySystem();
+                }
+            } elseif ($locked->isClosedBySystem()) {
+                // Only what the forum closed: a moderator closing or opening it since clears the mark
+                $locked->reopen();
+            }
+        });
     }
 
     /**
@@ -245,6 +245,13 @@ final readonly class PublicationDiscussionSync
     {
         $firstPostId = $record->firstPostId();
         if ($before->opening === $after->opening || ! $firstPostId instanceof PostId) {
+            return;
+        }
+
+        // Once a moderator edited it, the first post is theirs: the forum no longer rewrites it
+        $revisions = $this->revisions->ofPost($firstPostId);
+        $last = $revisions === [] ? null : array_last($revisions);
+        if ($last !== null && ! $this->systemAccount->isSystemAccount($last->editorId())) {
             return;
         }
 

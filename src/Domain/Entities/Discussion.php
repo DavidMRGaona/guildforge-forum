@@ -36,6 +36,8 @@ final class Discussion
         private readonly DateTimeImmutable $createdAt,
         private bool $closedBySystem = false,
         private ?int $number = null,
+        private bool $awaitingApproval = false,
+        private bool $titleSetByModeration = false,
     ) {
         if ($number !== null && $number < 1) {
             throw InvalidDiscussionException::invalidNumber($number);
@@ -78,9 +80,55 @@ final class Discussion
         return $this->number;
     }
 
+    /**
+     * Renamed by the forum itself (its publication changed title). Whoever calls it checks first
+     * that moderation did not give it its title (isTitleSetByModeration).
+     */
     public function rename(DiscussionTitle $title): void
     {
         $this->title = $title;
+    }
+
+    /**
+     * Renamed by a moderator: from now on the title is theirs and the forum leaves it alone.
+     */
+    public function renameByModeration(DiscussionTitle $title): void
+    {
+        $this->title = $title;
+        $this->titleSetByModeration = true;
+    }
+
+    public function isTitleSetByModeration(): bool
+    {
+        return $this->titleSetByModeration;
+    }
+
+    /**
+     * Its first post waits for approval: until a moderator approves it, only its author and its
+     * moderators see the discussion.
+     */
+    public function awaitApproval(): void
+    {
+        $this->awaitingApproval = true;
+    }
+
+    /**
+     * Its first post was approved: the discussion is there for everyone who reads its category.
+     *
+     * @throws InvalidDiscussionException unless it awaits approval
+     */
+    public function approve(): void
+    {
+        if (! $this->awaitingApproval) {
+            throw InvalidDiscussionException::notAwaitingApproval($this->id->value);
+        }
+
+        $this->awaitingApproval = false;
+    }
+
+    public function isAwaitingApproval(): bool
+    {
+        return $this->awaitingApproval;
     }
 
     public function moveTo(CategoryId $categoryId): void
@@ -157,12 +205,12 @@ final class Discussion
     }
 
     /**
-     * Open and shown. Who may still write in it (moderators in a closed one) is decided by the
+     * Open, shown and not awaiting approval. Who may still write in it (moderators in a closed one) is decided by the
      * forum's access rules, not here.
      */
     public function acceptsReplies(): bool
     {
-        return $this->status === DiscussionStatus::Open && ! $this->hidden;
+        return $this->status === DiscussionStatus::Open && ! $this->hidden && ! $this->awaitingApproval;
     }
 
     public function id(): DiscussionId

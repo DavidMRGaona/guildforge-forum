@@ -13,6 +13,7 @@ use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\Services\ForumBrowser;
+use Modules\Forum\Application\Services\ModerationQueue;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 
 /**
@@ -27,6 +28,7 @@ final class ForumIndexController extends Controller
         private readonly ForumPresenter $presenter,
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
+        private readonly ModerationQueue $queue,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -40,6 +42,7 @@ final class ForumIndexController extends Controller
             'canStart' => array_filter($readable, static fn (CategoryAccessDTO $access): bool => $access->canStartDiscussions()) !== [],
             'newDiscussionUrl' => route('forum.discussions.create'),
             'markReadUrl' => $reader === null ? null : route('forum.read'),
+            'moderationUrl' => $this->queue->hasQueue($reader) ? route('forum.moderation.index') : null,
             'seo' => $this->seo->forPage(new SeoPageDTO(
                 title: __('forum::messages.pages.index_title'),
                 description: __('forum::messages.pages.index_description'),

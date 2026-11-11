@@ -125,4 +125,9 @@ final class InvalidCategoryException extends DomainException
     {
         return new self("The discussions of category {$id} cannot move into it.", 'cannot_move_into_itself');
     }
+
+    public static function approvalThresholdOutOfBounds(int $max): self
+    {
+        return new self("A category asks for 0 to {$max} approved posts.", 'approval_threshold');
+    }
 }

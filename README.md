@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña, las páginas públicas, los «me gusta», el seguimiento y los avisos.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña, las páginas públicas, los «me gusta», el seguimiento, los avisos y la moderación.
 
 ## Qué hay
 
@@ -111,6 +111,49 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
 - Los avisos tratan del tema (los de temas nuevos y espacios, de la categoría), así que silenciarlo desde el correo los calla también en la web. Al borrar un tema o una categoría se llama a `forgetSubject()`, que borra sus silencios y sus avisos.
 - Los nombres que van al correo pasan por `EscapesMarkdown`.
 
+## Moderación
+
+Modera un tema quien tiene `forum:forum.moderate` (todo el foro) o modera su categoría (sus roles moderadores o, en un espacio de campaña, la dirección). Todo pasa por `ForumModeration`: comprueba el permiso (lo que no se puede leer da 404 y lo que no se puede moderar, 403), escribe con los bloqueos de `ForumWriter` y anota la acción en el historial en la misma transacción.
+
+- **En el tema** (menú «Moderar» de la cabecera): fijar y desfijar, cerrar y reabrir, renombrar, mover, ocultar y mostrar, y borrar.
+  - **Mover**: solo a una categoría que quien mueve también modere, nunca a «Mesas», «Campañas» ni «Eventos». El tema de una publicación no se mueve: se queda donde lo puso el foro.
+  - **Borrar** es definitivo (el tema y todos sus mensajes): solo lo hace quien modera todo el foro, y pide marcar una casilla. Quien modera una categoría lo oculta.
+  - Cerrar, ocultar, mover y borrar admiten un motivo, que queda en el historial.
+- **En cada mensaje** (menú «Moderar» de su pie): ocultar con un motivo (300 caracteres), que leen su autor y la moderación, y mostrar; aprobar o rechazar lo pendiente (rechazar borra el mensaje y pide marcar una casilla). La moderación edita también los mensajes ajenos con el editor de siempre; la versión anterior queda en el historial del mensaje.
+- **Lo que hace la moderación es suyo** y el foro nunca lo deshace:
+  - un tema que cierra la moderación no lo reabre el foro (`closed_by_system` se borra al cerrarlo a mano);
+  - un título que pone la moderación ya no sigue al de la publicación (`title_by_moderation`);
+  - un primer mensaje de un tema automático que edita la moderación ya no se reescribe;
+  - el foro decide sus cambios sobre el tema bloqueado (`ForumWriter::changeDiscussion()`), así que lo que haga la moderación a la vez no se pisa;
+  - un espacio de campaña en solo lectura por la moderación sigue así (`read_only_by`).
+- **Aprobación previa**, por categoría (*Aprobación previa* en el formulario, de 0 a 50; 0 la apaga): los mensajes de quien tenga menos mensajes publicados en todo el foro que ese número esperan a que la moderación los apruebe. Cuentan los mensajes a la vista y los que borró su autor, nunca los ocultos ni los pendientes. Quien modera la categoría nunca espera. Si no se puede comprobar, el mensaje espera (falla cerrada).
+  - Una respuesta pendiente no tiene número; al aprobarla recibe el siguiente libre.
+  - Un tema cuyo primer mensaje espera, espera con él (`awaiting_approval`): solo lo ven su autor y la moderación, no sale en las listas, no admite respuestas y su menú solo ofrece aprobar o rechazar. Al aprobarlo se abre a sus lectores y, si toca, se anuncia en los canales una sola vez y tras guardarse (`DiscussionAnnouncer`, con las mismas reglas que al abrirlo). Rechazarlo borra el tema.
+- **Límites**: *Mensajes por minuto* y *Temas por hora* por persona (5 por defecto, de 1 a 60), en los ajustes. Cada tema cuenta también como mensaje. Al pasarse se responde 429 con `Retry-After` y un mensaje que dice cuánto esperar.
+- **Denuncias** (`forum_reports`): cualquiera con sesión denuncia un mensaje a la vista que no sea suyo, con un motivo de una lista cerrada (spam, ofensivo, fuera de tema, datos personales de otra persona, otro) y un comentario opcional. Mientras su denuncia sigue abierta, volver a denunciar no hace nada. Quien escribió el mensaje no sabe quién lo denunció.
+  - Se resuelven todas las denuncias abiertas de un mensaje a la vez: «oculto» (oculta el mensaje, con el motivo), «editado» o «sin acción». Ocultar o editar un mensaje denunciado desde el tema también las resuelve.
+  - Al denunciar se lanza `ForumPostReported` (tras guardarse), para que los avisos lleguen a la moderación.
+- **Suspensiones** (`forum_suspensions`): quien modera todo el foro suspende a una persona unos días o sin fecha de fin, con un motivo que esa persona ve en el foro. Mientras dura, lee, pero no escribe, no denuncia y no modera nada; «me gusta» debe preguntarlo igual (`ForumSuspensions::isSuspended()`). Se levanta sola al terminar (no hace falta ninguna tarea) o antes, a mano.
+  - Nadie se suspende a sí mismo, ni a la cuenta del sistema ni a quien modera todo el foro. Una suspensión nueva sustituye a la que estuviera en vigor.
+  - Si no se pueden leer las suspensiones, nadie escribe (falla cerrada).
+  - Al suspender se lanza `ForumUserSuspended` (tras guardarse), y al aprobar un mensaje, `ForumPostApproved`, para los avisos.
+- **Página «Moderación»** del foro (`/foro/moderacion`, enlace en la portada y en cada tema para quien modera algo): las denuncias pendientes y lo que espera aprobación en las categorías que la persona modera, para resolverlo sin el panel. Quien no modera nada recibe 404.
+- **Historial** (`forum_moderation_log`): quién hizo qué, a quién, dónde, cuándo y por qué. Solo se añaden filas: nada lo cambia ni lo borra. Guarda el título y el número del tema, así que se lee aunque el tema ya no exista.
+
+### Endpoints de moderación (JSON, con sesión, 60 por minuto)
+
+| Método y ruta | Qué hace |
+|---|---|
+| `POST /foro/temas/{tema}/moderacion` | `{"action": "pin" \| "unpin" \| "close" \| "reopen" \| "hide" \| "show" \| "rename" \| "move", "reason"?, "title"?, "category"?}` |
+| `DELETE /foro/temas/{tema}` | Borrar el tema, con `{"confirmed": true, "reason"?}` |
+| `POST /foro/mensajes/{mensaje}/moderacion` | `{"action": "hide" \| "show" \| "approve" \| "reject", "reason"?}` |
+| `POST /foro/mensajes/{mensaje}/denuncias` | Denunciar, con `{"reason", "note"?}` (10 por minuto) |
+| `POST /foro/mensajes/{mensaje}/denuncias/resolver` | `{"resolution": "hidden" \| "edited" \| "no_action", "reason"?}` |
+| `POST /foro/suspensiones` | Suspender, con `{"user", "reason", "days"?}` (sin `days`, sin fecha de fin) |
+| `DELETE /foro/suspensiones/{suspensión}` | Levantar una suspensión, con `{"reason"?}` |
+
+Algo que la moderación nunca hace (mover a una categoría del sistema, un título fuera de límites) responde 422 con `reason`; una acción sobre algo que ya está así (cerrar un tema cerrado), 409.
+
 ## Editor de mensajes
 
 El editor es TipTap en el navegador. Lo que se envía y se guarda es su documento JSON, que el servidor comprueba contra un esquema propio antes de guardarlo. Si no encaja, responde 422 con un código (`reason`) y la ruta dentro del documento (`path`); nunca lo arregla a escondidas. Nunca se acepta HTML de quien escribe.
@@ -174,15 +217,22 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 
 | Permiso | Para qué sirve |
 |---|---|
-| `forum:forum.moderate` | Moderar todo el foro |
+| `forum:forum.moderate` | Moderar todo el foro, también desde el panel, y borrar temas |
 | `forum:categories.manage` | Gestionar las categorías y quién ve y escribe en cada una |
 | `forum:settings.manage` | Cambiar los ajustes del foro |
 | `forum:posts.upload_images` | Subir imágenes a los mensajes |
 
 ## Panel
 
-- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo.
-- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
+- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
+- **Moderación del foro**: en *Comunicación* (hueco 35), con `forum:forum.moderate`. El número del menú suma denuncias abiertas y mensajes pendientes. Cuatro pestañas (`?pestana=`):
+  - *Denuncias*: las abiertas, lo más antiguo primero. «Ocultar el mensaje» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro», «Resolver sin acción» y «Resolver como editado».
+  - *Pendientes*: lo que espera aprobación, lo más antiguo primero. «Aprobar» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro» y «Rechazar», que pide un motivo opcional y marcar una casilla.
+  - *Suspensiones*: las que están en vigor primero, con «Levantar». La acción «Suspender» de la cabecera elige a la persona, el motivo y la duración (1, 3, 7, 30 o 90 días, o sin fecha de fin).
+  - *Historial*: el historial de moderación, lo más nuevo primero, con filtro por acción. Solo se lee.
+  - Las tablas caben en todos los anchos: las columnas secundarias aparecen desde el ancho en que caben y «Ver detalles» muestra las ocultas.
+- **Actividad del foro**: widget del escritorio con los temas y mensajes de los últimos 30 días, las denuncias pendientes y lo pendiente de aprobación (enlaza a la moderación). Solo con `forum:forum.moderate`.
+- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
 
 ## Desarrollo
 

@@ -12,6 +12,8 @@ return [
     'posts_per_page' => 20,
     // Posts one person may publish per minute (1–60)
     'posts_per_minute' => 6,
+    // Discussions one person may start per hour (1–60)
+    'discussions_per_hour' => 5,
     // Image formats people may upload (jpeg, png, webp, gif; never svg)
     'image_types' => ['jpeg', 'png', 'webp', 'gif'],
     // Largest image file, in kilobytes (128–10240)

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Contracts;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+
 /**
  * The accounts the forum shows by name: mentions, quote authors, editors of a version.
  */
@@ -26,4 +28,9 @@ interface AccountDirectoryInterface
      * @return list<string>
      */
     public function mentionable(array $accountIds): array;
+
+    /**
+     * The account with that id, while it is active (neither deactivated nor anonymized).
+     */
+    public function active(string $accountId): ?Authenticatable;
 }

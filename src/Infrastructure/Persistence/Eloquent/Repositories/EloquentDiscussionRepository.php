@@ -29,6 +29,8 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
             'is_pinned' => $discussion->isPinned(),
             'is_hidden' => $discussion->isHidden(),
             'closed_by_system' => $discussion->isClosedBySystem(),
+            'awaiting_approval' => $discussion->isAwaitingApproval(),
+            'title_by_moderation' => $discussion->isTitleSetByModeration(),
             'created_at' => $discussion->createdAt(),
         ]);
     }
@@ -119,6 +121,8 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
             createdAt: $model->created_at->toDateTimeImmutable(),
             closedBySystem: $model->closed_by_system,
             number: $model->number,
+            awaitingApproval: $model->awaiting_approval,
+            titleSetByModeration: $model->title_by_moderation,
         );
     }
 }

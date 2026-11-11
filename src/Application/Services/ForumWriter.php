@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Services;
 
+use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -55,8 +56,9 @@ final readonly class ForumWriter
     ) {}
 
     /**
-     * Saves a new discussion with its first post, number 1 unless it awaits approval. The post
-     * is dated when the discussion started. The discussion gets the next public number; should
+     * Saves a new discussion with its first post, number 1 unless it awaits approval (then the
+     * discussion waits with it: only its author and moderators see it). The post is dated when
+     * the discussion started. The discussion gets the next public number; should
      * another discussion take it at the same moment, the whole write is tried again with the
      * following one.
      */
@@ -69,11 +71,17 @@ final readonly class ForumWriter
 
                     // Numbered on a copy: a failed attempt leaves the caller's discussion as it was
                     $numbered = clone $discussion;
+                    if ($needsApproval) {
+                        $numbered->awaitApproval();
+                    }
                     if ($numbered->number() === null) {
                         $numbered->numberAs($this->discussions->nextNumber());
                     }
                     $this->discussions->save($numbered);
                     $discussion->numberAs((int) $numbered->number());
+                    if ($needsApproval) {
+                        $discussion->awaitApproval();
+                    }
 
                     $post = $needsApproval
                         ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $body, $discussion->createdAt())
@@ -118,7 +126,8 @@ final readonly class ForumWriter
 
     /**
      * Publishes a post that awaited approval with the next number at the time of approval, so
-     * it reads after whatever was published while it waited and counts as new activity.
+     * it reads after whatever was published while it waited and counts as new activity. In a
+     * discussion that waited for its first post, the discussion is approved with it.
      *
      * @throws PostNotFoundException
      * @throws InvalidPostException unless it awaits approval
@@ -132,10 +141,38 @@ final readonly class ForumWriter
             $post->approve($this->nextNumber($discussion->id()), $at);
             $this->posts->save($post);
 
+            if ($discussion->isAwaitingApproval()) {
+                $discussion->approve();
+                $this->discussions->save($discussion);
+            }
+
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
             return $post;
         }, self::ATTEMPTS));
+    }
+
+    /**
+     * Changes a post as it is under the lock: the change runs on the post read again inside the
+     * transaction, so two moderators at once never undo each other.
+     *
+     * @param  Closure(Post): void  $change
+     *
+     * @throws PostNotFoundException
+     */
+    public function changePost(PostId $postId, Closure $change): Post
+    {
+        return DB::transaction(function () use ($postId, $change): Post {
+            $discussion = $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
+
+            $post = $this->posts->findOrFail($postId);
+            $change($post);
+            $this->posts->save($post);
+
+            $this->refresh($discussion->id(), [$discussion->categoryId()]);
+
+            return $post;
+        }, self::ATTEMPTS);
     }
 
     /**
@@ -256,6 +293,38 @@ final readonly class ForumWriter
             $this->posts->delete($postId);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+        }, self::ATTEMPTS);
+    }
+
+    /**
+     * Changes a discussion as it is under the lock (pinning, closing, renaming, moving…): the
+     * change runs on the discussion read again inside the transaction, so two moderators at once
+     * never undo each other. A move needs the category it goes to, locked with the one it leaves
+     * (in id order); both are refreshed.
+     *
+     * @param  Closure(Discussion): void  $change
+     *
+     * @throws DiscussionNotFoundException
+     */
+    public function changeDiscussion(DiscussionId $discussionId, Closure $change, ?CategoryId $moveTo = null): Discussion
+    {
+        return DB::transaction(function () use ($discussionId, $change, $moveTo): Discussion {
+            $stored = $this->discussions->findOrFail($discussionId);
+            $categories = $this->lockCategories($moveTo instanceof CategoryId ? [$stored->categoryId(), $moveTo] : [$stored->categoryId()]);
+            $discussion = $this->discussions->findForUpdate($discussionId);
+
+            // Moved by someone else since it was read: that category changes too
+            if (! in_array($discussion->categoryId()->value, array_map(static fn (CategoryId $id): string => $id->value, $categories), true)) {
+                $this->categories->lockForWrite($discussion->categoryId());
+                $categories[] = $discussion->categoryId();
+            }
+
+            $change($discussion);
+            $this->discussions->save($discussion);
+
+            $this->refresh($discussionId, $categories);
+
+            return $discussion;
         }, self::ATTEMPTS);
     }
 

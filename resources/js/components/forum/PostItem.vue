@@ -2,26 +2,41 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
-import { Link2, Pencil, Quote, Trash2 } from '@lucide/vue';
+import { Flag, Link2, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import LikeButton from './LikeButton.vue';
+import ModerationDialog, { type ModerationDialogFields } from '../moderation/ModerationDialog.vue';
+import ModerationMenu, { type ModerationMenuItem } from '../moderation/ModerationMenu.vue';
+import ReportDialog from '../moderation/ReportDialog.vue';
+import SuspendDialog from '../moderation/SuspendDialog.vue';
 import { sendJson } from '../../forum/api';
 import type { ForumEditorSettings, ForumPost } from '../../types/forum';
+
+type PostAction = 'hide' | 'show' | 'approve' | 'reject';
 
 /**
  * One post of the conversation. Its author may edit or delete it while they may post in the
  * discussion; anyone who may reply can quote it (the selected text, or the whole post); anyone
- * signed in who reads it may like it, except its author.
+ * signed in who reads it may like it, except its author. Its moderators also edit it, hide or
+ * show it (with a reason its author reads) and approve or reject it while it awaits approval.
  */
-const props = defineProps<{
-    post: ForumPost;
-    focused: boolean;
-    canQuote: boolean;
-    editor: ForumEditorSettings;
-    mentionsUrl: string | null;
-    mentionNames: Record<string, string>;
-}>();
+const props = withDefaults(
+    defineProps<{
+        post: ForumPost;
+        focused: boolean;
+        canQuote: boolean;
+        editor: ForumEditorSettings;
+        mentionsUrl: string | null;
+        mentionNames: Record<string, string>;
+        hiddenReasonMax?: number;
+        reasonMax?: number;
+        /** For whoever moderates the whole forum: suspending the author from this post */
+        suspendUrl?: string | null;
+        viewerId?: string | null;
+    }>(),
+    { hiddenReasonMax: 300, reasonMax: 500, suspendUrl: null, viewerId: null }
+);
 
 const emit = defineEmits<{
     quote: [source: { postId: string; text: string }];
@@ -35,6 +50,96 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const confirmDelete = ref(false);
 const body = ref<HTMLElement | null>(null);
+
+const moderating = ref<PostAction | null>(null);
+const moderationOpen = ref(false);
+const moderationBusy = ref(false);
+const moderationError = ref<string | null>(null);
+
+const reporting = ref(false);
+const reported = ref(false);
+const suspending = ref(false);
+const suspended = ref(false);
+
+/** Whether the author may be suspended from here: someone else's post, by an account */
+const canSuspendAuthor = computed(
+    () =>
+        props.suspendUrl !== null &&
+        props.post.authorId !== null &&
+        props.post.authorId !== props.viewerId
+);
+
+const moderationItems = computed<ModerationMenuItem[]>(() => {
+    if (props.post.moderationUrl === null) {
+        return [];
+    }
+    const items: ModerationMenuItem[] = [];
+    switch (props.post.status) {
+        case 'visible':
+            items.push({ key: 'hide', label: t('forum.moderation.post.hide') });
+            break;
+        case 'hidden':
+            items.push({ key: 'show', label: t('forum.moderation.post.show') });
+            break;
+        case 'pending':
+            items.push(
+                { key: 'approve', label: t('forum.moderation.post.approve') },
+                { key: 'reject', label: t('forum.moderation.post.reject'), danger: true }
+            );
+            break;
+        default:
+            break;
+    }
+    if (canSuspendAuthor.value) {
+        items.push({ key: 'suspend', label: t('forum.moderation.post.suspend'), danger: true });
+    }
+
+    return items;
+});
+
+function selectModeration(key: string): void {
+    if (key === 'suspend') {
+        suspending.value = true;
+
+        return;
+    }
+    const action = key as PostAction;
+    moderationError.value = null;
+    if (action === 'hide' || action === 'reject') {
+        moderating.value = action;
+        moderationOpen.value = true;
+
+        return;
+    }
+    void moderate(action, { reason: '', title: '', category: '' });
+}
+
+async function moderate(action: PostAction, fields: ModerationDialogFields): Promise<void> {
+    if (props.post.moderationUrl === null) {
+        return;
+    }
+    moderationBusy.value = true;
+    const answer = await sendJson(props.post.moderationUrl, 'POST', {
+        action,
+        reason: fields.reason === '' ? undefined : fields.reason,
+    });
+    moderationBusy.value = false;
+
+    if (answer.ok) {
+        moderationOpen.value = false;
+        moderating.value = null;
+        emit('changed');
+
+        return;
+    }
+
+    const message = answer.message ?? t('forum.moderation.errors.generic');
+    if (moderationOpen.value) {
+        moderationError.value = message;
+    } else {
+        error.value = message;
+    }
+}
 
 const anchor = computed(() =>
     props.post.number === null ? `post-${props.post.id}` : `post-${props.post.number}`
@@ -172,6 +277,19 @@ async function remove(): Promise<void> {
                 <p v-else-if="post.placeholder" class="mb-2 text-xs font-medium text-base-muted">
                     {{ post.placeholder }}
                 </p>
+                <p
+                    v-if="post.hiddenReason"
+                    class="mb-2 text-xs text-base-muted"
+                    data-testid="post-hidden-reason"
+                >
+                    {{ t('forum.moderation.post.hiddenReason', { reason: post.hiddenReason }) }}
+                </p>
+                <p v-if="reported" role="status" class="mb-2 text-xs text-base-muted">
+                    {{ t('forum.reports.sent') }}
+                </p>
+                <p v-if="suspended" role="status" class="mb-2 text-xs text-base-muted">
+                    {{ t('forum.suspensions.done') }}
+                </p>
                 <!-- Rendered by the server from the stored document, with every text escaped -->
                 <!-- eslint-disable vue/no-v-html -->
                 <div
@@ -188,8 +306,10 @@ async function remove(): Promise<void> {
         <footer
             v-if="
                 !editing &&
-                (canQuote || post.canEdit || post.canDelete || showsLikes) &&
-                post.html !== null
+                (((canQuote || post.canEdit || post.canDelete || showsLikes) &&
+                    post.html !== null) ||
+                    moderationItems.length > 0 ||
+                    (post.reportUrl !== null && !reported))
             "
             class="flex flex-wrap items-center justify-end gap-1 border-t border-default px-2 py-1"
         >
@@ -200,6 +320,22 @@ async function remove(): Promise<void> {
                 :post-id="post.id"
                 :post-number="post.number"
             />
+            <ModerationMenu
+                :items="moderationItems"
+                :label="t('forum.moderation.post.menu')"
+                :busy="moderationBusy"
+                @select="selectModeration"
+            />
+            <button
+                v-if="post.reportUrl && !reported"
+                type="button"
+                class="inline-flex min-h-[44px] items-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
+                data-testid="post-report"
+                @click="reporting = true"
+            >
+                <Flag class="h-4 w-4" aria-hidden="true" />
+                {{ t('forum.reports.action') }}
+            </button>
             <button
                 v-if="canQuote && post.status === 'visible'"
                 type="button"
@@ -228,6 +364,51 @@ async function remove(): Promise<void> {
                 {{ t('forum.posts.delete') }}
             </button>
         </footer>
+
+        <ModerationDialog
+            v-model="moderationOpen"
+            :title="
+                moderating === 'reject'
+                    ? t('forum.moderation.post.rejectTitle')
+                    : t('forum.moderation.post.hideTitle')
+            "
+            :message="
+                moderating === 'reject'
+                    ? t('forum.moderation.post.rejectMessage')
+                    : t('forum.moderation.post.hideMessage')
+            "
+            :confirm-label="
+                moderating === 'reject'
+                    ? t('forum.moderation.post.reject')
+                    : t('forum.moderation.post.hide')
+            "
+            :danger="moderating === 'reject'"
+            ask-reason
+            :reason-max="moderating === 'reject' ? reasonMax : hiddenReasonMax"
+            :confirmation="
+                moderating === 'reject' ? t('forum.moderation.post.rejectConfirmation') : null
+            "
+            :busy="moderationBusy"
+            :error="moderationError"
+            @confirm="(fields) => moderating && moderate(moderating, fields)"
+        />
+
+        <ReportDialog
+            v-if="post.reportUrl"
+            v-model="reporting"
+            :report-url="post.reportUrl"
+            :post-number="post.number"
+            @reported="reported = true"
+        />
+
+        <SuspendDialog
+            v-if="canSuspendAuthor && suspendUrl && post.authorId"
+            v-model="suspending"
+            :suspend-url="suspendUrl"
+            :user-id="post.authorId"
+            :user-name="post.authorName"
+            @suspended="suspended = true"
+        />
 
         <ConfirmDialog
             v-model="confirmDelete"

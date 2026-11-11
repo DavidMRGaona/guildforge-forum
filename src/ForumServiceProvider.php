@@ -44,15 +44,22 @@ use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
+use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\ReportRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\SuspensionRepositoryInterface;
+use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
+use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
@@ -60,11 +67,15 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentReportRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubjectDiscussionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSuspensionRepository;
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
+use Modules\Forum\Infrastructure\Queries\EloquentModerationQueueQuery;
 use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
@@ -115,11 +126,16 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostRevisionRepositoryInterface::class, EloquentPostRevisionRepository::class);
         $this->app->bind(ForumCountersInterface::class, EloquentForumCounters::class);
         $this->app->bind(SubjectDiscussionRepositoryInterface::class, EloquentSubjectDiscussionRepository::class);
+        $this->app->bind(ModerationLogRepositoryInterface::class, EloquentModerationLogRepository::class);
+        $this->app->bind(ReportRepositoryInterface::class, EloquentReportRepository::class);
+        $this->app->bind(SuspensionRepositoryInterface::class, EloquentSuspensionRepository::class);
         $this->app->bind(SystemAccountInterface::class, EloquentSystemAccount::class);
         $this->app->bind(PublicationSyncQueueInterface::class, JobPublicationSyncQueue::class);
         $this->app->bind(ForumSettingsInterface::class, ForumSettings::class);
         // Roles and rosters are read once per request (or queue job)
         $this->app->scoped(CategoryAccessPolicy::class);
+        // Suspensions are read once per person and request (or queue job)
+        $this->app->scoped(ForumSuspensions::class);
         $this->app->bind(AccountDirectoryInterface::class, EloquentAccountDirectory::class);
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
@@ -132,6 +148,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(ForumNoticesInterface::class, QueuedForumNotices::class);
         $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
+        $this->app->bind(ModerationQueueQueryInterface::class, EloquentModerationQueueQuery::class);
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
 
@@ -296,7 +313,15 @@ final class ForumServiceProvider extends ModuleServiceProvider
      */
     public function registerFilamentPages(): array
     {
-        return [ForumSettingsPage::class];
+        return [ForumSettingsPage::class, ForumModerationPage::class];
+    }
+
+    /**
+     * @return array<class-string>
+     */
+    public function registerFilamentWidgets(): array
+    {
+        return [ForumActivityWidget::class];
     }
 
     /**

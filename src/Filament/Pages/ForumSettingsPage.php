@@ -97,6 +97,8 @@ final class ForumSettingsPage extends Page implements HasForms
                             ->maxValue(ForumSettings::MAX_POSTS_PER_MINUTE)
                             ->required()
                             ->default(ForumSettings::DEFAULT_POSTS_PER_MINUTE),
+                        $this->boundedField('discussions_per_hour', ForumSettings::MIN_DISCUSSIONS_PER_HOUR, ForumSettings::MAX_DISCUSSIONS_PER_HOUR, ForumSettings::DEFAULT_DISCUSSIONS_PER_HOUR)
+                            ->helperText(__('forum::messages.settings.discussions_per_hour_help', ['min' => ForumSettings::MIN_DISCUSSIONS_PER_HOUR, 'max' => ForumSettings::MAX_DISCUSSIONS_PER_HOUR])),
                     ]),
                 Section::make(__('forum::messages.settings.announcements'))
                     ->description(__('forum::messages.settings.announcements_help'))

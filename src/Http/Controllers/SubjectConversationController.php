@@ -15,6 +15,7 @@ use Modules\Forum\Domain\Enums\DiscussionStatus;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
+use Modules\Forum\Http\Presenters\ModerationProps;
 
 /**
  * The conversation of a record, for the `subject-discussion` slot of its page
@@ -29,6 +30,7 @@ final class SubjectConversationController extends Controller
         private readonly EditorProps $editor,
         private readonly ForumUrlsInterface $urls,
         private readonly EngagementPresenter $engagement,
+        private readonly ModerationProps $moderationProps,
     ) {}
 
     public function show(Request $request, string $type, string $id): JsonResponse
@@ -65,7 +67,7 @@ final class SubjectConversationController extends Controller
                 'isClosed' => $discussion->status() === DiscussionStatus::Closed,
                 'closedReason' => $conversation->closedReason?->value,
             ],
-            'posts' => $this->engagement->withLikes($posts, $conversation->posts, $discussion, $user),
+            'posts' => $this->moderationProps->withReportLinks($this->engagement->withLikes($posts, $conversation->posts, $discussion, $user), $user),
             'mentionNames' => $mentionNames,
             'olderCount' => $conversation->olderCount,
             'olderNext' => min(SubjectConversationReader::EARLIER, $conversation->olderCount),
@@ -82,6 +84,7 @@ final class SubjectConversationController extends Controller
                 'postUrl' => route('forum.posts.store', ['discussion' => $discussionId]),
                 'mentionsUrl' => $signedIn ? route('forum.mentions.index', ['discussion' => $discussionId]) : null,
                 ...$this->editor->for($user),
+                'suspension' => $this->moderationProps->suspensionNotice($user),
             ],
         ];
     }

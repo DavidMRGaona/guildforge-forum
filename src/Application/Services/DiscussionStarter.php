@@ -24,8 +24,10 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 /**
  * Starting a discussion from the forum: a title, a category the person may write in (never one
  * of the categories publications fill), tags already used in the forum, and the first post.
- * Only moderators of the category start it pinned or closed. Once it is saved, a discussion
- * guests can read may be announced (DiscussionAnnouncer).
+ * Only moderators of the category start it pinned or closed. Starting one counts against the
+ * discussions-per-hour limit as well as the posts one. In a category that asks newcomers for
+ * approval (ApprovalRule) it waits, with its first post, for a moderator. Once it is saved and
+ * shown, a discussion guests can read may be announced (DiscussionAnnouncer).
  */
 final readonly class DiscussionStarter
 {
@@ -44,6 +46,7 @@ final readonly class DiscussionStarter
         private DiscussionAnnouncer $announcer,
         private DiscussionReadsInterface $reads,
         private FollowService $follows,
+        private ApprovalRule $approval,
     ) {}
 
     /**
@@ -96,7 +99,9 @@ final readonly class DiscussionStarter
         $title = new DiscussionTitle($this->checkedTitle($input->title));
         $topics = $this->checkedTopics($author, $input->topicKeys);
         $body = $this->bodies->fromInput($input->document, $author);
+        $this->posting->countDiscussion($author);
         $this->posting->countPost($author);
+        $needsApproval = $this->approval->needsApproval($author, $access->category);
 
         $authorId = ForumBrowser::accountId($author);
         $discussion = Discussion::start(DiscussionId::generate(), $access->category->id(), $authorId, $title, CarbonImmutable::now());
@@ -107,17 +112,19 @@ final readonly class DiscussionStarter
             $discussion->close();
         }
 
-        DB::transaction(function () use ($discussion, $body, $topics): void {
-            $this->writer->startDiscussion($discussion, PostId::generate(), $body, needsApproval: false);
+        DB::transaction(function () use ($discussion, $body, $topics, $needsApproval): void {
+            $this->writer->startDiscussion($discussion, PostId::generate(), $body, $needsApproval);
             if ($topics !== []) {
                 $this->discussions->replaceTopics($discussion->id(), $topics);
             }
         });
 
-        // Its author has read what they wrote, and follows it
-        $this->reads->advance((string) $authorId, $discussion->id(), 1, $discussion->createdAt());
+        // Its author has read what they wrote, and follows it; one awaiting approval is announced once approved
         $this->follows->followAfterPosting((string) $authorId, $discussion->id());
-        $this->announcer->announce($discussion, $access->category, $body, $topics);
+        if (! $discussion->isAwaitingApproval()) {
+            $this->reads->advance((string) $authorId, $discussion->id(), 1, $discussion->createdAt());
+            $this->announcer->announce($discussion, $access->category, $body, $topics);
+        }
 
         return $discussion;
     }

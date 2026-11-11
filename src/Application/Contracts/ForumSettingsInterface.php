@@ -24,6 +24,11 @@ interface ForumSettingsInterface
     public function postsPerMinute(): int;
 
     /**
+     * Discussions one person may start per hour.
+     */
+    public function discussionsPerHour(): int;
+
+    /**
      * Image formats people may upload; none when every one was turned off.
      *
      * @return list<PostImageType>

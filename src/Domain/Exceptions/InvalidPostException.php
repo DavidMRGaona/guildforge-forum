@@ -50,4 +50,14 @@ final class InvalidPostException extends DomainException
     {
         return new self("Post {$postId} is not awaiting approval: only those are discarded, so readers never see a gap in the numbering.");
     }
+
+    public static function hiddenReasonTooLong(int $max): self
+    {
+        return new self("The reason for hiding a post is limited to {$max} characters.");
+    }
+
+    public static function reasonWithoutHiding(PostStatus $status): self
+    {
+        return new self("Only a hidden post keeps a reason, not a {$status->value} one.");
+    }
 }

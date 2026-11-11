@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Models;
 
 use App\Infrastructure\Persistence\Eloquent\Concerns\StoresInstantsInStorageTimezone;
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable|null $edited_at
  * @property CarbonImmutable|null $deleted_at
  * @property CarbonImmutable|null $content_purged_at
+ * @property string|null $hidden_reason
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -38,7 +41,23 @@ final class PostModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'deleted_at', 'content_purged_at', 'created_at'];
+    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'deleted_at', 'content_purged_at', 'hidden_reason', 'created_at'];
+
+    /**
+     * @return BelongsTo<DiscussionModel, $this>
+     */
+    public function discussion(): BelongsTo
+    {
+        return $this->belongsTo(DiscussionModel::class, 'discussion_id');
+    }
+
+    /**
+     * @return BelongsTo<UserModel, $this>
+     */
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'author_id');
+    }
 
     /**
      * @return array<string, string>

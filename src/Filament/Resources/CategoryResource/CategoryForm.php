@@ -36,6 +36,7 @@ final readonly class CategoryForm
         'has_subcategories' => 'parent_id',
         'wider_than_parent' => 'view_kind',
         'narrower_than_children' => 'view_kind',
+        'approval_threshold' => 'approval_threshold',
     ];
 
     public function __construct(
@@ -66,6 +67,7 @@ final readonly class CategoryForm
             'moderator_role_ids' => is_array($moderators['role_ids'] ?? null) ? $moderators['role_ids'] : [],
             'moderator_roster' => is_string($moderators['roster'] ?? null) ? $moderators['roster'] : null,
             'read_only' => $record->read_only_by !== null,
+            'approval_threshold' => $record->approval_threshold,
         ];
     }
 
@@ -93,6 +95,10 @@ final readonly class CategoryForm
             );
 
             $this->applyReadOnly($category, $data);
+            $threshold = $data['approval_threshold'] ?? null;
+            if (is_numeric($threshold)) {
+                $category->requireApprovalFor((int) $threshold);
+            }
 
             $this->manager->save($category);
         } catch (InvalidCategoryException $exception) {

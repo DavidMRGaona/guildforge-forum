@@ -70,6 +70,42 @@ final class PostTest extends TestCase
         $this->assertFalse($post->isVisible());
     }
 
+    public function test_hiding_keeps_the_reason_until_it_is_shown_again(): void
+    {
+        $post = $this->published(2);
+
+        $post->hide('  Insultos  ');
+
+        $this->assertSame('Insultos', $post->hiddenReason());
+
+        $post->restore();
+
+        $this->assertNull($post->hiddenReason());
+    }
+
+    public function test_a_blank_reason_is_no_reason(): void
+    {
+        $post = $this->published(2);
+
+        $post->hide('   ');
+
+        $this->assertNull($post->hiddenReason());
+    }
+
+    public function test_a_reason_too_long_is_refused(): void
+    {
+        $this->expectException(InvalidPostException::class);
+
+        $this->published(2)->hide(str_repeat('a', Post::MAX_HIDDEN_REASON_LENGTH + 1));
+    }
+
+    public function test_only_a_hidden_post_keeps_a_reason(): void
+    {
+        $this->expectException(InvalidPostException::class);
+
+        new Post(PostId::generate(), DiscussionId::generate(), new PostNumber(1), null, $this->body(), PostStatus::Visible, new DateTimeImmutable, new DateTimeImmutable, hiddenReason: 'Spam');
+    }
+
     public function test_a_hidden_post_is_restored(): void
     {
         $post = $this->published(2);

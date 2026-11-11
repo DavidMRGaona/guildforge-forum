@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { Plus } from '@lucide/vue';
+import { Plus, ShieldCheck } from '@lucide/vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import type { ForumCategoryCard, ForumDiscussionList, ForumListFilters } from '../../types/forum';
 import CategoryList from '../../components/forum/CategoryList.vue';
@@ -16,6 +16,8 @@ defineProps<{
     canStart: boolean;
     newDiscussionUrl: string;
     markReadUrl: string | null;
+    /** The forum's moderation page, for whoever moderates something */
+    moderationUrl: string | null;
 }>();
 
 const { t } = useI18n();
@@ -33,6 +35,15 @@ const { t } = useI18n();
                 <p class="mt-2 text-lg text-base-secondary">{{ t('forum.description') }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
+                <Link
+                    v-if="moderationUrl"
+                    :href="moderationUrl"
+                    class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-base-secondary hover:bg-muted hover:text-base-primary"
+                    data-testid="forum-moderation-link"
+                >
+                    <ShieldCheck class="h-4 w-4" aria-hidden="true" />
+                    {{ t('forum.moderation.queueLink') }}
+                </Link>
                 <MarkReadButton
                     v-if="markReadUrl"
                     :url="markReadUrl"

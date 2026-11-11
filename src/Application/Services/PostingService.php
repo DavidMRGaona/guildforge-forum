@@ -13,6 +13,7 @@ use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\DTOs\AccountSummaryDTO;
 use Modules\Forum\Application\DTOs\PostVersionDTO;
+use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
@@ -21,6 +22,7 @@ use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostingTooFastException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
@@ -50,6 +52,8 @@ final readonly class PostingService
         private MentionCandidatesInterface $mentionCandidates,
         private DiscussionReadsInterface $reads,
         private FollowService $follows,
+        private CategoryRepositoryInterface $categories,
+        private ApprovalRule $approval,
     ) {}
 
     /**
@@ -64,10 +68,14 @@ final readonly class PostingService
         $this->assertCanPost($author, $discussion);
 
         $body = $this->bodies->fromInput($document, $author);
+        $category = $this->categories->find($discussion->categoryId());
+        if (! $category instanceof Category) {
+            throw DiscussionNotFoundException::withId($discussionId->value);
+        }
         $this->countPost($author);
 
         $now = CarbonImmutable::now();
-        $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: false);
+        $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: $this->approval->needsApproval($author, $category));
 
         // Whoever replies has read the discussion up to their reply, and follows it from now on
         $number = $post->number()?->value;
@@ -108,6 +116,16 @@ final readonly class PostingService
         $this->assertCanPost($author, $discussion);
 
         return $this->writer->deletePostByAuthor($postId, CarbonImmutable::now());
+    }
+
+    /**
+     * Whether the post is the person's own (whatever they may do with it).
+     */
+    public function owns(Authenticatable $user, PostId $postId): bool
+    {
+        $authorId = $this->posts->find($postId)?->authorId();
+
+        return $authorId !== null && $authorId === $this->accountId($user);
     }
 
     /**
@@ -180,12 +198,27 @@ final readonly class PostingService
     }
 
     /**
+     * Counts a new discussion against the person's limit per hour.
+     *
+     * @throws PostingTooFastException
+     */
+    public function countDiscussion(Authenticatable $author): void
+    {
+        $wait = $this->rateLimiter->attemptDiscussion($this->accountId($author));
+        if ($wait !== null) {
+            throw PostingTooFastException::retryIn($wait, discussions: true);
+        }
+    }
+
+    /**
      * Whether the person may post in the discussion (and so edit or delete their posts in it):
      * they write in its category, and it is open or they moderate it.
      */
     public function canPost(?Authenticatable $user, Discussion $discussion): bool
     {
+        // Awaiting approval it takes no posts: the first one would take its number
         return $user instanceof Authenticatable
+            && ! $discussion->isAwaitingApproval()
             && $this->access->canWrite($user, $discussion)
             && ($discussion->acceptsReplies() || $this->access->canModerate($user, $discussion));
     }

@@ -10,8 +10,8 @@ import type { ForumReplySettings } from '../../types/forum';
 
 /**
  * Where a reader replies to a discussion: the editor when they may post, otherwise why they
- * may not (no session, an unverified email, a closed discussion or a category they may not
- * write in). Used by the discussion page and by the conversation of a record's page.
+ * may not (no session, an unverified email, a suspension in the forum, a discussion awaiting
+ * approval or closed, or a category they may not write in). Used by the discussion page and by the conversation of a record's page.
  */
 const props = withDefaults(
     defineProps<{
@@ -26,8 +26,10 @@ const props = withDefaults(
         signInSuffix: string;
         /** Why the discussion is closed, when the page can say more than that it is */
         closedNotice?: string | null;
+        /** Its first post awaits approval: it takes replies once approved */
+        isAwaitingApproval?: boolean;
     }>(),
-    { closedNotice: null }
+    { closedNotice: null, isAwaitingApproval: false }
 );
 
 const emit = defineEmits<{ submit: [document: JSONContent] }>();
@@ -39,7 +41,9 @@ const routes = useRoutes();
 const editor = ref<InstanceType<typeof PostEditor> | null>(null);
 
 /** Why there is no editor, when there is none */
-const notice = computed<'guest' | 'verify' | 'closed' | 'forbidden' | null>(() => {
+const notice = computed<
+    'guest' | 'verify' | 'suspended' | 'awaiting' | 'closed' | 'forbidden' | null
+>(() => {
     if (props.reply.canPost) {
         return null;
     }
@@ -48,6 +52,12 @@ const notice = computed<'guest' | 'verify' | 'closed' | 'forbidden' | null>(() =
     }
     if (mustVerifyEmail.value) {
         return 'verify';
+    }
+    if (props.reply.suspension) {
+        return 'suspended';
+    }
+    if (props.isAwaitingApproval) {
+        return 'awaiting';
     }
 
     return props.isClosed ? 'closed' : 'forbidden';
@@ -86,6 +96,21 @@ defineExpose({
             {{ signInSuffix }}
         </template>
         <template v-else-if="notice === 'verify'">{{ t('forum.posts.verifyToReply') }}</template>
+        <span
+            v-else-if="notice === 'suspended' && reply.suspension"
+            data-testid="reply-suspended"
+            >{{
+                reply.suspension.untilLabel
+                    ? t('forum.suspensions.noticeUntil', {
+                          until: reply.suspension.untilLabel,
+                          reason: reply.suspension.reason,
+                      })
+                    : t('forum.suspensions.noticeForever', { reason: reply.suspension.reason })
+            }}</span
+        >
+        <template v-else-if="notice === 'awaiting'">{{
+            t('forum.moderation.awaitingReplies')
+        }}</template>
         <template v-else-if="notice === 'closed'">{{
             closedNotice ?? t('forum.posts.closedNotice')
         }}</template>

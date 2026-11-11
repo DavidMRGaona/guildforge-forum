@@ -136,6 +136,12 @@ export interface ForumPost {
     updateUrl: string | null;
     deleteUrl: string | null;
     likes: ForumPostLikes;
+    /** Why moderation hid it, only for its author and its moderators */
+    hiddenReason: string | null;
+    /** Where its moderation menu sends its actions; null for whoever does not moderate it */
+    moderationUrl: string | null;
+    /** Where to report it; null for its author, guests and whoever is suspended */
+    reportUrl: string | null;
 }
 
 export interface ForumConversation {
@@ -146,6 +152,8 @@ export interface ForumConversation {
     isClosed: boolean;
     isPinned: boolean;
     isHidden: boolean;
+    /** Its first post awaits approval: only its author and its moderators see it */
+    isAwaitingApproval: boolean;
     topics: ForumTopic[];
     category: ForumCategoryHeader;
     /** null for guests */
@@ -175,6 +183,30 @@ export interface ForumPreferences {
     forumUrl: string;
 }
 
+export interface ForumMoveTarget {
+    id: string;
+    name: string;
+    parentName: string | null;
+}
+
+/** What the discussion's moderation menu offers; null for whoever does not moderate it */
+export interface ForumDiscussionModeration {
+    /** The forum's moderation page: reports and posts awaiting approval */
+    queueUrl: string;
+    /** Only for whoever moderates the whole forum */
+    suspendUrl: string | null;
+    actionsUrl: string;
+    /** Only for whoever moderates the whole forum */
+    deleteUrl: string | null;
+    moveTargets: ForumMoveTarget[];
+    limits: {
+        titleMin: number;
+        titleMax: number;
+        reasonMax: number;
+        hiddenReasonMax: number;
+    };
+}
+
 export interface ForumPagination {
     page: number;
     pageCount: number;
@@ -192,10 +224,19 @@ export interface ForumEditorSettings {
     imageTypes: string[];
 }
 
+/** Why and until when the reader may not write; null unless they are suspended */
+export interface ForumSuspensionNotice {
+    reason: string;
+    /** null: until moderation lifts it */
+    untilLabel: string | null;
+}
+
 export interface ForumReplySettings extends ForumEditorSettings {
     canPost: boolean;
     postUrl: string;
     mentionsUrl: string | null;
+    /** Why the reader may not write: a suspension in the forum */
+    suspension?: ForumSuspensionNotice | null;
 }
 
 export interface ForumCategoryOption {
@@ -229,4 +270,32 @@ export interface ForumSubjectConversation {
     lastReadNumber: number | null;
     readUrl: string | null;
     reply: ForumReplySettings;
+}
+
+/** A post with open reports, in the forum's moderation page */
+export interface ForumReportedItem {
+    postId: string;
+    status: ForumPostStatus;
+    excerpt: string;
+    authorName: string | null;
+    discussionTitle: string;
+    url: string;
+    reports: number;
+    /** Each reason once, already in words */
+    reasons: string[];
+    notes: string[];
+    firstReportedLabel: string;
+    resolveUrl: string;
+}
+
+/** A post awaiting approval, in the forum's moderation page */
+export interface ForumPendingItem {
+    postId: string;
+    excerpt: string;
+    authorName: string | null;
+    discussionTitle: string;
+    url: string;
+    opensDiscussion: boolean;
+    writtenLabel: string;
+    moderationUrl: string;
 }

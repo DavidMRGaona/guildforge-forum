@@ -26,6 +26,12 @@ final readonly class ForumSettings implements ForumSettingsInterface
 
     public const int MAX_POSTS_PER_MINUTE = 60;
 
+    public const int DEFAULT_DISCUSSIONS_PER_HOUR = 5;
+
+    public const int MIN_DISCUSSIONS_PER_HOUR = 1;
+
+    public const int MAX_DISCUSSIONS_PER_HOUR = 60;
+
     public const int DEFAULT_IMAGE_MAX_KILOBYTES = 4096;
 
     public const int MIN_IMAGE_MAX_KILOBYTES = 128;
@@ -63,6 +69,11 @@ final readonly class ForumSettings implements ForumSettingsInterface
     public function postsPerMinute(): int
     {
         return $this->bounded('posts_per_minute', self::MIN_POSTS_PER_MINUTE, self::MAX_POSTS_PER_MINUTE, self::DEFAULT_POSTS_PER_MINUTE);
+    }
+
+    public function discussionsPerHour(): int
+    {
+        return $this->bounded('discussions_per_hour', self::MIN_DISCUSSIONS_PER_HOUR, self::MAX_DISCUSSIONS_PER_HOUR, self::DEFAULT_DISCUSSIONS_PER_HOUR);
     }
 
     public function imageTypes(): array

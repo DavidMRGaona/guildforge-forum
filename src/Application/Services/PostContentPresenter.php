@@ -14,7 +14,8 @@ use Modules\Forum\Domain\Enums\PostStatus;
 /**
  * What each post of a discussion shows to a reader. A post its author deleted keeps its place
  * as «Mensaje borrado» and a hidden one as «Mensaje oculto»; their moderators still read them,
- * and a hidden post's author does too. The pages decide which posts to list (pending ones only
+ * and a hidden post's author does too, with the reason it was hidden. Moderators may edit any
+ * post that was not deleted. The pages decide which posts to list (pending ones only
  * to their author and moderators).
  */
 final readonly class PostContentPresenter
@@ -41,9 +42,11 @@ final readonly class PostContentPresenter
             $this->renderer->toHtml(array_values(array_map(static fn (Post $post) => $post->body(), $shown)), $reader),
         );
 
-        return array_map(function (Post $post) use ($html, $readerId, $canPost): PostContentDTO {
+        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates): PostContentDTO {
             $own = $readerId !== null && $post->authorId() === $readerId;
-            $editable = $own && $canPost && $post->status() !== PostStatus::Deleted;
+            $ownEditable = $own && $canPost && $post->status() !== PostStatus::Deleted;
+            // Moderators edit anyone's post; the version it replaces stays in its history
+            $editable = $ownEditable || ($moderates && $post->status() !== PostStatus::Deleted);
 
             return new PostContentDTO(
                 id: $post->id()->value,
@@ -54,7 +57,8 @@ final readonly class PostContentPresenter
                 placeholder: $this->placeholder($post->status()),
                 editedAt: $post->editedAt(),
                 canEdit: $editable,
-                canDelete: $editable && $post->status() !== PostStatus::Pending,
+                canDelete: $ownEditable && $post->status() !== PostStatus::Pending,
+                hiddenReason: $own || $moderates ? $post->hiddenReason() : null,
             );
         }, $posts);
     }

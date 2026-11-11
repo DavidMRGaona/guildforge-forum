@@ -147,7 +147,7 @@ final readonly class ForumPresenter
     public function conversation(ConversationPageDTO $page, array $readable): array
     {
         $discussion = $page->discussion;
-        ['posts' => $posts, 'mentionNames' => $mentionNames] = $this->posts($discussion, $page->posts, $page->contents);
+        ['posts' => $posts, 'mentionNames' => $mentionNames] = $this->posts($discussion, $page->posts, $page->contents, $page->canModerate);
 
         $categoryAccess = null;
         foreach ($readable as $access) {
@@ -168,6 +168,7 @@ final readonly class ForumPresenter
                 'isClosed' => $discussion->status() === DiscussionStatus::Closed,
                 'isPinned' => $discussion->isPinned(),
                 'isHidden' => $discussion->isHidden(),
+                'isAwaitingApproval' => $discussion->isAwaitingApproval(),
                 'topics' => $this->topics($page->topics),
                 'category' => $categoryAccess instanceof CategoryAccessDTO
                     ? $this->categoryHeader($categoryAccess, $readable)
@@ -217,7 +218,7 @@ final readonly class ForumPresenter
      * @param  list<PostContentDTO>  $contents  what each post shows to the reader, in the same order
      * @return array{posts: list<array<string, mixed>>, mentionNames: array<string, string>}
      */
-    public function posts(Discussion $discussion, array $posts, array $contents): array
+    public function posts(Discussion $discussion, array $posts, array $contents, bool $moderates = false): array
     {
         // The editor of a post its author may change starts from its stored document
         $editable = [];
@@ -263,6 +264,9 @@ final readonly class ForumPresenter
                 'document' => $editable[$post->id()->value] ?? null,
                 'updateUrl' => $content->canEdit ? route('forum.posts.update', ['post' => $post->id()->value]) : null,
                 'deleteUrl' => $content->canDelete ? route('forum.posts.destroy', ['post' => $post->id()->value]) : null,
+                'hiddenReason' => $content->hiddenReason,
+                // Its moderation menu, for whoever moderates the discussion
+                'moderationUrl' => $moderates ? route('forum.moderation.posts', ['post' => $post->id()->value]) : null,
             ];
         }
 

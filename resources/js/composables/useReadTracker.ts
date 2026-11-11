@@ -62,12 +62,15 @@ export function useReadTracker(options: ReadTrackerOptions): { flush: () => void
     }
 
     function topPost(): void {
+        // The first post that still fills part of the top quarter: one barely showing its end
+        // above it does not count
+        const limit = window.innerHeight * 0.25;
         let top: HTMLElement | null = null;
         let topY = Number.POSITIVE_INFINITY;
         for (const element of visible.keys()) {
-            const y = element.getBoundingClientRect().top;
-            if (element instanceof HTMLElement && y < topY) {
-                topY = y;
+            const rect = element.getBoundingClientRect();
+            if (element instanceof HTMLElement && rect.bottom > limit && rect.top < topY) {
+                topY = rect.top;
                 top = element;
             }
         }

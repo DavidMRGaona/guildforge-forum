@@ -7,6 +7,7 @@ namespace Modules\Forum\Application\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
@@ -47,6 +48,7 @@ final readonly class PostingService
         private PostRenderer $renderer,
         private AccountDirectoryInterface $accounts,
         private MentionCandidatesInterface $mentionCandidates,
+        private DiscussionReadsInterface $reads,
     ) {}
 
     /**
@@ -63,7 +65,16 @@ final readonly class PostingService
         $body = $this->bodies->fromInput($document, $author);
         $this->countPost($author);
 
-        return $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, CarbonImmutable::now(), needsApproval: false);
+        $now = CarbonImmutable::now();
+        $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: false);
+
+        // Whoever replies has read the discussion up to their reply
+        $number = $post->number()?->value;
+        if ($number !== null) {
+            $this->reads->advance($this->accountId($author), $discussionId, $number, $now);
+        }
+
+        return $post;
     }
 
     /**

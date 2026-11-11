@@ -9,6 +9,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -101,6 +102,7 @@ final class StartDiscussionTest extends ModuleTestCase
         $this->assertCount(1, $posts);
         $this->assertSame(1, $posts[0]->number()?->value);
         $this->assertSame('Hola a todos', $posts[0]->body()->plainText);
+        $this->assertSame(1, app(DiscussionReadsInterface::class)->readThrough(strtolower($this->author->id), $discussion->id(), $discussion->categoryId()));
 
         $this->get($response->json('url'))->assertOk();
     }

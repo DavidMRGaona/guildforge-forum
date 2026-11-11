@@ -7,6 +7,7 @@ namespace Modules\Forum\Application\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\StartDiscussionDTO;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -41,6 +42,7 @@ final readonly class DiscussionStarter
         private ForumWriter $writer,
         private DiscussionRepositoryInterface $discussions,
         private DiscussionAnnouncer $announcer,
+        private DiscussionReadsInterface $reads,
     ) {}
 
     /**
@@ -111,6 +113,8 @@ final readonly class DiscussionStarter
             }
         });
 
+        // Its author has read what they wrote
+        $this->reads->advance((string) $authorId, $discussion->id(), 1, $discussion->createdAt());
         $this->announcer->announce($discussion, $access->category, $body, $topics);
 
         return $discussion;

@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos y los temas automáticos de las publicaciones, todavía sin pantallas públicas.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones y las páginas públicas.
 
 ## Qué hay
 
@@ -30,6 +30,28 @@ Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes
 - **Categorías del sistema**: «Mesas», «Campañas» y «Eventos», con claves estables. Las usan los temas automáticos. Se pueden renombrar y cambiar de aspecto, pero no borrar.
 - **Etiquetas de sistema de juego** (`game-system.<uuid>`, de los temas de cada publicación): sirven para filtrar, nunca para dar acceso.
 - **Instalación**: al habilitar el módulo se crean «General», «Partidas por foro» y las tres del sistema, todas legibles por cualquiera.
+
+## Páginas públicas
+
+| Ruta | Qué muestra |
+|---|---|
+| `/foro` | Las categorías que se pueden leer, con sus subcategorías, y los temas recientes de todas |
+| `/foro/c/<categoría>` | Sus subcategorías y los temas de la categoría y de ellas, con los fijados primero |
+| `/foro/t/<número>-<título>[/<mensaje>]` | La conversación, por páginas de números de mensaje (1-20, 21-40…) |
+| `/foro/nuevo` | Abrir un tema (con sesión) |
+
+- **Número del tema**: cada tema recibe al empezar un número correlativo (1, 2, 3…), que es lo que identifica la dirección. Si el resto de la dirección no coincide (el tema se renombró), redirige a la buena con un 301. Si dos temas se abren a la vez y les toca el mismo número, se vuelve a intentar con el siguiente.
+- **Lo que no se puede ver da 404**, nunca 403: una categoría privada, un tema oculto (salvo para quien lo modera) o un tema que no existe.
+- **Listas**: por última actividad, con paginación por cursor (`?desde=`) sobre la actividad y el id, así que la actividad nueva nunca repite ni salta temas entre páginas. Filtros «Sin leer» (`?sin-leer=1`, solo con sesión) y etiqueta de sistema de juego (`?etiqueta=`). En una categoría, los fijados salen aparte en la primera página.
+- **Conversación**: un enlace a un mensaje abre su página y lo resalta. Sin número, se abre en el primer mensaje sin leer (en el último si ya está todo leído) y, para quien nunca lo abrió o no tiene sesión, en el primero. La dirección del navegador sigue al mensaje que se lee, sin añadir entradas al historial. La URL canónica es la del principio de cada página.
+- **Desde la conversación**: responder, citar (el texto seleccionado o el mensaje entero, con enlace al original) y editar o borrar los mensajes propios, con el editor de abajo.
+- **No leídos**, solo con sesión:
+  - Por persona y tema se guarda el último número leído (`forum_discussion_reads`). La página informa de los mensajes que ha tenido en pantalla, así que la marca avanza al leer, nunca por adelantado, y nunca retrocede. Al responder o abrir un tema, la marca llega hasta el mensaje propio.
+  - «Marcar todo como leído», en el foro y en cada categoría (con sus subcategorías), guarda la fecha por persona y categoría (`forum_category_reads`): lo publicado antes cuenta como leído. Marcar todo el foro escribe una fila por categoría, no por tema.
+- **Abrir un tema**: título de 3 a 120 caracteres, una categoría donde la persona pueda escribir (nunca «Mesas», «Campañas» ni «Eventos», que llenan las publicaciones), hasta 5 etiquetas de las que ya hay en el foro y el primer mensaje. Quien modera la categoría puede abrirlo fijado o cerrado.
+- **Avisos en los canales**: un tema nuevo lanza el evento del core `ForumDiscussionStarted` (una vez, tras guardarse) solo si un invitado puede leer su categoría, la categoría está marcada en *Categorías que se anuncian* de los ajustes (ninguna por defecto) y no es una categoría del sistema ni un espacio de publicación. Lleva el título, la dirección pública, un extracto del primer mensaje y como etiquetas el nombre de la categoría y las del tema; nada del autor.
+- **Menú**: al habilitar el módulo se añade «Foro» al menú principal, como enlace del módulo. Se mueve o se quita en *Sitio web → Navegación*.
+- **SEO**: las páginas públicas llevan título, descripción y URL canónica; las de categorías o temas que un invitado no puede leer, y el formulario de abrir tema, llevan `noindex`. El foro no sale en el mapa del sitio.
 
 ## Temas automáticos
 
@@ -119,7 +141,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 ## Panel
 
 - **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo.
-- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
+- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
 
 ## Desarrollo
 

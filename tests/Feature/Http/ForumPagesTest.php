@@ -262,6 +262,19 @@ final class ForumPagesTest extends ModuleTestCase
         $this->actingAs($reader)->post(route('forum.categories.read', ['category' => 'no-existe']))->assertNotFound();
     }
 
+    public function test_whoever_replies_or_starts_a_discussion_has_read_it_up_to_their_post(): void
+    {
+        $author = $this->anAccount();
+        [$discussion] = $this->aDiscussion($this->public, title: 'Corto');
+        $this->aReply($discussion, '2026-11-10 19:00:00');
+
+        $this->actingAs($author)->postJson(route('forum.posts.store', ['discussion' => $discussion->id()->value]), [
+            'document' => ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Yo también']]]]],
+        ])->assertCreated();
+
+        $this->assertReadThrough($author, $discussion, 3);
+    }
+
     private function assertReadThrough(UserModel $reader, Discussion $discussion, int $expected): void
     {
         $this->assertSame($expected, app(DiscussionReadsInterface::class)->readThrough(strtolower($reader->id), $discussion->id(), $discussion->categoryId()));

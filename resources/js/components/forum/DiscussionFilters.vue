@@ -52,7 +52,7 @@ function onTopicChange(event: Event): void {
         >
             <button
                 type="button"
-                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium sm:flex-none"
+                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium whitespace-nowrap sm:flex-none"
                 :class="
                     !filters.unread ? 'bg-primary text-white' : 'text-base-secondary hover:bg-muted'
                 "
@@ -63,7 +63,7 @@ function onTopicChange(event: Event): void {
             </button>
             <button
                 type="button"
-                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium sm:flex-none"
+                class="min-h-[40px] flex-1 rounded px-4 text-sm font-medium whitespace-nowrap sm:flex-none"
                 :class="
                     filters.unread ? 'bg-primary text-white' : 'text-base-secondary hover:bg-muted'
                 "

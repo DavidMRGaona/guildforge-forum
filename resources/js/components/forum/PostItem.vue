@@ -167,13 +167,14 @@ async function remove(): Promise<void> {
                     {{ post.placeholder }}
                 </p>
                 <!-- Rendered by the server from the stored document, with every text escaped -->
-                <!-- eslint-disable-next-line vue/no-v-html -->
+                <!-- eslint-disable vue/no-v-html -->
                 <div
                     v-if="post.html !== null"
                     ref="body"
                     class="forum-post prose dark:prose-invert max-w-none break-words text-base-primary"
                     v-html="post.html"
                 />
+                <!-- eslint-enable vue/no-v-html -->
                 <p v-if="error" role="alert" class="mt-2 text-sm text-red-600">{{ error }}</p>
             </template>
         </div>

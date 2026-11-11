@@ -306,7 +306,8 @@ async function remove(): Promise<void> {
         <footer
             v-if="
                 !editing &&
-                (((canQuote || post.canEdit || post.canDelete || showsLikes) && post.html !== null) ||
+                (((canQuote || post.canEdit || post.canDelete || showsLikes) &&
+                    post.html !== null) ||
                     moderationItems.length > 0 ||
                     (post.reportUrl !== null && !reported))
             "

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $status
  * @property bool $is_pinned
  * @property bool $is_hidden
+ * @property bool $closed_by_system
  * @property int $post_count
  * @property string|null $last_post_id
  * @property CarbonImmutable|null $last_activity_at
@@ -39,7 +40,7 @@ final class DiscussionModel extends Model
      *
      * @var list<string>
      */
-    protected $fillable = ['id', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'created_at'];
+    protected $fillable = ['id', 'category_id', 'author_id', 'title', 'status', 'is_pinned', 'is_hidden', 'closed_by_system', 'created_at'];
 
     /**
      * @return array<string, string>
@@ -49,6 +50,7 @@ final class DiscussionModel extends Model
         return [
             'is_pinned' => 'boolean',
             'is_hidden' => 'boolean',
+            'closed_by_system' => 'boolean',
             'post_count' => 'integer',
             'last_activity_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',

@@ -34,6 +34,7 @@ final class Discussion
         private bool $pinned,
         private bool $hidden,
         private readonly DateTimeImmutable $createdAt,
+        private bool $closedBySystem = false,
     ) {
         $this->authorId = $authorId === null
             ? null
@@ -61,6 +62,8 @@ final class Discussion
     }
 
     /**
+     * Closed by someone (a moderator): the forum never opens it by itself.
+     *
      * @throws InvalidDiscussionException when it is closed already
      */
     public function close(): void
@@ -70,6 +73,19 @@ final class Discussion
         }
 
         $this->status = DiscussionStatus::Closed;
+        $this->closedBySystem = false;
+    }
+
+    /**
+     * Closed by the forum itself (its publication was cancelled or taken down), so the forum may
+     * open it again. Any later close or reopen by someone else takes that away.
+     *
+     * @throws InvalidDiscussionException when it is closed already
+     */
+    public function closeBySystem(): void
+    {
+        $this->close();
+        $this->closedBySystem = true;
     }
 
     /**
@@ -82,6 +98,15 @@ final class Discussion
         }
 
         $this->status = DiscussionStatus::Open;
+        $this->closedBySystem = false;
+    }
+
+    /**
+     * Closed, and by the forum itself: the only kind of close the forum lifts.
+     */
+    public function isClosedBySystem(): bool
+    {
+        return $this->status === DiscussionStatus::Closed && $this->closedBySystem;
     }
 
     public function pin(): void

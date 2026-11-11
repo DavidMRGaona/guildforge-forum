@@ -199,4 +199,22 @@ return [
     'editor' => [
         'image_attribute' => 'imagen',
     ],
+
+    'publications' => [
+        'page_link' => 'Ver la ficha',
+        'opening' => [
+            'date' => 'Fecha: :date.',
+            'game_system' => 'Sistema: :systems.',
+        ],
+        'notices' => [
+            'rescheduled' => 'Nueva fecha: :date.',
+            'place_freed' => 'Ha quedado una plaza libre: ya te puedes inscribir.',
+            'registration_closed' => 'Se han cerrado las inscripciones.',
+            'cancelled' => 'Se ha cancelado. El tema queda cerrado.',
+            'reactivated' => 'Se ha reactivado: vuelve a estar en marcha.',
+            'withdrawn' => 'Se ha retirado de la web. El tema queda cerrado.',
+            'deleted' => 'Se ha borrado de la web. El tema queda cerrado.',
+            'republished' => 'Se ha vuelto a publicar en la web.',
+        ],
+    ],
 ];

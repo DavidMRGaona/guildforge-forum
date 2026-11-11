@@ -27,6 +27,7 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
             'status' => $discussion->status()->value,
             'is_pinned' => $discussion->isPinned(),
             'is_hidden' => $discussion->isHidden(),
+            'closed_by_system' => $discussion->isClosedBySystem(),
             'created_at' => $discussion->createdAt(),
         ]);
     }
@@ -103,6 +104,7 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
             pinned: $model->is_pinned,
             hidden: $model->is_hidden,
             createdAt: $model->created_at->toDateTimeImmutable(),
+            closedBySystem: $model->closed_by_system,
         );
     }
 }

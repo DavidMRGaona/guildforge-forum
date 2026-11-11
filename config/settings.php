@@ -22,4 +22,6 @@ return [
     'images_per_post' => 10,
     // Image uploads per person and hour (1–200)
     'image_uploads_per_hour' => 30,
+    // Categories whose new discussions are announced on the site's channels (ids; only those guests can read)
+    'announced_categories' => [],
 ];

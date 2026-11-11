@@ -99,6 +99,20 @@ final readonly class ForumSettings implements ForumSettingsInterface
         return $this->bounded('image_uploads_per_hour', self::MIN_IMAGE_UPLOADS_PER_HOUR, self::MAX_IMAGE_UPLOADS_PER_HOUR, self::DEFAULT_IMAGE_UPLOADS_PER_HOUR);
     }
 
+    public function announcedCategoryIds(): array
+    {
+        $stored = config('modules.settings.forum.announced_categories');
+        if (! is_array($stored)) {
+            return [];
+        }
+
+        // Only well-formed ids: anything else in the settings never matches a category
+        return array_values(array_unique(array_map(
+            strtolower(...),
+            array_filter($stored, static fn (mixed $id): bool => is_string($id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1),
+        )));
+    }
+
     private function pageSize(string $key): int
     {
         return $this->bounded($key, self::MIN_PAGE_SIZE, self::MAX_PAGE_SIZE, self::DEFAULT_PAGE_SIZE);

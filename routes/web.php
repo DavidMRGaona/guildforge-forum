@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Http\Controllers\CategoryController;
+use Modules\Forum\Http\Controllers\DiscussionController;
+use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\PostController;
 use Modules\Forum\Http\Controllers\PostImageController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
+use Modules\Forum\Http\Controllers\ReadMarksController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,10 +23,37 @@ use Modules\Forum\Http\Controllers\PostVersionsController;
 |
 */
 
-// The public pages (/foro) arrive with the discussion lists
 Route::prefix('foro')
     ->name('forum.')
     ->group(function (): void {
+        // Public pages: what a reader may not read answers 404, never 403
+        Route::get('/', ForumIndexController::class)->name('index');
+        Route::get('c/{category}', [CategoryController::class, 'show'])
+            ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->name('categories.show');
+        Route::get('t/{discussion}/{post?}', [DiscussionController::class, 'show'])
+            ->where(['discussion' => '[1-9][0-9]{0,9}(?:-[a-z0-9-]*)?', 'post' => '[1-9][0-9]{0,9}'])
+            ->name('discussions.show');
+
+        Route::middleware('auth')->group(function (): void {
+            Route::get('nuevo', [DiscussionController::class, 'create'])->name('discussions.create');
+            // Starting a discussion counts against the posts-per-minute limit too
+            Route::post('temas', [DiscussionController::class, 'store'])
+                ->middleware('throttle:20,1,forum-discussions')
+                ->name('discussions.store');
+            Route::post('temas/{discussion}/leido', [ReadMarksController::class, 'discussion'])
+                ->whereUuid('discussion')
+                ->middleware('throttle:120,1,forum-reads')
+                ->name('discussions.read');
+            Route::post('leido', [ReadMarksController::class, 'forum'])
+                ->middleware('throttle:20,1,forum-reads-all')
+                ->name('read');
+            Route::post('c/{category}/leido', [ReadMarksController::class, 'category'])
+                ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
+                ->middleware('throttle:20,1,forum-reads-all')
+                ->name('categories.read');
+        });
+
         // The editor's endpoints, all JSON. `auth` also brings the site's email verification
         // rule (EnsureEmailIsVerifiedWhenRequired), so unverified accounts get a 403 here
         Route::middleware('auth')->group(function (): void {

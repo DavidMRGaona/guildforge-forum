@@ -21,6 +21,7 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
     public function save(Discussion $discussion): void
     {
         DiscussionModel::query()->updateOrCreate(['id' => $discussion->id()->value], [
+            'number' => $discussion->number(),
             'category_id' => $discussion->categoryId()->value,
             'author_id' => $discussion->authorId(),
             'title' => $discussion->title()->value,
@@ -42,6 +43,18 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
     public function findOrFail(DiscussionId $id): Discussion
     {
         return $this->find($id) ?? throw DiscussionNotFoundException::withId($id->value);
+    }
+
+    public function findByNumber(int $number): ?Discussion
+    {
+        $model = DiscussionModel::query()->where('number', $number)->first();
+
+        return $model instanceof DiscussionModel ? $this->toEntity($model) : null;
+    }
+
+    public function nextNumber(): int
+    {
+        return (int) DiscussionModel::query()->max('number') + 1;
     }
 
     public function findForUpdate(DiscussionId $id): Discussion
@@ -105,6 +118,7 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
             hidden: $model->is_hidden,
             createdAt: $model->created_at->toDateTimeImmutable(),
             closedBySystem: $model->closed_by_system,
+            number: $model->number,
         );
     }
 }

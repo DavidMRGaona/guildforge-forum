@@ -22,7 +22,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 
 /**
@@ -96,6 +98,21 @@ final class ForumSettingsPage extends Page implements HasForms
                             ->required()
                             ->default(ForumSettings::DEFAULT_POSTS_PER_MINUTE),
                     ]),
+                Section::make(__('forum::messages.settings.announcements'))
+                    ->description(__('forum::messages.settings.announcements_help'))
+                    ->schema([
+                        CheckboxList::make('announced_categories')
+                            ->label(__('forum::messages.settings.announced_categories'))
+                            ->helperText(__('forum::messages.settings.announced_categories_help'))
+                            ->options(self::announceableCategoryOptions())
+                            // Only offered categories are kept: one that turned private since is dropped,
+                            // and so is anything forged (the announcer checks the rules again anyway)
+                            ->dehydrateStateUsing(static fn (mixed $state): array => is_array($state)
+                                ? array_values(array_intersect(array_filter($state, is_string(...)), array_keys(self::announceableCategoryOptions())))
+                                : [])
+                            ->columns(2)
+                            ->default([]),
+                    ]),
                 Section::make(__('forum::messages.settings.images'))
                     ->description(__('forum::messages.settings.images_help'))
                     ->schema([
@@ -155,6 +172,27 @@ final class ForumSettingsPage extends Page implements HasForms
         $options = [];
         foreach (PostImageType::cases() as $type) {
             $options[$type->value] = $type->label();
+        }
+
+        return $options;
+    }
+
+    /**
+     * Categories whose new discussions may be announced: those guests can read that no
+     * publication fills (tables, campaigns and events announce through their own records).
+     *
+     * @return array<string, string>
+     */
+    private static function announceableCategoryOptions(): array
+    {
+        $policy = app(CategoryAccessPolicy::class);
+        $options = [];
+        foreach (app(CategoryRepositoryInterface::class)->all() as $category) {
+            if ($category->isSystem() || $category->isPublicationSpace() || ! $policy->canView(null, $category)) {
+                continue;
+            }
+
+            $options[$category->id()->value] = $category->name();
         }
 
         return $options;

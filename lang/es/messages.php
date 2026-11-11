@@ -46,6 +46,36 @@ return [
         'image_uploads_per_hour' => 'Subidas por hora y persona',
         'range_help' => 'De :min a :max.',
         'saved' => 'Ajustes guardados',
+        'announcements' => 'Avisos de temas nuevos',
+        'announcements_help' => 'Los temas que se abran en estas categorías se anuncian en los canales del sitio (Telegram y los demás que estén configurados).',
+        'announced_categories' => 'Categorías que se anuncian',
+        'announced_categories_help' => 'Solo aparecen las categorías que se leen sin sesión. Las de mesas, campañas y eventos se anuncian con su publicación. Sin ninguna marcada, no se anuncia nada.',
+    ],
+
+    'pages' => [
+        'index_title' => 'Foro',
+        'index_description' => 'Conversaciones de la comunidad: partidas, campañas, eventos y todo lo demás.',
+        'category_description' => 'Temas de la categoría :name del foro.',
+        'create_title' => 'Nuevo tema',
+    ],
+
+    'discussions' => [
+        'fields' => [
+            'title' => 'título',
+            'category' => 'categoría',
+            'topics' => 'etiquetas',
+        ],
+        'errors' => [
+            'not_writable' => 'No puedes abrir temas en esa categoría.',
+            'unknown_topic' => 'Elige las etiquetas de la lista.',
+            'not_moderator' => 'Solo la moderación puede fijar o cerrar un tema al abrirlo.',
+            'title' => 'El título debe tener entre :min y :max caracteres.',
+        ],
+    ],
+
+    'reads' => [
+        'forum_marked' => 'Todo el foro está marcado como leído.',
+        'category_marked' => 'La categoría :name está marcada como leída.',
     ],
 
     'defaults' => [

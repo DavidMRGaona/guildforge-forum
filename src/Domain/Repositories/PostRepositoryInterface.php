@@ -45,6 +45,20 @@ interface PostRepositoryInterface
     public function inDiscussion(DiscussionId $discussionId): array;
 
     /**
+     * The numbered posts of the discussion from the number on, in order, whatever their status.
+     *
+     * @return list<Post>
+     */
+    public function numberedFrom(DiscussionId $discussionId, PostNumber $from, int $limit): array;
+
+    /**
+     * The discussion's posts awaiting approval, by when they were written.
+     *
+     * @return list<Post>
+     */
+    public function pendingIn(DiscussionId $discussionId): array;
+
+    /**
      * Posts their authors deleted before the given time whose content is still kept, oldest
      * deletion first.
      *

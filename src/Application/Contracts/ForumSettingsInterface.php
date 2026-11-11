@@ -40,4 +40,12 @@ interface ForumSettingsInterface
 
     /** Image uploads one person may make per hour */
     public function imageUploadsPerHour(): int;
+
+    /**
+     * The categories whose new discussions are announced on the site's channels (only those
+     * guests can read); none by default.
+     *
+     * @return list<string> category ids
+     */
+    public function announcedCategoryIds(): array;
 }

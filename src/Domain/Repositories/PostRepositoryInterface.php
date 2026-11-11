@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Domain\Repositories;
 
+use DateTimeImmutable;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
@@ -42,6 +43,14 @@ interface PostRepositoryInterface
      * @return list<Post>
      */
     public function inDiscussion(DiscussionId $discussionId): array;
+
+    /**
+     * Posts their authors deleted before the given time whose content is still kept, oldest
+     * deletion first.
+     *
+     * @return list<PostId>
+     */
+    public function deletedAwaitingPurge(DateTimeImmutable $deletedBefore, int $limit): array;
 
     public function delete(PostId $id): void;
 }

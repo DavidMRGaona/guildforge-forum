@@ -10,12 +10,18 @@ import type { JSONContent } from '@tiptap/core';
 export const FORUM_IMAGE_PATTERN =
     /^forum\/posts\/\d{4}\/\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/;
 
+/** The origin of an image uploaded to the forum (ImageNode::ORIGIN_UPLOAD) */
+export const IMAGE_ORIGIN_UPLOAD = 'upload';
+
+/** Image formats the forum may allow (PostImageType); the settings say which it does */
+export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 /** Heading levels a post may use: level 1 is the discussion title */
 export const HEADING_LEVELS = [2, 3, 4] as const;
 
 export type HeadingLevel = (typeof HEADING_LEVELS)[number];
 
-/** Limits of DocumentLimits on the server */
+/** Limits of DocumentLimits on the server (images per post default; the settings may change it) */
 export const MAX_IMAGES = 10;
 export const MAX_MENTIONS = 20;
 export const MAX_QUOTES = 10;
@@ -100,7 +106,12 @@ export function sanitizeContent(node: JSONContent): JSONContent | null {
     if (node.type === 'image') {
         const src = node.attrs?.['src'];
 
-        return typeof src === 'string' && FORUM_IMAGE_PATTERN.test(src) ? node : null;
+        return typeof src === 'string' && FORUM_IMAGE_PATTERN.test(src)
+            ? {
+                  type: 'image',
+                  attrs: { origin: IMAGE_ORIGIN_UPLOAD, src, alt: node.attrs?.['alt'] ?? null },
+              }
+            : null;
     }
 
     const sanitized: JSONContent = { ...node };

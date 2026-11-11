@@ -19,6 +19,7 @@ final class DocumentLimits
     /** Every node and text run of the document */
     public const int MAX_NODES = 10_000;
 
+    /** Images per post unless the forum settings say otherwise */
     public const int MAX_IMAGES = 10;
 
     public const int MAX_MENTIONS = 20;

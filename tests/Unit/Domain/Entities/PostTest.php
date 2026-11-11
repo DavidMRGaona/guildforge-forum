@@ -101,8 +101,8 @@ final class PostTest extends TestCase
         $hidden = $this->published(2);
         $hidden->hide();
 
-        $visible->deleteByAuthor();
-        $hidden->deleteByAuthor();
+        $visible->deleteByAuthor(new DateTimeImmutable);
+        $hidden->deleteByAuthor(new DateTimeImmutable);
 
         $this->assertSame(PostStatus::Deleted, $visible->status());
         $this->assertSame(PostStatus::Deleted, $hidden->status());
@@ -112,7 +112,7 @@ final class PostTest extends TestCase
     public function test_a_deleted_post_stays_deleted(): void
     {
         $post = $this->published(1);
-        $post->deleteByAuthor();
+        $post->deleteByAuthor(new DateTimeImmutable);
 
         $this->expectException(InvalidPostException::class);
 
@@ -123,7 +123,7 @@ final class PostTest extends TestCase
     {
         $this->expectException(InvalidPostException::class);
 
-        $this->pending()->deleteByAuthor();
+        $this->pending()->deleteByAuthor(new DateTimeImmutable);
     }
 
     public function test_editing_replaces_the_body_and_records_when(): void
@@ -141,7 +141,7 @@ final class PostTest extends TestCase
     public function test_a_deleted_post_is_never_edited(): void
     {
         $post = $this->published(1);
-        $post->deleteByAuthor();
+        $post->deleteByAuthor(new DateTimeImmutable);
 
         $this->expectException(InvalidPostException::class);
 

@@ -56,7 +56,7 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->writer()->editPost($reply->id(), $this->withImages([self::MAP, self::PORTRAIT]), null, new DateTimeImmutable('2026-11-10 18:40:00'));
         // The map leaves the post but stays in its history
         $this->writer()->editPost($reply->id(), $this->withImages([self::PORTRAIT]), null, new DateTimeImmutable('2026-11-10 18:50:00'));
-        $this->writer()->deletePostByAuthor($reply->id());
+        $this->writer()->deletePostByAuthor($reply->id(), new DateTimeImmutable('2026-11-10 19:30:00'));
 
         $usages = iterator_to_array($this->source()->usages(), false);
 
@@ -112,7 +112,7 @@ final class PostImageMediaSourceTest extends ModuleTestCase
             'type' => 'doc',
             'content' => [
                 ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Mirad']]],
-                ...array_map(static fn (string $path): array => ['type' => 'image', 'attrs' => ['src' => $path]], $paths),
+                ...array_map(static fn (string $path): array => ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => $path]], $paths),
             ],
         ], 'Mirad');
     }

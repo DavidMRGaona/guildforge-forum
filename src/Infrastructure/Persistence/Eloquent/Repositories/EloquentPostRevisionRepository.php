@@ -46,4 +46,9 @@ final class EloquentPostRevisionRepository implements PostRevisionRepositoryInte
 
         return (is_numeric($highest) ? (int) $highest : 0) + 1;
     }
+
+    public function deleteOfPost(PostId $postId): void
+    {
+        PostRevisionModel::query()->where('post_id', $postId->value)->delete();
+    }
 }

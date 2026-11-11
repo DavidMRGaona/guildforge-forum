@@ -65,6 +65,30 @@ final readonly class PostRenderer
     }
 
     /**
+     * The quotations of a document about to be stored, each with the post it names and its
+     * text as plain text.
+     *
+     * @return list<array{postId: string, text: string}>
+     */
+    public function quotations(PostDocument $document): array
+    {
+        $context = new RenderContext(accountNames: $this->accounts->namesOf($document->mentionedAccountIds()));
+        $quotations = [];
+
+        foreach ($this->renderer->nodesOf($document->toArray(), (new PostQuoteNode)->name()) as $node) {
+            $postId = is_array($node['attrs'] ?? null) ? ($node['attrs']['postId'] ?? null) : null;
+            if (is_string($postId)) {
+                $quotations[] = [
+                    'postId' => $postId,
+                    'text' => $this->renderer->toText(['type' => 'doc', 'content' => $node['content'] ?? []], $context),
+                ];
+            }
+        }
+
+        return $quotations;
+    }
+
+    /**
      * @param  list<PostBody>  $bodies
      */
     private function contextFor(array $bodies, ?Authenticatable $reader): RenderContext

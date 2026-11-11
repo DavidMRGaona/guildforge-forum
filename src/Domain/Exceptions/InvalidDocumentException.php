@@ -55,6 +55,8 @@ final class InvalidDocumentException extends DomainException
 
     public const string UNKNOWN_POST = 'unknown_post';
 
+    public const string INVALID_QUOTE = 'invalid_quote';
+
     private function __construct(
         public readonly string $reason,
         public readonly string $path,

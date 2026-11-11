@@ -64,7 +64,8 @@ final readonly class PostContentPresenter
         return match ($post->status()) {
             PostStatus::Visible => true,
             PostStatus::Hidden, PostStatus::Pending => $moderates || ($readerId !== null && $post->authorId() === $readerId),
-            PostStatus::Deleted => $moderates,
+            // Once purged there is nothing left to read
+            PostStatus::Deleted => $moderates && ! $post->isContentPurged(),
         };
     }
 

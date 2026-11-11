@@ -114,7 +114,7 @@ final class DocumentRendererTest extends ModuleTestCase
         $html = $this->renderer()->toHtml($this->doc([
             $this->paragraph([['type' => 'mention', 'attrs' => ['id' => '00000000-0000-4000-8000-000000000000']]]),
             ['type' => 'postQuote', 'attrs' => ['postId' => '00000000-0000-4000-8000-000000000001'], 'content' => [$this->paragraph([$this->text('x')])]],
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE]],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]],
         ]), new RenderContext);
 
         $this->assertSame(
@@ -166,7 +166,7 @@ final class DocumentRendererTest extends ModuleTestCase
             ]],
             ['type' => 'codeBlock', 'attrs' => ['language' => 'php'], 'content' => [$this->text("echo 1;\necho 2;")]],
             ['type' => 'horizontalRule'],
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE, 'alt' => 'Mapa']],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => 'Mapa']],
             ['type' => 'paragraph'],
         ]);
     }

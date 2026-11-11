@@ -54,8 +54,6 @@ final class CategoryForumAccessTest extends ModuleTestCase
         $this->assertFalse($this->access()->canWrite(null, $discussion));
         $this->assertTrue($this->access()->canWrite($user, $discussion));
         $this->assertFalse($this->access()->canModerate($user, $discussion));
-        $this->assertTrue($this->access()->canWriteSomewhere($user));
-        $this->assertFalse($this->access()->canWriteSomewhere(null));
     }
 
     public function test_a_hidden_discussion_is_only_for_its_moderators(): void
@@ -74,7 +72,7 @@ final class CategoryForumAccessTest extends ModuleTestCase
         $this->assertTrue($this->access()->canModerate($moderator, $discussion));
     }
 
-    public function test_nobody_writes_anywhere_when_every_category_is_read_only_for_them(): void
+    public function test_a_category_read_only_for_someone_lets_them_read_but_not_write(): void
     {
         $category = new Category(CategoryId::generate(), 'Anuncios', new CategorySlug('anuncios'), writeAudience: CategoryAudience::associationMembers());
         app(CategoryRepositoryInterface::class)->save($category);
@@ -83,7 +81,6 @@ final class CategoryForumAccessTest extends ModuleTestCase
 
         $this->assertTrue($this->access()->canRead($user, $discussion));
         $this->assertFalse($this->access()->canWrite($user, $discussion));
-        $this->assertFalse($this->access()->canWriteSomewhere($user));
     }
 
     private function access(): ForumAccessInterface

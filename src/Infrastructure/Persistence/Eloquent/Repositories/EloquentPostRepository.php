@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 
+use App\Application\Services\TimezoneServiceInterface;
+use DateTimeImmutable;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
@@ -14,8 +16,12 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 
-final class EloquentPostRepository implements PostRepositoryInterface
+final readonly class EloquentPostRepository implements PostRepositoryInterface
 {
+    public function __construct(
+        private TimezoneServiceInterface $timezone,
+    ) {}
+
     public function save(Post $post): void
     {
         PostModel::query()->updateOrCreate(['id' => $post->id()->value], [
@@ -27,6 +33,8 @@ final class EloquentPostRepository implements PostRepositoryInterface
             'plain_text' => $post->body()->plainText,
             'published_at' => $post->publishedAt(),
             'edited_at' => $post->editedAt(),
+            'deleted_at' => $post->deletedAt(),
+            'content_purged_at' => $post->contentPurgedAt(),
             'created_at' => $post->createdAt(),
         ]);
     }
@@ -77,6 +85,21 @@ final class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function deletedAwaitingPurge(DateTimeImmutable $deletedBefore, int $limit): array
+    {
+        return array_values(PostModel::query()
+            ->where('status', PostStatus::Deleted->value)
+            ->whereNull('content_purged_at')
+            // Bindings bypass the model's storage zone: converted here
+            ->where('deleted_at', '<', $this->timezone->toStorage($deletedBefore)->format('Y-m-d H:i:s'))
+            ->orderBy('deleted_at')
+            ->orderBy('id')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(static fn (mixed $id): PostId => PostId::fromString(is_string($id) ? $id : ''))
+            ->all());
+    }
+
     public function delete(PostId $id): void
     {
         PostModel::query()->whereKey($id->value)->delete();
@@ -94,6 +117,8 @@ final class EloquentPostRepository implements PostRepositoryInterface
             createdAt: $model->created_at->toDateTimeImmutable(),
             publishedAt: $model->published_at?->toDateTimeImmutable(),
             editedAt: $model->edited_at?->toDateTimeImmutable(),
+            deletedAt: $model->deleted_at?->toDateTimeImmutable(),
+            contentPurgedAt: $model->content_purged_at?->toDateTimeImmutable(),
         );
     }
 }

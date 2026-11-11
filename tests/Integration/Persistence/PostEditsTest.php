@@ -72,7 +72,7 @@ final class PostEditsTest extends ModuleTestCase
         $reply = $this->aReply($discussion, '2026-11-10 18:30:00');
         $this->writer()->editPost($reply->id(), self::aBody('Corregida'), null, new DateTimeImmutable('2026-11-10 18:40:00'));
 
-        $deleted = $this->writer()->deletePostByAuthor($reply->id());
+        $deleted = $this->writer()->deletePostByAuthor($reply->id(), new DateTimeImmutable('2026-11-10 19:30:00'));
 
         $this->assertSame(PostStatus::Deleted, $deleted->status());
         $this->assertSame(2, $deleted->number()?->value);
@@ -87,11 +87,11 @@ final class PostEditsTest extends ModuleTestCase
     public function test_a_post_its_author_deleted_cannot_be_edited_or_deleted_again(): void
     {
         [, $post] = $this->aDiscussion($this->aCategory());
-        $this->writer()->deletePostByAuthor($post->id());
+        $this->writer()->deletePostByAuthor($post->id(), new DateTimeImmutable('2026-11-10 19:30:00'));
 
         foreach ([
             fn (): mixed => $this->writer()->editPost($post->id(), self::aBody('Otra cosa'), null, new DateTimeImmutable('2026-11-10 19:00:00')),
-            fn (): mixed => $this->writer()->deletePostByAuthor($post->id()),
+            fn (): mixed => $this->writer()->deletePostByAuthor($post->id(), new DateTimeImmutable('2026-11-10 19:30:00')),
         ] as $write) {
             try {
                 $write();

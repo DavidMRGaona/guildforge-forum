@@ -160,22 +160,43 @@ final readonly class ForumWriter
     }
 
     /**
-     * Deletes a post on its author's behalf: it keeps its number, its body and its revisions
-     * (for moderators), and readers see a placeholder in its place.
+     * Deletes a post on its author's behalf: it keeps its number, and its body and revisions
+     * stay for moderators until they are purged. Readers see a placeholder in its place.
      *
      * @throws PostNotFoundException
      * @throws InvalidPostException unless it is visible or hidden
      */
-    public function deletePostByAuthor(PostId $postId): Post
+    public function deletePostByAuthor(PostId $postId, DateTimeImmutable $at): Post
     {
-        return DB::transaction(function () use ($postId): Post {
+        return DB::transaction(function () use ($postId, $at): Post {
             $discussion = $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
-            $post->deleteByAuthor();
+            $post->deleteByAuthor($at);
             $this->posts->save($post);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+
+            return $post;
+        }, self::ATTEMPTS);
+    }
+
+    /**
+     * Empties a post its author deleted and drops its revisions, so nothing it said is kept
+     * (nor counts as using an image). Only its place in the numbering is left.
+     *
+     * @throws PostNotFoundException
+     * @throws InvalidPostException unless its author deleted it
+     */
+    public function purgeDeletedPost(PostId $postId, DateTimeImmutable $at): Post
+    {
+        return DB::transaction(function () use ($postId, $at): Post {
+            $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
+
+            $post = $this->posts->findOrFail($postId);
+            $post->purgeContent($at);
+            $this->revisions->deleteOfPost($postId);
+            $this->posts->save($post);
 
             return $post;
         }, self::ATTEMPTS);

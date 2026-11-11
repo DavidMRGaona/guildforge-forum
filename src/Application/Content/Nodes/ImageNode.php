@@ -12,18 +12,30 @@ use Modules\Forum\Application\Content\Rendering\RenderContext;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 
 /**
- * An image uploaded to the forum. It holds the stored path in the forum's own folder, never a
- * URL: images from elsewhere could track readers, and only files the forum's media source
- * claims count as used in the media library.
+ * An image in a post. `origin` says where it comes from; for now only `upload`: a file uploaded
+ * to the forum, whose `src` is its stored path in the forum's own folder, never a URL (images
+ * from elsewhere could track readers, and only files the forum's media source claims count as
+ * used in the media library). Other origins can be added later without touching stored posts.
  */
 final class ImageNode extends AbstractNodeType
 {
+    public const string ORIGIN_UPLOAD = 'upload';
+
+    public const array ORIGINS = [self::ORIGIN_UPLOAD];
+
     /** The folder post images are uploaded to, claimed by the forum's media source */
     public const string FOLDER = 'forum/posts/';
 
     public const string PATH_PATTERN = '#^forum/posts/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$#';
 
     public const int MAX_ALT_LENGTH = 300;
+
+    /**
+     * @param  int  $maxPerDocument  images one post may hold (the forum settings)
+     */
+    public function __construct(
+        private readonly int $maxPerDocument = DocumentLimits::MAX_IMAGES,
+    ) {}
 
     public function name(): string
     {
@@ -37,12 +49,16 @@ final class ImageNode extends AbstractNodeType
 
     public function limit(): NodeLimit
     {
-        return new NodeLimit(DocumentLimits::MAX_IMAGES, InvalidDocumentException::TOO_MANY_IMAGES);
+        return new NodeLimit($this->maxPerDocument, InvalidDocumentException::TOO_MANY_IMAGES);
     }
 
     public function validateAttributes(array $attributes, string $path): void
     {
-        Attributes::only($attributes, ['src', 'alt'], $path);
+        Attributes::only($attributes, ['origin', 'src', 'alt'], $path);
+
+        if (! in_array($attributes['origin'] ?? null, self::ORIGINS, true)) {
+            throw InvalidDocumentException::because(InvalidDocumentException::INVALID_IMAGE, $path, 'Images say where they come from');
+        }
 
         $src = $attributes['src'] ?? null;
         if (! is_string($src) || preg_match(self::PATH_PATTERN, $src) !== 1) {
@@ -54,7 +70,11 @@ final class ImageNode extends AbstractNodeType
 
     public function toHtml(array $attributes, array $children, RenderContext $context): string
     {
-        $url = $context->imageUrl(Attributes::string($attributes, 'src') ?? '');
+        // Checked again: a stored document is never trusted to have been validated
+        $src = Attributes::string($attributes, 'src') ?? '';
+        $url = Attributes::string($attributes, 'origin') === self::ORIGIN_UPLOAD && preg_match(self::PATH_PATTERN, $src) === 1
+            ? $context->imageUrl($src)
+            : null;
 
         if ($url === null) {
             return '';

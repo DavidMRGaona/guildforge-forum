@@ -6,7 +6,14 @@ import { buildImageUrl } from '@/utils/cloudinary';
 import { csrfHeaders, isCsrfFailure } from '@/utils/csrf';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { isDocumentEmpty, MAX_IMAGES, normalizeHref, storedImageUrl } from '../../editor/document';
+import {
+    IMAGE_ORIGIN_UPLOAD,
+    IMAGE_TYPES,
+    isDocumentEmpty,
+    MAX_IMAGES,
+    normalizeHref,
+    storedImageUrl,
+} from '../../editor/document';
 import { postDraft } from '../../editor/draft';
 import EditorToolbar from '../../editor/EditorToolbar.vue';
 import { createForumExtensions } from '../../editor/extensions';
@@ -33,8 +40,12 @@ const props = withDefaults(
         draftKey?: string | null;
         /** The discussion's mention candidates endpoint; null offers no mentions */
         mentionsUrl?: string | null;
-        /** The image upload endpoint; null offers no images */
+        /** The image upload endpoint; null offers no images (no permission to upload) */
         uploadUrl?: string | null;
+        /** Images one post may hold, from the forum settings */
+        maxImages?: number;
+        /** Image formats the forum settings allow, as MIME types */
+        imageTypes?: string[];
         /** Names of the accounts the starting document mentions, by id */
         mentionNames?: Record<string, string>;
         extensions?: AnyExtension[];
@@ -52,6 +63,8 @@ const props = withDefaults(
         draftKey: null,
         mentionsUrl: null,
         uploadUrl: null,
+        maxImages: MAX_IMAGES,
+        imageTypes: () => [...IMAGE_TYPES],
         mentionNames: () => ({}),
         extensions: () => [],
         toolbarItems: () => [],
@@ -70,7 +83,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const DRAFT_DELAY_MS = 600;
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 const names = reactive(new Map<string, string>(Object.entries(props.mentionNames)));
 watch(
@@ -282,13 +294,13 @@ function imageCount(): number {
 
 /** Uploads the images among the files; true when it took them (so a paste or drop stops there) */
 function uploadFiles(files: FileList | null | undefined): boolean {
-    const images = Array.from(files ?? []).filter((file) => IMAGE_TYPES.includes(file.type));
+    const images = Array.from(files ?? []).filter((file) => props.imageTypes.includes(file.type));
     if (props.uploadUrl === null || images.length === 0) {
         return false;
     }
 
-    if (imageCount() + uploading.value + images.length > MAX_IMAGES) {
-        localError.value = t('forum.editor.errors.too_many_images', { max: MAX_IMAGES });
+    if (imageCount() + uploading.value + images.length > props.maxImages) {
+        localError.value = t('forum.editor.errors.too_many_images', { max: props.maxImages });
 
         return true;
     }
@@ -323,7 +335,14 @@ async function upload(file: File, url: string): Promise<void> {
         }
 
         const image = (await response.json()) as UploadedImage;
-        editor.value?.chain().focus().setImage({ src: image.path }).run();
+        editor.value
+            ?.chain()
+            .focus()
+            .insertContent({
+                type: 'image',
+                attrs: { origin: IMAGE_ORIGIN_UPLOAD, src: image.path, alt: null },
+            })
+            .run();
         status.value = t('forum.editor.images.uploaded');
     } catch {
         localError.value = t('forum.editor.errors.upload');
@@ -417,7 +436,7 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             class="sr-only"
             tabindex="-1"
             aria-hidden="true"
-            :accept="IMAGE_TYPES.join(',')"
+            :accept="imageTypes.join(',')"
             multiple
             @change="onFilesChosen"
         />

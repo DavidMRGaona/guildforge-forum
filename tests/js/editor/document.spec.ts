@@ -81,6 +81,13 @@ describe('documents', () => {
                     },
                     { type: 'image', attrs: { src: 'https://tracker.example.com/p.gif' } },
                     {
+                        type: 'image',
+                        attrs: {
+                            src: 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.png',
+                            title: 'x',
+                        },
+                    },
+                    {
                         type: 'codeBlock',
                         attrs: { language: 'Python' },
                         content: [{ type: 'text', text: 'x' }],
@@ -105,6 +112,14 @@ describe('documents', () => {
             content: [
                 { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Uno' }] },
                 { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Seis' }] },
+                {
+                    type: 'image',
+                    attrs: {
+                        origin: 'upload',
+                        src: 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.png',
+                        alt: null,
+                    },
+                },
                 {
                     type: 'codeBlock',
                     attrs: { language: 'python' },

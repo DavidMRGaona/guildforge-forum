@@ -47,17 +47,17 @@ El editor es TipTap en el navegador. Lo que se envía y se guarda es su document
 | `bulletList`, `orderedList` | `listItem` | `orderedList`: `start` opcional (1 a 100 000) |
 | `listItem` | bloques | ninguno |
 | `codeBlock` | texto sin marcas | `language` opcional (`[a-z0-9][a-z0-9+#.-]{0,29}`) |
-| `horizontalRule`, `image` | — | `image`: `src` (ruta en `forum/posts/`) y `alt` opcional (300 caracteres) |
+| `horizontalRule`, `image` | — | `image`: `origin` (`upload`; otros orígenes podrán añadirse sin migrar datos), `src` (ruta en `forum/posts/`) y `alt` opcional (300 caracteres) |
 | `hardBreak`, `mention` (inline) | — | `mention`: `id` de la cuenta |
 
 Marcas: `bold`, `italic`, `strike`, `code` y `link` (solo `href`, a `http`, `https` o `mailto`, sin credenciales).
 
-Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 caracteres de texto, 10 imágenes, 20 menciones y 10 citas por mensaje. Un mensaje sin texto, imagen ni mención está vacío.
+Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 caracteres de texto, 20 menciones y 10 citas por mensaje; las imágenes por mensaje, según los ajustes. Un mensaje sin texto, imagen ni mención está vacío.
 
-- **Menciones y citas** guardan solo el id. El nombre y el enlace se buscan al pintar el mensaje, así que cambiar de nombre no rompe nada y nadie puede atribuir una cita a otra persona. Una cita muestra autor y enlace solo a quien puede leer el original.
-- **Imágenes**: se suben a `POST /foro/imagenes` (JPEG, PNG, WebP o GIF, 4 MB, el tipo se lee de los bytes) y se guardan en `forum/posts/<año>/<mes>/`, redimensionadas a 2000 px. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado.
+- **Menciones y citas** guardan solo el id. El nombre y el enlace se buscan al pintar el mensaje, así que cambiar de nombre no rompe nada. Una cita muestra autor y enlace solo a quien puede leer el original, y al guardarla su texto tiene que estar en el mensaje citado (se comparan letras y cifras), para que nadie atribuya a otra persona lo que no dijo.
+- **Imágenes**: las sube quien tiene `forum:posts.upload_images` a `POST /foro/imagenes`, con los formatos (de JPEG, PNG, WebP y GIF; nunca SVG), el peso, el lado máximo, las imágenes por mensaje y las subidas por hora de los ajustes. El tipo se lee de los bytes. Se guardan en `forum/posts/<año>/<mes>/`. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado (hasta que se vacía).
 - **Texto plano**: sale del mismo documento (bloques por línea, listas con su marca, citas tras «> », menciones con el nombre del momento).
-- **Borrar**: el autor borra su mensaje y en su sitio queda «Mensaje borrado»; el cuerpo y las versiones se conservan para quien modera.
+- **Borrar**: el autor borra su mensaje y en su sitio queda «Mensaje borrado». Quien modera sigue viendo el cuerpo y las versiones durante 30 días; después `forum:purge-deleted-posts` (cada día) los vacía y sus imágenes dejan de contar como uso.
 - **Límite de envío**: *Mensajes por minuto y persona* en los ajustes (6 por defecto). Al pasarse responde 429 con `Retry-After`.
 
 ### Endpoints (JSON, con sesión)
@@ -82,7 +82,7 @@ Un nodo nuevo (tiradas, apartes fuera de personaje) se añade en los dos lados:
 
 ### Componente
 
-`resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl`, `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
+`resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl` (solo a quien tiene el permiso de subir imágenes), `maxImages` e `imageTypes` (de los ajustes), `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
 
 ## Permisos
 
@@ -93,11 +93,12 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 | `forum:forum.moderate` | Moderar todo el foro |
 | `forum:categories.manage` | Gestionar las categorías y quién ve y escribe en cada una |
 | `forum:settings.manage` | Cambiar los ajustes del foro |
+| `forum:posts.upload_images` | Subir imágenes a los mensajes |
 
 ## Panel
 
 - **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo.
-- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto) y cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto).
+- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
 
 ## Desarrollo
 

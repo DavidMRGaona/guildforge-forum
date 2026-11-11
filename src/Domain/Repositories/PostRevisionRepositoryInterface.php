@@ -22,4 +22,6 @@ interface PostRevisionRepositoryInterface
      * The number the next revision of the post takes.
      */
     public function nextNumber(PostId $postId): int;
+
+    public function deleteOfPost(PostId $postId): void;
 }

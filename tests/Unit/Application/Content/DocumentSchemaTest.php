@@ -46,7 +46,7 @@ final class DocumentSchemaTest extends TestCase
             ]],
             ['type' => 'codeBlock', 'attrs' => ['language' => 'php'], 'content' => [self::text("echo 1;\necho 2;")]],
             ['type' => 'horizontalRule'],
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE, 'alt' => 'Mapa de la mazmorra']],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => 'Mapa de la mazmorra']],
             ['type' => 'paragraph'],
         ]);
 
@@ -65,7 +65,7 @@ final class DocumentSchemaTest extends TestCase
             ['type' => 'codeBlock', 'attrs' => ['language' => null], 'content' => [self::text('x')]],
             ['type' => 'codeBlock', 'content' => [self::text('y')]],
             ['type' => 'orderedList', 'content' => [['type' => 'listItem', 'content' => [self::paragraph([self::text('a')])]]]],
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE, 'alt' => null]],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => null]],
         ]));
 
         $this->assertSame([self::IMAGE], $document->imagePaths());
@@ -76,8 +76,8 @@ final class DocumentSchemaTest extends TestCase
         $mention = ['type' => 'mention', 'attrs' => ['id' => self::ACCOUNT]];
         $document = DocumentSchema::core()->validate(self::doc([
             self::paragraph([$mention, self::text(' y '), $mention]),
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE]],
-            ['type' => 'image', 'attrs' => ['src' => self::IMAGE]],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]],
         ]));
 
         $this->assertSame([self::ACCOUNT], $document->mentionedAccountIds());
@@ -137,13 +137,15 @@ final class DocumentSchemaTest extends TestCase
         yield 'empty mailto' => [self::doc([self::paragraph([self::text('x', [['type' => 'link', 'attrs' => ['href' => 'mailto:']]])])]), InvalidDocumentException::INVALID_LINK, 'content.0.content.0.marks.0'];
         yield 'link too long' => [self::doc([self::paragraph([self::text('x', [['type' => 'link', 'attrs' => ['href' => 'https://example.com/'.str_repeat('a', 2048)]]])])]), InvalidDocumentException::INVALID_LINK, 'content.0.content.0.marks.0'];
         yield 'link with a target' => [self::doc([self::paragraph([self::text('x', [['type' => 'link', 'attrs' => ['href' => 'https://example.com', 'target' => '_self']]])])]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0.content.0.marks.0'];
-        yield 'external image' => [self::doc([['type' => 'image', 'attrs' => ['src' => 'https://tracker.example.com/pixel.gif']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
-        yield 'image of another folder' => [self::doc([['type' => 'image', 'attrs' => ['src' => 'users/1/avatar.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
-        yield 'image path climbing up' => [self::doc([['type' => 'image', 'attrs' => ['src' => 'forum/posts/2026/11/../../../users/a.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
-        yield 'image with an svg file' => [self::doc([['type' => 'image', 'attrs' => ['src' => 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.svg']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
-        yield 'image alt too long' => [self::doc([['type' => 'image', 'attrs' => ['src' => self::IMAGE, 'alt' => str_repeat('a', 301)]]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
-        yield 'image with a title' => [self::doc([['type' => 'image', 'attrs' => ['src' => self::IMAGE, 'title' => 'x']]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
-        yield 'image inside a paragraph' => [self::doc([self::paragraph([['type' => 'image', 'attrs' => ['src' => self::IMAGE]]])]), InvalidDocumentException::NOT_ALLOWED_HERE, 'content.0.content.0'];
+        yield 'external image' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'https://tracker.example.com/pixel.gif']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image of another folder' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'users/1/avatar.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image path climbing up' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'forum/posts/2026/11/../../../users/a.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image with an svg file' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.svg']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image without origin' => [self::doc([['type' => 'image', 'attrs' => ['src' => self::IMAGE]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image from an origin not yet allowed' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://i.example.com/a.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image alt too long' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => str_repeat('a', 301)]]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
+        yield 'image with a title' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'title' => 'x']]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
+        yield 'image inside a paragraph' => [self::doc([self::paragraph([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]]])]), InvalidDocumentException::NOT_ALLOWED_HERE, 'content.0.content.0'];
         yield 'mention without id' => [self::doc([self::paragraph([['type' => 'mention', 'attrs' => []]])]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0.content.0'];
         yield 'mention by name' => [self::doc([self::paragraph([['type' => 'mention', 'attrs' => ['id' => 'admin']]])]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0.content.0'];
         yield 'mention with a label' => [self::doc([self::paragraph([['type' => 'mention', 'attrs' => ['id' => self::ACCOUNT, 'label' => 'Administración']]])]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0.content.0'];
@@ -228,7 +230,7 @@ final class DocumentSchemaTest extends TestCase
     {
         $cases = [
             InvalidDocumentException::TOO_MANY_IMAGES => array_map(
-                static fn (int $i): array => ['type' => 'image', 'attrs' => ['src' => sprintf('forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-%012d.png', $i)]],
+                static fn (int $i): array => ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => sprintf('forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-%012d.png', $i)]],
                 range(1, DocumentLimits::MAX_IMAGES + 1),
             ),
             InvalidDocumentException::TOO_MANY_MENTIONS => [self::paragraph(array_map(
@@ -248,6 +250,23 @@ final class DocumentSchemaTest extends TestCase
             } catch (InvalidDocumentException $exception) {
                 $this->assertSame($reason, $exception->reason);
             }
+        }
+    }
+
+    public function test_the_images_per_post_come_from_the_settings(): void
+    {
+        $images = array_map(
+            static fn (int $i): array => ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => sprintf('forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-%012d.png', $i)]],
+            range(1, 3),
+        );
+
+        DocumentSchema::core(maxImages: 3)->validate(self::doc($images));
+
+        try {
+            DocumentSchema::core(maxImages: 2)->validate(self::doc($images));
+            $this->fail('The document was accepted.');
+        } catch (InvalidDocumentException $exception) {
+            $this->assertSame(InvalidDocumentException::TOO_MANY_IMAGES, $exception->reason);
         }
     }
 

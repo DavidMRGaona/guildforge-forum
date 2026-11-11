@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\PostController;
 use Modules\Forum\Http\Controllers\PostImageController;
@@ -45,7 +46,7 @@ Route::prefix('foro')
                 ->middleware('throttle:120,1,forum-mentions')
                 ->name('mentions.index');
             Route::post('imagenes', [PostImageController::class, 'store'])
-                ->middleware('throttle:30,60,forum-images')
+                ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
                 ->name('images.store');
         });
     });

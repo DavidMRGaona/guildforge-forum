@@ -67,11 +67,6 @@ final class FakeForumAccess implements ForumAccessInterface
         return $user instanceof Authenticatable && isset($this->moderators[$this->id($user)]);
     }
 
-    public function canWriteSomewhere(?Authenticatable $user): bool
-    {
-        return $user instanceof Authenticatable && isset($this->writers[$this->id($user)]);
-    }
-
     private function id(Authenticatable $user): string
     {
         $id = $user->getAuthIdentifier();

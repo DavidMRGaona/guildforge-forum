@@ -62,6 +62,35 @@ final readonly class DocumentRenderer
     }
 
     /**
+     * Every node of a type, whole (attributes and content), at any depth.
+     *
+     * @param  array<array-key, mixed>  $document
+     * @return list<array<array-key, mixed>>
+     */
+    public function nodesOf(array $document, string $type): array
+    {
+        $found = [];
+        $walk = static function (array $node, int $depth) use (&$walk, &$found, $type): void {
+            $content = $node['content'] ?? null;
+            if (! is_array($content) || $depth > DocumentLimits::MAX_DEPTH) {
+                return;
+            }
+
+            foreach ($content as $child) {
+                if (is_array($child)) {
+                    if (($child['type'] ?? null) === $type) {
+                        $found[] = $child;
+                    }
+                    $walk($child, $depth + 1);
+                }
+            }
+        };
+        $walk($document, 1);
+
+        return $found;
+    }
+
+    /**
      * @param  array<array-key, mixed>  $node
      * @param  list<string>  $types
      * @param  array<string, list<array<string, mixed>>>  $found

@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $plain_text
  * @property CarbonImmutable|null $published_at
  * @property CarbonImmutable|null $edited_at
+ * @property CarbonImmutable|null $deleted_at
+ * @property CarbonImmutable|null $content_purged_at
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -36,7 +38,7 @@ final class PostModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'created_at'];
+    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'deleted_at', 'content_purged_at', 'created_at'];
 
     /**
      * @return array<string, string>
@@ -48,6 +50,8 @@ final class PostModel extends Model
             'body' => 'array',
             'published_at' => 'immutable_datetime',
             'edited_at' => 'immutable_datetime',
+            'deleted_at' => 'immutable_datetime',
+            'content_purged_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];

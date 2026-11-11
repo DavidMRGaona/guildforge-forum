@@ -94,7 +94,7 @@ final readonly class PostingService
         $discussion = $this->ownPostDiscussion($author, $postId);
         $this->assertCanPost($author, $discussion);
 
-        return $this->writer->deletePostByAuthor($postId);
+        return $this->writer->deletePostByAuthor($postId, CarbonImmutable::now());
     }
 
     /**

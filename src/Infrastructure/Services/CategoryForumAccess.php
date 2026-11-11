@@ -54,15 +54,6 @@ final class CategoryForumAccess implements ForumAccessInterface
         return $category instanceof Category && $this->policy->canModerate($user, $category);
     }
 
-    public function canWriteSomewhere(?Authenticatable $user): bool
-    {
-        if (! $user instanceof Authenticatable) {
-            return false;
-        }
-
-        return array_any($this->repository->all(), fn (Category $category): bool => $this->policy->canWrite($user, $category));
-    }
-
     private function categoryOf(Discussion $discussion): ?Category
     {
         $id = $discussion->categoryId()->value;

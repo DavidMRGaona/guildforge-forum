@@ -1,5 +1,5 @@
 import Image from '@tiptap/extension-image';
-import { FORUM_IMAGE_PATTERN } from '../document';
+import { FORUM_IMAGE_PATTERN, IMAGE_ORIGIN_UPLOAD } from '../document';
 import type { Attributes } from '@tiptap/core';
 import type { ImageOptions } from '@tiptap/extension-image';
 import type { DOMOutputSpec, TagParseRule } from '@tiptap/pm/model';
@@ -11,7 +11,8 @@ export interface ForumImageOptions extends ImageOptions {
 
 /**
  * Images uploaded to the forum. The node keeps the stored path (`src`) and a description
- * (`alt`), nothing else; pasted images from other sites are not taken in.
+ * (`alt`), and where it comes from (`origin`, `upload` for now); pasted images from other sites
+ * are not taken in.
  */
 export const ForumImage = Image.extend<ForumImageOptions>({
     addOptions(): ForumImageOptions {
@@ -27,6 +28,15 @@ export const ForumImage = Image.extend<ForumImageOptions>({
 
     addAttributes(): Attributes {
         return {
+            // Where the image comes from: only files uploaded to the forum for now
+            origin: {
+                default: IMAGE_ORIGIN_UPLOAD,
+                parseHTML: (element: HTMLElement): string | null =>
+                    element.getAttribute('data-origin'),
+                renderHTML: (attributes: Record<string, unknown>): Record<string, unknown> => ({
+                    'data-origin': attributes['origin'],
+                }),
+            },
             src: { default: null, renderHTML: () => ({}) },
             alt: { default: null },
         };
@@ -40,7 +50,11 @@ export const ForumImage = Image.extend<ForumImageOptions>({
                     const path = element.getAttribute('data-path') ?? '';
 
                     return FORUM_IMAGE_PATTERN.test(path)
-                        ? { src: path, alt: element.getAttribute('alt') }
+                        ? {
+                              origin: IMAGE_ORIGIN_UPLOAD,
+                              src: path,
+                              alt: element.getAttribute('alt'),
+                          }
                         : false;
                 },
             },

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Integration\Content;
 
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use DateTimeImmutable;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Application\Services\PostContentPresenter;
@@ -43,7 +44,7 @@ final class PostContentPresenterTest extends ModuleTestCase
         $hidden = app(PostRepositoryInterface::class)->findOrFail($hidden->id());
         $hidden->hide();
         app(ForumWriter::class)->savePost($hidden);
-        app(ForumWriter::class)->deletePostByAuthor($this->aReply($discussion, '2026-11-10 18:40:00', text: 'Me arrepiento')->id());
+        $deleted = app(ForumWriter::class)->deletePostByAuthor($this->aReply($discussion, '2026-11-10 18:40:00', text: 'Me arrepiento')->id(), new DateTimeImmutable('2026-11-10 19:30:00'));
         $posts = app(PostRepositoryInterface::class)->inDiscussion($discussion->id());
 
         $presenter = app(PostContentPresenter::class);
@@ -67,5 +68,12 @@ final class PostContentPresenterTest extends ModuleTestCase
         $this->assertSame('<p>Me arrepiento</p>', $forModerator[2]->html);
         $this->assertSame('Mensaje borrado', $forModerator[2]->placeholder);
         $this->assertFalse($forModerator[2]->canEdit);
+
+        // Once purged, moderators see only the placeholder too
+        app(ForumWriter::class)->purgeDeletedPost($deleted->id(), new DateTimeImmutable('2026-12-15 04:10:00'));
+        $posts = app(PostRepositoryInterface::class)->inDiscussion($discussion->id());
+        $purged = $presenter->present($posts, $discussion, $moderator)[2];
+        $this->assertNull($purged->html);
+        $this->assertSame('Mensaje borrado', $purged->placeholder);
     }
 }

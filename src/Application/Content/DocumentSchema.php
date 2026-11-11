@@ -87,15 +87,16 @@ final class DocumentSchema
     /**
      * The nodes and marks of the editor's core, without the ones other features add.
      */
-    public static function core(): self
+    public static function core(int $maxImages = DocumentLimits::MAX_IMAGES): self
     {
-        return new self(self::coreNodes(), self::coreMarks());
+        return new self(self::coreNodes($maxImages), self::coreMarks());
     }
 
     /**
+     * @param  int  $maxImages  images one post may hold (the forum settings)
      * @return list<NodeTypeInterface>
      */
-    public static function coreNodes(): array
+    public static function coreNodes(int $maxImages = DocumentLimits::MAX_IMAGES): array
     {
         return [
             new ParagraphNode,
@@ -107,7 +108,7 @@ final class DocumentSchema
             new ListItemNode,
             new CodeBlockNode,
             new HorizontalRuleNode,
-            new ImageNode,
+            new ImageNode($maxImages),
             new HardBreakNode,
             new MentionNode,
         ];

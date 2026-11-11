@@ -100,7 +100,7 @@ describe('the editor document', () => {
             type: 'doc',
             content: [
                 { type: 'paragraph', content: [{ type: 'mention', attrs: { id: ACCOUNT } }] },
-                { type: 'image', attrs: { src: IMAGE, alt: null } },
+                { type: 'image', attrs: { origin: 'upload', src: IMAGE, alt: null } },
             ],
         }).getHTML();
 

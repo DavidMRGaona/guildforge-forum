@@ -39,6 +39,8 @@ final class Post
         private readonly DateTimeImmutable $createdAt,
         private ?DateTimeImmutable $publishedAt,
         private ?DateTimeImmutable $editedAt = null,
+        private ?DateTimeImmutable $deletedAt = null,
+        private ?DateTimeImmutable $contentPurgedAt = null,
     ) {
         if ($status->isNumbered() !== ($number instanceof PostNumber) || $status->isNumbered() !== ($publishedAt instanceof DateTimeImmutable)) {
             throw InvalidPostException::numberMismatch($status);
@@ -106,16 +108,31 @@ final class Post
     }
 
     /**
-     * Deleted by its author: it keeps its number and readers see a placeholder. A pending post
-     * is withdrawn instead (it never had a place).
+     * Deleted by its author: it keeps its number and readers see a placeholder. Its moderators
+     * still read it until its content is purged (DeletedPostRetention). A pending post is
+     * withdrawn instead (it never had a place).
      *
      * @throws InvalidPostException unless it is visible or hidden
      */
-    public function deleteByAuthor(): void
+    public function deleteByAuthor(DateTimeImmutable $at): void
     {
         $this->assertStatus([PostStatus::Visible, PostStatus::Hidden], 'be deleted by its author');
 
         $this->status = PostStatus::Deleted;
+        $this->deletedAt = $at;
+    }
+
+    /**
+     * Empties a post its author deleted: only its place in the numbering is left.
+     *
+     * @throws InvalidPostException unless its author deleted it
+     */
+    public function purgeContent(DateTimeImmutable $at): void
+    {
+        $this->assertStatus([PostStatus::Deleted], 'be purged');
+
+        $this->body = PostBody::empty();
+        $this->contentPurgedAt = $at;
     }
 
     /**
@@ -177,6 +194,22 @@ final class Post
     public function editedAt(): ?DateTimeImmutable
     {
         return $this->editedAt;
+    }
+
+    /** When its author deleted it; null unless deleted (or deleted before this was kept) */
+    public function deletedAt(): ?DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function isContentPurged(): bool
+    {
+        return $this->contentPurgedAt instanceof DateTimeImmutable;
+    }
+
+    public function contentPurgedAt(): ?DateTimeImmutable
+    {
+        return $this->contentPurgedAt;
     }
 
     /**

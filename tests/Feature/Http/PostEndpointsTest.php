@@ -111,11 +111,18 @@ final class PostEndpointsTest extends ModuleTestCase
 
     public function test_quotes_must_point_at_posts_the_author_may_read(): void
     {
-        $quote = fn (string $postId): array => $this->doc([['type' => 'postQuote', 'attrs' => ['postId' => $postId], 'content' => [$this->paragraph([['type' => 'text', 'text' => 'Lo dicho']])]]]);
+        $quote = fn (string $postId, string $text = 'Respuesta'): array => $this->doc([['type' => 'postQuote', 'attrs' => ['postId' => $postId], 'content' => [$this->paragraph([['type' => 'text', 'text' => $text]])]]]);
 
-        $this->reply($quote($this->firstPost->id()->value))->assertCreated();
+        $this->reply($quote($this->firstPost->id()->value, 'Primer mensaje'))->assertCreated();
+        // Formatting and spacing do not matter, only the words
+        $this->reply($quote($this->firstPost->id()->value, 'PRIMER  mensaje'))->assertCreated();
 
-        $this->reply($quote('00000000-0000-4000-8000-000000000000'))
+        // Words the original never said cannot be put in its author's mouth
+        $this->reply($quote($this->firstPost->id()->value, 'Lo dicho'))
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'invalid_quote');
+
+        $this->reply($quote('00000000-0000-4000-8000-000000000000', 'Lo que sea'))
             ->assertUnprocessable()
             ->assertJsonPath('reason', 'unknown_post');
 
@@ -171,9 +178,9 @@ final class PostEndpointsTest extends ModuleTestCase
     {
         $routes = app('router')->getRoutes();
 
-        foreach (['forum.posts.update' => 'forum-edits', 'forum.posts.destroy' => 'forum-edits', 'forum.mentions.index' => 'forum-mentions', 'forum.images.store' => 'forum-images'] as $name => $prefix) {
+        foreach (['forum.posts.update' => 'forum-edits', 'forum.posts.destroy' => 'forum-edits', 'forum.mentions.index' => 'forum-mentions', 'forum.images.store' => 'forum-images'] as $name => $key) {
             $middleware = $routes->getByName($name)?->gatherMiddleware() ?? [];
-            $this->assertNotEmpty(array_filter($middleware, static fn (mixed $entry): bool => is_string($entry) && str_starts_with($entry, 'throttle:') && str_ends_with($entry, ','.$prefix)), $name);
+            $this->assertNotEmpty(array_filter($middleware, static fn (mixed $entry): bool => is_string($entry) && str_starts_with($entry, 'throttle:') && str_ends_with($entry, $key)), $name);
         }
     }
 

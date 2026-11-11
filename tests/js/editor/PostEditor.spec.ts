@@ -183,7 +183,7 @@ describe('PostEditor', () => {
         );
         expect((wrapper.vm as unknown as Exposed).getDocument()?.content).toContainEqual({
             type: 'image',
-            attrs: { src: IMAGE, alt: null },
+            attrs: { origin: 'upload', src: IMAGE, alt: null },
         });
         vi.unstubAllGlobals();
     });

@@ -10,8 +10,12 @@ use App\Application\Modules\DTOs\PermissionDTO;
 use App\Infrastructure\Media\Observers\RefreshMediaUsagesObserver;
 use App\Modules\ModuleServiceProvider;
 use Filament\Pages\Page;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
 use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
 use Modules\Forum\Application\Content\DocumentSchema;
@@ -25,6 +29,7 @@ use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
@@ -52,7 +57,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * Permission names, stored by the loader as "forum:<name>".
      */
-    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage'];
+    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images'];
 
     /**
      * Container tags for the post document's extra node and mark types: a feature that adds a
@@ -61,6 +66,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public const string NODE_TYPES_TAG = 'forum.content.nodes';
 
     public const string MARK_TYPES_TAG = 'forum.content.marks';
+
+    public const string IMAGE_UPLOADS_LIMITER = 'forum-images';
 
     public function moduleName(): string
     {
@@ -87,14 +94,15 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
 
-        $this->app->singleton(DocumentSchema::class, static function (Application $app): DocumentSchema {
+        // Built each time: the images a post may hold come from the settings
+        $this->app->bind(DocumentSchema::class, static function (Application $app): DocumentSchema {
             /** @var iterable<NodeTypeInterface> $nodes */
             $nodes = $app->tagged(self::NODE_TYPES_TAG);
             /** @var iterable<MarkTypeInterface> $marks */
             $marks = $app->tagged(self::MARK_TYPES_TAG);
 
             return new DocumentSchema(
-                [...DocumentSchema::coreNodes(), ...$nodes],
+                [...DocumentSchema::coreNodes($app->make(ForumSettingsInterface::class)->imagesPerPost()), ...$nodes],
                 [...DocumentSchema::coreMarks(), ...$marks],
             );
         });
@@ -103,6 +111,19 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // Image uploads per person and hour, from the settings
+        RateLimiter::for(self::IMAGE_UPLOADS_LIMITER, static fn (Request $request): Limit => Limit::perHour(app(ForumSettingsInterface::class)->imageUploadsPerHour())
+            ->by('forum-images:'.self::requesterKey($request)));
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([PurgeDeletedPostsCommand::class]);
+        }
+
+        // What authors deleted is emptied once its retention has passed
+        $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
+            $schedule->command('forum:purge-deleted-posts')->dailyAt('04:10')->withoutOverlapping(60);
+        });
 
         // The media library learns at once which images a post started or stopped using
         $observer = new RefreshMediaUsagesObserver(
@@ -182,5 +203,12 @@ final class ForumServiceProvider extends ModuleServiceProvider
         }
 
         return false;
+    }
+
+    private static function requesterKey(Request $request): string
+    {
+        $id = $request->user()?->getAuthIdentifier();
+
+        return is_scalar($id) ? (string) $id : (string) $request->ip();
     }
 }

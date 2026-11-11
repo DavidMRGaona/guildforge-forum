@@ -23,10 +23,4 @@ interface ForumAccessInterface
     public function canWrite(?Authenticatable $user, Discussion $discussion): bool;
 
     public function canModerate(?Authenticatable $user, Discussion $discussion): bool;
-
-    /**
-     * Whether the person may write in at least one category, so uploading an image for a post
-     * makes sense.
-     */
-    public function canWriteSomewhere(?Authenticatable $user): bool;
 }

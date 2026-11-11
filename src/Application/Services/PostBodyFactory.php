@@ -6,9 +6,11 @@ namespace Modules\Forum\Application\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Content\DocumentSchema;
+use Modules\Forum\Application\Content\PostDocument;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
@@ -43,7 +45,7 @@ final readonly class PostBodyFactory
             throw InvalidDocumentException::because(InvalidDocumentException::UNKNOWN_ACCOUNT, '', 'A mentioned account cannot be mentioned');
         }
 
-        $this->assertQuotesReadable($document->quotedPostIds(), $author);
+        $this->assertQuotesHold($document, $author);
 
         $text = $this->renderer->toText($document);
         if (mb_strlen($text) > PostBody::MAX_PLAIN_TEXT_LENGTH) {
@@ -54,24 +56,40 @@ final readonly class PostBodyFactory
     }
 
     /**
-     * Every quoted post exists, is visible and is in a discussion the author may read.
-     *
-     * @param  list<string>  $postIds
+     * Every quoted post exists, is visible and is in a discussion the author may read, and
+     * every quotation holds words of that post: a quote shows who wrote the original, so it
+     * cannot put words in someone else's mouth. Only letters and digits are compared, so
+     * formatting and spacing do not matter.
      *
      * @throws InvalidDocumentException
      */
-    private function assertQuotesReadable(array $postIds, Authenticatable $author): void
+    private function assertQuotesHold(PostDocument $document, Authenticatable $author): void
     {
-        $readable = 0;
+        $postIds = $document->quotedPostIds();
+
+        /** @var array<string, Post> $readable */
+        $readable = [];
         foreach ($this->posts->findMany(array_map(PostId::fromString(...), $postIds)) as $post) {
             $discussion = $this->discussions->find($post->discussionId());
             if ($post->isVisible() && $discussion instanceof Discussion && $this->access->canRead($author, $discussion)) {
-                $readable++;
+                $readable[$post->id()->value] = $post;
             }
         }
 
-        if ($readable !== count($postIds)) {
+        if (count($readable) !== count($postIds)) {
             throw InvalidDocumentException::because(InvalidDocumentException::UNKNOWN_POST, '', 'A quoted post cannot be read');
         }
+
+        foreach ($this->renderer->quotations($document) as $quotation) {
+            $original = $readable[$quotation['postId']] ?? null;
+            if (! $original instanceof Post || ! str_contains($this->words($original->body()->plainText), $this->words($quotation['text']))) {
+                throw InvalidDocumentException::because(InvalidDocumentException::INVALID_QUOTE, '', 'A quotation does not match the quoted post');
+            }
+        }
+    }
+
+    private function words(string $text): string
+    {
+        return mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $text) ?? '');
     }
 }

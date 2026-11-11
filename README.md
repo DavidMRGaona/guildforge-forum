@@ -82,7 +82,10 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
 - **Sin copia de la plantilla**: el acceso se pregunta al roster del core (`PublicationRosterInterface`) cada vez, así que entrar o salir de la campaña cambia el acceso al momento. Si el roster no responde, solo entra la moderación del foro.
 - **Terminada o cancelada**: el espacio pasa a solo lectura. Su plantilla y su dirección lo siguen leyendo, y la dirección lo sigue moderando, pero solo escribe quien tiene `forum:forum.moderate`.
 - **Retirada o borrada**: sin roster no hay plantilla, así que solo lo ve la moderación del foro (y queda en solo lectura). Al volver a publicarla, se recupera tal cual. Nunca se borran mensajes.
-- **Solo lectura con origen** (`read_only_by` en `forum_categories`): la pone el foro (`system`) o la moderación (`moderation`, con el interruptor «Solo lectura» del panel). El foro solo quita la que puso él; mientras la tiene puesta, el interruptor sale desactivado. Una categoría madre en solo lectura deja también en solo lectura sus subcategorías.
+- **Solo lectura con origen** (`read_only_by` en `forum_categories`): la pone el foro (`system`) o la moderación (`moderation`, con el interruptor «Solo lectura» del panel).
+  - El foro solo actúa cuando la campaña cambia (de en marcha a terminada, cancelada o retirada, o al revés), según lo último que vio (`space_open`). Entre medias manda la moderación.
+  - Encender el interruptor hace la marca de la moderación: el foro ya no la quita al reactivar la campaña. Apagarlo la quita, aunque la pusiera el foro. Guardar sin tocarlo no cambia nada.
+  - En una categoría en solo lectura (o con la madre en solo lectura) solo escribe quien tiene `forum:forum.moderate`, también en sus temas ocultos.
 - **Cabecera**: `SpaceNotices.vue` (`resources/js/components/spaces`) dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (props `isPublicationSpace` y `readOnly`).
 - **Reconciliación diaria**: la de los temas automáticos comprueba también las campañas cuyo espacio aún admite mensajes.
 

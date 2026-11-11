@@ -9,7 +9,6 @@ use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\CategoryIcon;
-use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Exceptions\CategoryNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
@@ -108,18 +107,20 @@ final readonly class CategoryForm
     }
 
     /**
-     * By hand, read-only is moderation's. What the forum set is left to the forum (the field is
-     * disabled then, and a disabled field sends nothing).
+     * By hand, read-only is moderation's: switching it on makes the mark moderation's (the forum
+     * never lifts it), switching it off lifts it whoever set it. Saving without touching it
+     * leaves the mark and who set it as they are.
      *
      * @param  array<string, mixed>  $data
      */
     private function applyReadOnly(Category $category, array $data): void
     {
-        if ($category->readOnlyBy() === ReadOnlyOrigin::System || ! array_key_exists('read_only', $data)) {
+        $wanted = $data['read_only'] ?? null;
+        if (! is_bool($wanted) || $wanted === $category->isReadOnly()) {
             return;
         }
 
-        if ($data['read_only'] === true) {
+        if ($wanted) {
             $category->makeReadOnly();
         } else {
             $category->allowWriting();

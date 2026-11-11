@@ -44,7 +44,9 @@ final class CategoryForumAccess implements ForumAccessInterface
             return false;
         }
 
-        return $discussion->isHidden() ? $this->policy->canModerate($user, $category) : $this->policy->canWrite($user, $category);
+        // A hidden discussion is for its moderators, who still write only where writing is allowed
+        // (not in a read-only category, not with an email verification pending)
+        return $this->policy->canWrite($user, $category) && (! $discussion->isHidden() || $this->policy->canModerate($user, $category));
     }
 
     public function canModerate(?Authenticatable $user, Discussion $discussion): bool

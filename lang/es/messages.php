@@ -125,7 +125,7 @@ return [
             'moderator_roster' => 'También la moderan',
             'read_only' => 'Solo lectura',
             'read_only_help' => 'Nadie escribe en ella salvo quien modera todo el foro. Quien la modera sigue moderándola.',
-            'read_only_by_system' => 'La ha puesto el foro porque la campaña terminó, se canceló o se retiró. Se quita sola si vuelve a estar en marcha.',
+            'read_only_by_system' => 'La ha puesto el foro porque la campaña terminó, se canceló o se retiró, y se quita sola si vuelve a estar en marcha. Si la apagas, se puede volver a escribir.',
             'discussions' => 'Temas',
             'system' => 'Sistema',
         ],

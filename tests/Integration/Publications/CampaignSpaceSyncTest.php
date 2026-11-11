@@ -14,19 +14,26 @@ use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Bus;
+use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Publications\PublicationDiscussionReconciler;
 use Modules\Forum\Application\Publications\PublicationDiscussionSync;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
+use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
+use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
+use Modules\Forum\Domain\ValueObjects\PostBody;
+use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Filament\Resources\CategoryResource\CategoryForm;
 use Modules\Forum\Infrastructure\Jobs\SyncPublicationDiscussionJob;
@@ -166,6 +173,26 @@ final class CampaignSpaceSyncTest extends ModuleTestCase
         $this->assertFalse($this->freshPolicy()->canWrite($this->director, $space));
         $this->assertTrue($this->freshPolicy()->canModerate($this->director, $space));
         $this->assertTrue($this->freshPolicy()->canWrite($this->forumModerator(), $space));
+    }
+
+    public function test_directors_cannot_write_in_a_hidden_discussion_of_a_read_only_space(): void
+    {
+        $this->publish();
+        $this->sync();
+        $discussion = Discussion::start(DiscussionId::generate(), $this->space()->id(), $this->director->id, new DiscussionTitle('Sesión cero'), now()->toImmutable());
+        app(ForumWriter::class)->startDiscussion($discussion, PostId::generate(), new PostBody(['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Hola']]]]], 'Hola'), needsApproval: false);
+        $discussion->hide();
+        app(ForumWriter::class)->saveDiscussion($discussion);
+
+        $this->assertTrue($this->access()->canWrite($this->director, $discussion));
+        $this->assertFalse($this->access()->canWrite($this->player, $discussion));
+
+        $this->publish(PublicationState::Ended);
+        $this->sync();
+
+        $this->assertFalse($this->access()->canWrite($this->director, $discussion));
+        $this->assertTrue($this->access()->canModerate($this->director, $discussion));
+        $this->assertTrue($this->access()->canWrite($this->forumModerator(), $discussion));
     }
 
     public function test_a_cancelled_campaign_is_read_only_until_it_is_active_again(): void
@@ -312,26 +339,92 @@ final class CampaignSpaceSyncTest extends ModuleTestCase
         $this->assertTrue($this->freshPolicy()->canView($this->player, $this->space()));
     }
 
-    public function test_the_panel_sets_read_only_as_moderation_and_leaves_the_forums_mark_alone(): void
+    public function test_switching_read_only_on_in_the_panel_makes_it_moderations(): void
     {
         $this->publish();
         $this->sync();
+
+        $this->panelSaves(readOnly: true);
+        $this->assertSame(ReadOnlyOrigin::Moderation, $this->space()->readOnlyBy());
+
+        // Not lifted when the campaign is active again
+        $this->publish(PublicationState::Cancelled);
+        $this->sync();
+        $this->publish();
+        $this->sync();
+        $this->assertSame(ReadOnlyOrigin::Moderation, $this->space()->readOnlyBy());
+    }
+
+    public function test_switching_it_on_over_the_forums_mark_makes_it_moderations(): void
+    {
+        $this->publish();
+        $this->sync();
+        $this->publish(PublicationState::Ended);
+        $this->sync();
+        $this->assertSame(ReadOnlyOrigin::System, $this->space()->readOnlyBy());
+
+        $this->panelSaves(readOnly: false);
+        $this->panelSaves(readOnly: true);
+        $this->publish();
+        $this->sync();
+
+        $this->assertSame(ReadOnlyOrigin::Moderation, $this->space()->readOnlyBy());
+    }
+
+    public function test_switching_read_only_off_lifts_the_forums_mark_and_it_stays_lifted(): void
+    {
+        $this->publish();
+        $this->sync();
+        $this->publish(PublicationState::Ended);
+        $this->sync();
+
+        $this->panelSaves(readOnly: false);
+        $this->sync();
+        app(PublicationDiscussionReconciler::class)->reconcile();
+        $this->sync();
+
+        $this->assertFalse($this->space()->isReadOnly());
+        $this->assertTrue($this->freshPolicy()->canWrite($this->player, $this->space()));
+    }
+
+    public function test_saving_the_panel_without_touching_read_only_keeps_who_set_it(): void
+    {
+        $this->publish();
+        $this->sync();
+        $this->publish(PublicationState::Ended);
+        $this->sync();
+
+        $this->panelSaves(readOnly: true);
+
+        $this->assertSame(ReadOnlyOrigin::System, $this->space()->readOnlyBy());
+
+        $this->publish();
+        $this->sync();
+        $this->assertFalse($this->space()->isReadOnly());
+    }
+
+    public function test_the_forum_closes_the_space_again_when_the_campaign_ends_once_more(): void
+    {
+        $this->publish();
+        $this->sync();
+        $this->publish(PublicationState::Ended);
+        $this->sync();
+        $this->panelSaves(readOnly: false);
+
+        $this->publish();
+        $this->sync();
+        $this->publish(PublicationState::Cancelled);
+        $this->sync();
+
+        $this->assertSame(ReadOnlyOrigin::System, $this->space()->readOnlyBy());
+    }
+
+    private function panelSaves(bool $readOnly): void
+    {
         $form = app(CategoryForm::class);
         $record = CategoryModel::query()->findOrFail($this->space()->id()->value);
 
-        $form->save([...$form->fill($record), 'read_only' => true], $record->id);
-        $this->assertSame(ReadOnlyOrigin::Moderation, $this->space()->readOnlyBy());
-
-        $form->save([...$form->fill($record->fresh() ?? $record), 'read_only' => false], $record->id);
-        $this->assertFalse($this->space()->isReadOnly());
-
-        $this->publish(PublicationState::Ended);
-        $this->sync();
-        $record = CategoryModel::query()->findOrFail($record->id);
-
-        // The toggle is disabled then: whatever it sends, the forum's mark stays
-        $form->save([...$form->fill($record), 'read_only' => false], $record->id);
-        $this->assertSame(ReadOnlyOrigin::System, $this->space()->readOnlyBy());
+        $form->save([...$form->fill($record), 'read_only' => $readOnly], $record->id);
     }
 
     private function publish(PublicationState $state = PublicationState::Active, string $title = 'La caída de Arrakis'): void
@@ -381,6 +474,13 @@ final class CampaignSpaceSyncTest extends ModuleTestCase
     private function policy(): CategoryAccessPolicy
     {
         return app(CategoryAccessPolicy::class);
+    }
+
+    private function access(): ForumAccessInterface
+    {
+        $this->app->forgetScopedInstances();
+
+        return app(ForumAccessInterface::class);
     }
 
     private function freshPolicy(): CategoryAccessPolicy

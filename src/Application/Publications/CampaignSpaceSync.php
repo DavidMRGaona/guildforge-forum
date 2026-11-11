@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Entities\SubjectDiscussion;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
@@ -35,6 +36,8 @@ use Modules\Forum\Domain\ValueObjects\PublicationKey;
  *   deleted, its roster is gone, so only the forum's moderators see it; it is made read-only as
  *   well. Nothing in it is ever deleted.
  * - Active again, the forum lifts the read-only mark only if it set it: one set by hand stays.
+ * - The forum acts only when the campaign goes from active to over (or back), as last seen on
+ *   its record: a mark moderation lifted or set in between is left as it is.
  * - Its name follows the campaign's title.
  *
  * Checks of one campaign run one after the other (its publication record is locked).
@@ -69,7 +72,7 @@ final readonly class CampaignSpaceSync
         $subject = new CategorySubject($key->type, $key->id);
 
         DB::transaction(function () use ($key, $subject, $publication): void {
-            $this->records->lockOrCreate($key);
+            $record = $this->records->lockOrCreate($key);
 
             $active = $publication instanceof PublicationDTO && $publication->state === PublicationState::Active;
             $space = $this->categories->findBySubject($subject);
@@ -77,24 +80,40 @@ final readonly class CampaignSpaceSync
             if (! $space instanceof Category) {
                 if ($active) {
                     $this->open($subject, $publication);
+                    $this->seen($record, true);
                 }
 
                 return;
             }
 
             $before = [$space->readOnlyBy(), $space->name()];
+            $seenOpen = $record->spaceOpen();
+
+            // Only when the campaign changes (or the first time): moderation's say in between stays
+            if ($active && $seenOpen !== true) {
+                $space->allowWritingBySystem();
+            } elseif (! $active && $seenOpen !== false) {
+                $space->makeReadOnlyBySystem();
+            }
 
             if ($active) {
-                $space->allowWritingBySystem();
-                $space->rename($this->name($publication), $space->slug(), $space->description());
-            } else {
-                $space->makeReadOnlyBySystem();
+                $space->rename(self::name($publication), $space->slug(), $space->description());
             }
 
             if ($before !== [$space->readOnlyBy(), $space->name()]) {
                 $this->manager->save($space);
             }
+
+            $this->seen($record, $active);
         });
+    }
+
+    private function seen(SubjectDiscussion $record, bool $open): void
+    {
+        if ($record->spaceOpen() !== $open) {
+            $record->spaceSeenOpen($open);
+            $this->records->save($record);
+        }
     }
 
     private function open(CategorySubject $subject, PublicationDTO $publication): void

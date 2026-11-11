@@ -173,13 +173,12 @@ final class CategoryResource extends BaseResource
                             RosterScope::Roster->value => __('forum::messages.audiences.roster'),
                         ])
                         ->visible(fn (?CategoryModel $record): bool => self::isSpace($record)),
-                    // Set by the forum (a campaign over, cancelled or taken down), it is lifted only by the forum
+                    // Switching it off lifts the forum's mark too; switching it on makes it moderation's
                     Toggle::make('read_only')
                         ->label(__('forum::messages.categories.fields.read_only'))
                         ->helperText(fn (?CategoryModel $record): string => $record?->read_only_by === ReadOnlyOrigin::System->value
                             ? __('forum::messages.categories.fields.read_only_by_system')
                             : __('forum::messages.categories.fields.read_only_help'))
-                        ->disabled(fn (?CategoryModel $record): bool => $record?->read_only_by === ReadOnlyOrigin::System->value)
                         ->columnSpanFull(),
                 ]),
         ]);

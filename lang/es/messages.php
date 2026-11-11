@@ -330,7 +330,7 @@ return [
             'title' => 'El título debe tener entre 3 y 120 caracteres.',
             'reason' => 'El motivo es demasiado largo.',
             'awaiting_approval' => 'El tema espera aprobación: primero aprueba o rechaza su primer mensaje.',
-            'not_suspendable' => 'No se puede suspender a esta persona: no existe, eres tú, es la cuenta del foro o modera todo el foro.',
+            'not_suspendable' => 'No se puede suspender a esta persona: no existe, eres tú o es la cuenta del foro. A quien modera todo el foro solo lo suspende la administración.',
             'not_reportable' => 'No puedes denunciar este mensaje.',
             'suspended' => 'Estás suspendido en el foro: no puedes denunciar mensajes.',
             'invalid_record' => 'No se ha podido guardar: revisa los datos o recarga la página.',

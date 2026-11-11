@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Services;
 
+use App\Application\Authorization\Services\AuthorizationServiceInterface;
+use App\Domain\Enums\UserRole;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -22,9 +24,9 @@ use Modules\Forum\Domain\ValueObjects\SuspensionId;
 
 /**
  * Suspending someone in the forum and lifting it. Only whoever moderates the whole forum does
- * either, since it reaches every category. Nobody suspends themselves, the system account or
- * someone who moderates the whole forum. A new suspension of someone already suspended takes
- * the old one's place. Both are logged.
+ * either, since it reaches every category. Nobody suspends themselves or the system account,
+ * and only an admin suspends someone who moderates the whole forum. A new suspension of
+ * someone already suspended takes the old one's place. Both are logged.
  */
 final readonly class SuspensionService
 {
@@ -32,6 +34,7 @@ final readonly class SuspensionService
         private SuspensionRepositoryInterface $suspensions,
         private CategoryAccessPolicy $policy,
         private AccountDirectoryInterface $accounts,
+        private AuthorizationServiceInterface $authorization,
         private SystemAccountInterface $systemAccount,
         private ForumSuspensions $current,
         private ModerationLogger $logger,
@@ -60,7 +63,8 @@ final readonly class SuspensionService
         if (! $user instanceof Authenticatable
             || $userId === ForumBrowser::accountId($moderator)
             || $this->systemAccount->isSystemAccount($userId)
-            || $this->policy->canModerateForum($user)) {
+            // Whoever moderates the whole forum is suspended only by an admin: two moderators never suspend each other
+            || ($this->policy->canModerateForum($user) && ! $this->authorization->hasRole($moderator, UserRole::Admin->value))) {
             throw ModerationRefusedException::notSuspendable($userId);
         }
 

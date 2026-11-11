@@ -235,7 +235,7 @@ final class ReportsAndSuspensionsTest extends ModuleTestCase
         $this->assertTrue($stored->activeFor($member->id, CarbonImmutable::now())?->id()->equals($new->id()));
     }
 
-    public function test_only_whoever_moderates_the_whole_forum_suspends_and_never_themselves_a_peer_or_the_system(): void
+    public function test_only_whoever_moderates_the_whole_forum_suspends_and_never_a_peer_or_the_system(): void
     {
         $member = $this->anAccount();
         try {
@@ -254,6 +254,39 @@ final class ReportsAndSuspensionsTest extends ModuleTestCase
         }
 
         $this->assertSame(0, ModerationLogModel::query()->count());
+    }
+
+    public function test_nobody_suspends_themselves_not_even_an_admin(): void
+    {
+        $admin = UserModel::factory()->admin()->create();
+
+        foreach ([[$this->moderator, $this->moderator->id], [$admin, $admin->id]] as [$actor, $id]) {
+            try {
+                $this->suspensions()->suspend($actor, $id, 'Prueba', null);
+                $this->fail('Someone suspended themselves.');
+            } catch (ModerationRefusedException $exception) {
+                $this->assertSame('not_suspendable', $exception->reason);
+            }
+        }
+    }
+
+    public function test_only_an_admin_suspends_whoever_moderates_the_whole_forum(): void
+    {
+        $peer = $this->anAccount(self::MODERATE);
+
+        try {
+            $this->suspensions()->suspend($this->moderator, $peer->id, 'Se suspenden entre sí', null);
+            $this->fail('A forum moderator suspended another one.');
+        } catch (ModerationRefusedException $exception) {
+            $this->assertSame('not_suspendable', $exception->reason);
+        }
+
+        $admin = UserModel::factory()->admin()->create();
+        $suspension = $this->suspensions()->suspend($admin, $peer->id, 'Abuso de la moderación', null);
+        $this->forgetRequestState();
+
+        $this->assertSame(strtolower($peer->id), $suspension->userId());
+        $this->assertFalse(app(ForumAccessInterface::class)->canWrite($peer, $this->discussion));
     }
 
     public function test_suspensions_that_cannot_be_read_keep_everyone_from_writing(): void

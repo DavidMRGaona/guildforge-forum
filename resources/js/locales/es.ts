@@ -286,6 +286,7 @@ export default {
                 link: 'Enlace',
                 horizontal_rule: 'Separador',
                 image: 'Imagen',
+                roll: 'Tirada de dados',
                 undo: 'Deshacer',
                 redo: 'Rehacer',
             },
@@ -300,6 +301,16 @@ export default {
                 uploading: 'Subiendo la imagen…',
                 uploaded: 'Imagen añadida',
                 alt: 'Descripción de la imagen',
+            },
+            roll: {
+                label: 'Tirada',
+                expression_placeholder: '2d6+3',
+                reason: 'Motivo de la tirada (opcional)',
+                reason_placeholder: 'Motivo (opcional)',
+                remove: 'Quitar la tirada',
+                hint: 'Se tira en el servidor al publicar, y nadie puede elegir el resultado. Ejemplos: 2d6+3, 4d6kh3, 5d10>=7, 3d6!',
+                thrown_hint:
+                    'Ya está tirada y se mostrará como salió. Para tirar otra, quítala y añade una nueva.',
             },
             mentions: {
                 label: 'Personas que puedes mencionar',

@@ -9,6 +9,7 @@ import { ForumLink } from './ForumLink';
 import { ForumCodeBlock, ForumOrderedList } from './ForumLists';
 import { forumMention, type MentionNames } from './ForumMention';
 import { HeadingShortcut } from './HeadingShortcut';
+import { ForumRoll } from './ForumRoll';
 import { MarkdownPaste } from './MarkdownPaste';
 import { PostQuote } from './PostQuote';
 
@@ -48,6 +49,7 @@ export function createForumExtensions(options: ForumExtensionOptions): AnyExtens
         ForumLink,
         ForumImage.configure({ urlFor: options.imageUrl }),
         PostQuote,
+        ForumRoll,
         forumMention(options.mentionNames, options.mentionSuggestion),
         Placeholder.configure({ placeholder: options.placeholder ?? '' }),
         HeadingShortcut,

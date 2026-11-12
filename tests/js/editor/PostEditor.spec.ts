@@ -227,13 +227,13 @@ describe('PostEditor', () => {
     it('adds the buttons other features bring', async () => {
         const run = vi.fn();
         const wrapper = mountEditor({
-            toolbarItems: [{ id: 'roll', label: 'Tirada', icon: Dices, run }],
+            toolbarItems: [{ id: 'aside', label: 'Aparte', icon: Dices, run }],
         });
         await settle();
 
-        await wrapper.find('[data-toolbar-item="roll"]').trigger('click');
+        await wrapper.find('[data-toolbar-item="aside"]').trigger('click');
 
-        expect(wrapper.find('[data-toolbar-item="roll"]').attributes('aria-label')).toBe('Tirada');
+        expect(wrapper.find('[data-toolbar-item="aside"]').attributes('aria-label')).toBe('Aparte');
         expect(run).toHaveBeenCalledOnce();
     });
 });

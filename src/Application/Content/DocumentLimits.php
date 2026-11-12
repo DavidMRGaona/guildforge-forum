@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Content;
 
+use Modules\Forum\Domain\Dice\Limits;
+
 /**
  * How big a post document may be. Generous for long game posts, tight enough that a forged
  * document cannot make the server walk or render something huge.
@@ -25,4 +27,7 @@ final class DocumentLimits
     public const int MAX_MENTIONS = 20;
 
     public const int MAX_QUOTES = 10;
+
+    /** Dice rolls per post (the rest of their limits live in Domain\Dice\Limits) */
+    public const int MAX_ROLLS = Limits::MAX_ROLLS_PER_POST;
 }

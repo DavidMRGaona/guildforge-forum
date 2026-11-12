@@ -350,6 +350,31 @@ return [
         'unknown_account' => 'cuenta eliminada',
     ],
 
+    'dice' => [
+        'label' => 'Tirada',
+        'added_on_edit' => 'Añadida al editar',
+        'dropped' => 'descartado',
+        'exploded' => 'explosión',
+        'successes' => 'éxitos',
+        'total' => 'Total',
+        'unresolved' => 'Sin resultado',
+        'summary' => ':expression :reason = :total',
+        'errors' => [
+            'empty' => 'La tirada está vacía.',
+            'syntax' => 'No se entiende la expresión.',
+            'too_long' => 'La expresión es demasiado larga.',
+            'bad_dice' => 'Los dados no son válidos: tiene que haber al menos uno y cada dado, dos caras.',
+            'too_many_dice' => 'Demasiados dados en un grupo: 100 como mucho.',
+            'too_many_sides' => 'Demasiadas caras: 1000 como mucho.',
+            'too_many_terms' => 'Demasiados términos: 10 como mucho.',
+            'number_too_big' => 'Hay un número demasiado grande.',
+            'bad_keep' => 'Lo que se conserva o se descarta no es válido: tiene que quedar al menos un dado.',
+            'bad_explosion' => 'La explosión no es válida: tiene que ocurrir con algunas caras, pero no con todas.',
+            'bad_modifier' => 'Un modificador no es válido.',
+            'too_many_dice_in_post' => 'El mensaje ya lleva demasiados dados: 300 como mucho entre todas las tiradas.',
+        ],
+    ],
+
     'errors' => [
         'forbidden' => 'No puedes hacer eso en este tema.',
         'too_fast' => 'Has publicado muchos mensajes seguidos. Espera :seconds segundos y vuelve a intentarlo.',
@@ -379,6 +404,8 @@ return [
             'unknown_account' => 'Mencionas a una cuenta que ya no existe.',
             'unknown_post' => 'Citas un mensaje que no existe o que no puedes ver.',
             'invalid_quote' => 'La cita no coincide con el mensaje citado.',
+            'too_many_rolls' => 'Un mensaje puede llevar 10 tiradas como mucho.',
+            'unknown_roll' => 'El mensaje lleva una tirada que no es suya o que ya se quitó.',
         ],
     ],
 

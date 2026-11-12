@@ -57,6 +57,10 @@ final class InvalidDocumentException extends DomainException
 
     public const string INVALID_QUOTE = 'invalid_quote';
 
+    public const string TOO_MANY_ROLLS = 'too_many_rolls';
+
+    public const string UNKNOWN_ROLL = 'unknown_roll';
+
     private function __construct(
         public readonly string $reason,
         public readonly string $path,

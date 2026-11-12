@@ -277,7 +277,7 @@ final readonly class ForumModeration
             $edited = $this->writer->editPost($id, $body, ForumBrowser::accountId($moderator), CarbonImmutable::now());
 
             // The same document again changes nothing, and logs nothing
-            if (! $post->body()->sameDocumentAs($body)) {
+            if (! $post->body()->sameDocumentAs($edited->body())) {
                 $this->logger->record(ModerationAction::PostEdited, $moderator, $discussion, $edited);
                 // Editing a reported post settles its reports
                 $this->settleReports($moderator, $id, ReportResolution::Edited);

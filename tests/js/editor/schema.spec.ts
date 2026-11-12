@@ -44,6 +44,7 @@ describe('the editor document', () => {
                 '<pre><code class="language-php">echo 1;</code></pre>' +
                 '<hr>' +
                 `<img data-path="${IMAGE}" alt="Mapa">` +
+                '<div data-forum-roll data-expression="2d6+3" data-reason="Ataque"></div>' +
                 '<p>Fin</p>'
         ).getJSON();
 

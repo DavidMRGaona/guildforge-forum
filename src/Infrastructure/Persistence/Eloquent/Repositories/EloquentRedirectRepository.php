@@ -75,7 +75,17 @@ final readonly class EloquentRedirectRepository implements RedirectRepositoryInt
 
     public function mergedDiscussion(int $number): ?MergedDiscussion
     {
-        $row = DB::table(self::DISCUSSIONS)->where('from_number', $number)->first(['from_discussion_id', 'to_discussion_id']);
+        return $this->merged(DB::table(self::DISCUSSIONS)->where('from_number', $number)->first(['from_discussion_id', 'to_discussion_id']));
+    }
+
+    public function mergedDiscussionById(DiscussionId $id): ?MergedDiscussion
+    {
+        // `from_discussion_id` is unique: one read of its index
+        return $this->merged(DB::table(self::DISCUSSIONS)->where('from_discussion_id', $id->value)->first(['from_discussion_id', 'to_discussion_id']));
+    }
+
+    private function merged(?object $row): ?MergedDiscussion
+    {
         if ($row === null || ! is_string($row->from_discussion_id)) {
             return null;
         }

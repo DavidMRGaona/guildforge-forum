@@ -12,6 +12,7 @@ use Modules\Forum\Application\Content\Marks\SimpleMark;
 use Modules\Forum\Application\Content\Nodes\BlockquoteNode;
 use Modules\Forum\Application\Content\Nodes\BulletListNode;
 use Modules\Forum\Application\Content\Nodes\CodeBlockNode;
+use Modules\Forum\Application\Content\Nodes\EmbedNode;
 use Modules\Forum\Application\Content\Nodes\HardBreakNode;
 use Modules\Forum\Application\Content\Nodes\HeadingNode;
 use Modules\Forum\Application\Content\Nodes\HorizontalRuleNode;
@@ -115,6 +116,7 @@ final class DocumentSchema
             new MentionNode,
             new RollNode,
             new OocNode,
+            EmbedNode::builtIn(),
         ];
     }
 

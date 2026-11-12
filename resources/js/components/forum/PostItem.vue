@@ -14,6 +14,7 @@ import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import { sendJson } from '../../forum/api';
+import { useEmbeds } from '../../composables/useEmbeds';
 import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
 
 type PostAction = 'hide' | 'show' | 'approve' | 'reject';
@@ -60,6 +61,8 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const confirmDelete = ref(false);
 const body = ref<HTMLElement | null>(null);
+// Embedded posts of other services load only on request or with consent
+useEmbeds(body, () => props.post.html);
 
 const moderating = ref<PostAction | null>(null);
 const moderationOpen = ref(false);
@@ -421,6 +424,8 @@ async function remove(): Promise<void> {
                     :image-types="editor.imageTypes"
                     :external-image-url="editor.externalImageUrl"
                     :external-image-hosts="editor.externalImageHosts"
+                    :embed-url="editor.embedUrl"
+                    :embed-services="editor.embedServices"
                     :mention-names="mentionNames"
                     :submit-label="t('forum.posts.saveEdit')"
                     :submitting="saving"

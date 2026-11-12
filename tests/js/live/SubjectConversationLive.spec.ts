@@ -66,6 +66,8 @@ function aConversation(
             imageTypes: ['image/png'],
             externalImageUrl: null,
             externalImageHosts: [],
+            embedUrl: null,
+            embedServices: [],
         },
         ...overrides,
     };

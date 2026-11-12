@@ -142,6 +142,11 @@ final class Character
      */
     public function stripPersonalDetails(DateTimeImmutable $at): void
     {
+        // Nothing left to strip: the same anonymization again changes nothing, not even the time
+        if ($this->description === null && $this->portraitPath === null) {
+            return;
+        }
+
         $this->description = null;
         $this->portraitPath = null;
         $this->updatedAt = $at;

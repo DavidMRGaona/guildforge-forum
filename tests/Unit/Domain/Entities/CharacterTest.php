@@ -114,6 +114,26 @@ final class CharacterTest extends TestCase
         $this->assertNull($character->portraitPath());
     }
 
+    public function test_stripping_again_changes_nothing_not_even_its_time(): void
+    {
+        $character = $this->aCharacter('Arwen', 'Elfa de Rivendel');
+        $character->stripPersonalDetails(new DateTimeImmutable('2026-11-12 22:04:25'));
+
+        // Anonymizing twice (a repeated event) must leave the row exactly as the first time
+        $character->stripPersonalDetails(new DateTimeImmutable('2026-11-12 22:04:26'));
+
+        $this->assertEquals(new DateTimeImmutable('2026-11-12 22:04:25'), $character->updatedAt());
+    }
+
+    public function test_a_character_without_details_keeps_its_time_when_stripped(): void
+    {
+        $character = $this->aCharacter('Arwen');
+
+        $character->stripPersonalDetails(new DateTimeImmutable('2026-11-12 22:04:25'));
+
+        $this->assertEquals(new DateTimeImmutable('2026-11-12 09:00:00'), $character->updatedAt());
+    }
+
     private function aCharacter(string $name, ?string $description = null): Character
     {
         return Character::create(CharacterId::generate(), self::OWNER, $name, $description, null, new DateTimeImmutable('2026-11-12 09:00:00'));

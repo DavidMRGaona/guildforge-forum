@@ -54,6 +54,37 @@ export function looksLikeImageFile(address: string): boolean {
 /** Image formats the forum may allow (PostImageType); the settings say which it does */
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 
+/** A service key of an embed (EmbedProviders): lowercase letters */
+export const EMBED_SERVICE_PATTERN = /^[a-z]{1,20}$/;
+
+/** The characters of an embedded post's id; each service checks its own form on the server */
+export const EMBED_ID_PATTERN = /^[A-Za-z0-9_.:@/-]{1,200}$/;
+
+/** A service whose posts the forum embeds, as the editor knows it (EditorProps) */
+export interface EmbedService {
+    key: string;
+    label: string;
+    /** The sites whose links it reads, each with its subdomains */
+    hosts: string[];
+}
+
+/** The service a pasted link is of, among those the forum embeds; null when none */
+export function embedServiceOf(
+    address: string,
+    services: readonly EmbedService[]
+): EmbedService | null {
+    const host = remoteImageHost(address);
+    if (host === null) {
+        return null;
+    }
+
+    return (
+        services.find((service) =>
+            service.hosts.some((site) => host === site || host.endsWith(`.${site}`))
+        ) ?? null
+    );
+}
+
 /** Heading levels a post may use: level 1 is the discussion title */
 export const HEADING_LEVELS = [2, 3, 4] as const;
 
@@ -120,7 +151,7 @@ export function normalizeHref(input: string): string | null {
 }
 
 /** The nodes of the schema that hold text or something to see, so a post made of them is not empty */
-const SUBSTANTIAL_NODES = new Set(['image', 'mention', 'roll']);
+const SUBSTANTIAL_NODES = new Set(['image', 'mention', 'roll', 'embed']);
 
 /** Whether a document has nothing to publish: no text but spaces, no image, no mention and no roll */
 export function isDocumentEmpty(document: JSONContent | null | undefined): boolean {
@@ -144,6 +175,19 @@ export function isDocumentEmpty(document: JSONContent | null | undefined): boole
 export function sanitizeContent(node: JSONContent): JSONContent | null {
     if (node.type === 'image') {
         return sanitizeImage(node);
+    }
+
+    // An embed keeps its service and id only; the server checks the id against its service
+    if (node.type === 'embed') {
+        const service: unknown = node.attrs?.['service'];
+        const id: unknown = node.attrs?.['id'];
+
+        return typeof service === 'string' &&
+            EMBED_SERVICE_PATTERN.test(service) &&
+            typeof id === 'string' &&
+            EMBED_ID_PATTERN.test(id)
+            ? { type: 'embed', attrs: { service, id } }
+            : null;
     }
 
     // A roll that is pasted or converted is a new one: its expression and reason, never an id or a result

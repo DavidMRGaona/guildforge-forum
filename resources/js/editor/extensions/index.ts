@@ -4,6 +4,7 @@ import { Markdown } from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
 import type { SuggestionOptions } from '@tiptap/suggestion';
 import { HEADING_LEVELS } from '../document';
+import { ForumEmbed, type EmbedDescription } from './ForumEmbed';
 import { ForumImage } from './ForumImage';
 import { ForumLink } from './ForumLink';
 import { ForumCodeBlock, ForumOrderedList } from './ForumLists';
@@ -24,6 +25,8 @@ export interface ForumExtensionOptions {
     mentionSuggestion: Omit<SuggestionOptions, 'editor'> | null;
     /** The label shown above an aside out of character while writing */
     oocLabel?: string;
+    /** How an embedded post shows while writing */
+    describeEmbed?: (service: string, id: string) => EmbedDescription;
     /**
      * Nodes and marks other features add (dice rolls, out-of-character asides). Each must have
      * its node type registered with the server's document schema, or the post is refused.
@@ -54,6 +57,11 @@ export function createForumExtensions(options: ForumExtensionOptions): AnyExtens
         PostQuote,
         ForumRoll,
         ForumOoc.configure({ label: options.oocLabel ?? '' }),
+        ForumEmbed.configure({
+            describe:
+                options.describeEmbed ??
+                ((service: string): EmbedDescription => ({ label: service, title: null })),
+        }),
         forumMention(options.mentionNames, options.mentionSuggestion),
         Placeholder.configure({ placeholder: options.placeholder ?? '' }),
         HeadingShortcut,

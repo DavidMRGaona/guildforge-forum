@@ -127,6 +127,34 @@ final class ForumSettingsPageTest extends ModuleTestCase
         }
     }
 
+    public function test_embedded_services_and_their_cookie_categories_are_saved(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->assertSet('data.embed_services', ['reddit', 'x', 'bluesky', 'instagram', 'tiktok', 'youtube', 'vimeo', 'twitch'])
+            ->assertSet('data.embed_cookie_categories.youtube', 'marketing')
+            ->set('data.embed_services', ['youtube', 'vimeo'])
+            ->set('data.embed_cookie_categories.youtube', 'videos')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $settings = app(ForumSettingsInterface::class);
+        $this->assertSame(['youtube', 'vimeo'], $settings->embedServices());
+        $this->assertSame('videos', $settings->embedCookieCategory('youtube'));
+    }
+
+    public function test_unknown_services_and_malformed_categories_are_refused(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.embed_services', ['youtube', 'myspace'])
+            ->set('data.embed_cookie_categories.x', 'Con espacios')
+            ->call('save')
+            ->assertHasErrors(['data.embed_services', 'data.embed_cookie_categories.x']);
+    }
+
     public function test_saving_is_refused_without_the_permission(): void
     {
         $this->actingAs($this->userWith([self::MANAGE]));

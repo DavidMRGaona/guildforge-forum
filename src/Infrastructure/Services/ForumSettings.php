@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Services;
 
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
@@ -61,6 +62,11 @@ final readonly class ForumSettings implements ForumSettingsInterface
     public const array DEFAULT_EXTERNAL_IMAGE_HOSTS = ['imgur.com'];
 
     public const int MAX_EXTERNAL_IMAGE_HOSTS = 30;
+
+    public const string DEFAULT_EMBED_COOKIE_CATEGORY = 'marketing';
+
+    /** A cookie category slug, as the cookie consent module names them */
+    public const string COOKIE_CATEGORY_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,39}$/';
 
     public function discussionsPerPage(): int
     {
@@ -152,6 +158,25 @@ final readonly class ForumSettings implements ForumSettingsInterface
         );
 
         return array_slice(array_values(array_unique($hosts)), 0, self::MAX_EXTERNAL_IMAGE_HOSTS);
+    }
+
+    public function embedServices(): array
+    {
+        $known = EmbedProviders::builtIn()->keys();
+        $stored = config('modules.settings.forum.embed_services');
+        if (! is_array($stored)) {
+            return $known;
+        }
+
+        // In the list's order; an unknown key never turns anything on
+        return array_values(array_filter($known, static fn (string $key): bool => in_array($key, $stored, true)));
+    }
+
+    public function embedCookieCategory(string $service): string
+    {
+        $stored = config("modules.settings.forum.embed_cookie_categories.{$service}");
+
+        return is_string($stored) && preg_match(self::COOKIE_CATEGORY_PATTERN, $stored) === 1 ? $stored : self::DEFAULT_EMBED_COOKIE_CATEGORY;
     }
 
     private function pageSize(string $key): int

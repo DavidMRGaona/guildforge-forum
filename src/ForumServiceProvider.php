@@ -11,6 +11,7 @@ use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
+use App\Application\Security\Services\ContentSecurityPolicySourcesInterface;
 use App\Domain\Events\UserAnonymized;
 use App\Domain\Modules\Events\ModuleEnabled;
 use App\Domain\Modules\Events\ModuleUpdated;
@@ -52,6 +53,7 @@ use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
@@ -60,6 +62,7 @@ use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -72,6 +75,7 @@ use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ExternalImageCopyRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
@@ -103,6 +107,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCateg
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCharacterRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiceRollRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentEmbedCardRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentExternalImageCopyRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
@@ -198,6 +203,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
         $this->app->bind(ExternalImageCopyRepositoryInterface::class, EloquentExternalImageCopyRepository::class);
+        $this->app->bind(EmbedCardRepositoryInterface::class, EloquentEmbedCardRepository::class);
+        $this->app->singleton(EmbedProviders::class, static fn (): EmbedProviders => EmbedProviders::builtIn());
         $this->app->bind(HostResolverInterface::class, DnsHostResolver::class);
         $this->app->bind(RemoteFetcherInterface::class, static fn (Application $app): GuardedRemoteFetcher => new GuardedRemoteFetcher($app->make(HostResolverInterface::class)));
         $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
@@ -264,6 +271,12 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // the plain text of a post that mentions someone, says what was true when it was written,
         // like a quotation does; only anonymizing writes it again.
         Event::listen(UserAnonymized::class, [ForgetAnonymizedAccount::class, 'handle']);
+
+        // The pages may frame the players of the enabled services (core 3.57): the function runs
+        // every time the header is built, so it follows the settings
+        $this->callAfterResolving(ContentSecurityPolicySourcesInterface::class, function (ContentSecurityPolicySourcesInterface $sources): void {
+            $sources->allowFrames(fn (): array => $this->app->make(EmbedFrameOrigins::class)->enabled());
+        });
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
@@ -456,7 +469,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     {
         foreach ([$post->getOriginal('body'), $post->getAttribute('body')] as $body) {
             $json = json_encode($body, JSON_UNESCAPED_SLASHES);
-            if (is_string($json) && (str_contains($json, ImageNode::FOLDER) || str_contains($json, ImageNode::EXTERNAL_FOLDER))) {
+            if (is_string($json) && (str_contains($json, ImageNode::FOLDER) || str_contains($json, ImageNode::EXTERNAL_FOLDER) || str_contains($json, '"embed"'))) {
                 return true;
             }
         }

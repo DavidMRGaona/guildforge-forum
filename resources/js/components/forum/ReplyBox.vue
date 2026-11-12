@@ -93,6 +93,8 @@ defineExpose({
             :image-types="reply.imageTypes"
             :external-image-url="reply.externalImageUrl"
             :external-image-hosts="reply.externalImageHosts"
+            :embed-url="reply.embedUrl"
+            :embed-services="reply.embedServices"
             :submit-label="submitLabel"
             :submitting="sending"
             :error="error"

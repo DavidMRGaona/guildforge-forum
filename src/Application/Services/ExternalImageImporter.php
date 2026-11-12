@@ -45,9 +45,21 @@ final readonly class ExternalImageImporter
     {
         $url = $this->allowedUrl($address);
 
-        $path = $this->copies->pathFor($url->value) ?? $this->copy($url);
+        $path = $this->copyOf($url);
 
         return ['url' => $url->value, 'path' => $path, 'previewUrl' => $this->storage->url($path)];
+    }
+
+    /**
+     * The forum's copy of an image, made now when there is none yet. Whether the address may be
+     * fetched from (the settings' sites, or a service's thumbnail hosts) is the caller's check.
+     *
+     * @throws InvalidDocumentException
+     * @throws RuntimeException
+     */
+    public function copyOf(RemoteUrl $url): string
+    {
+        return $this->copies->pathFor($url->value) ?? $this->copy($url);
     }
 
     /**

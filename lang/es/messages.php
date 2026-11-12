@@ -57,6 +57,14 @@ return [
         'external_image_hosts_help' => 'Un dominio por entrada, sin https:// (imgur.com vale también para i.imgur.com). Solo se admiten direcciones https. Sin ninguno, no se pueden poner imágenes de otros sitios. Hace falta el permiso «Poner imágenes de otros sitios».',
         'external_image_hosts_invalid' => 'Escribe solo dominios, como imgur.com, sin https:// ni rutas.',
         'external_image_hosts_placeholder' => 'Añade un dominio',
+        'embeds' => 'Incrustaciones',
+        'embeds_help' => 'Los enlaces a publicaciones de estos servicios se pueden incrustar en los mensajes. Se ve una tarjeta propia con el enlace, y el contenido del servicio solo se carga si quien lee lo pide o ya aceptó la categoría de cookies del servicio. Sin el módulo de cookies, siempre hace falta pedirlo.',
+        'embed_services' => 'Servicios que se incrustan',
+        'embed_services_help' => 'Al quitar uno, los mensajes que ya lo incrustan siguen mostrando su tarjeta, sin cargar su contenido.',
+        'embed_services_invalid' => 'Elige solo entre los servicios de la lista.',
+        'embed_cookie_category' => 'Categoría de cookies de :service',
+        'embed_cookie_category_help' => 'Cada servicio carga su contenido sin pedirlo a quien ya aceptó su categoría de cookies: escribe el identificador de la categoría en el banner de cookies, como marketing.',
+        'embed_cookie_category_invalid' => 'Escribe el identificador de una categoría: minúsculas, cifras, guiones y guiones bajos.',
         'range_help' => 'De :min a :max.',
         'saved' => 'Ajustes guardados',
         'announcements' => 'Avisos de temas nuevos',
@@ -476,12 +484,24 @@ return [
             'external_image_host' => 'Solo se pueden poner imágenes con dirección https de los sitios que permite el foro.',
             'external_image_unavailable' => 'No se ha podido traer la imagen de ese sitio. Comprueba que la dirección es la de la imagen, no la de su página.',
             'external_image_too_large' => 'La imagen pesa más de lo que permite el foro.',
+            'invalid_embed' => 'El mensaje incrusta una publicación de un servicio que el foro no conoce.',
+            'unknown_embed' => 'Ese enlace no es una publicación de un servicio que el foro incruste.',
+            'embed_disabled' => 'El foro ya no incrusta publicaciones de ese servicio. Déjalo como enlace.',
+            'too_many_embeds' => 'Un mensaje puede incrustar 5 publicaciones como mucho.',
         ],
+    ],
+
+    'embeds' => [
+        'open' => 'Ver en :service',
+        'load' => 'Cargar contenido de :service',
+        'notice' => 'Al cargarlo, :service sabrá que lo ves y puede guardar sus cookies.',
+        'frame_title' => 'Publicación de :service',
     ],
 
     'editor' => [
         'image_attribute' => 'imagen',
         'external_image_attribute' => 'dirección de la imagen',
+        'embed_attribute' => 'enlace de la publicación',
     ],
 
     'publications' => [

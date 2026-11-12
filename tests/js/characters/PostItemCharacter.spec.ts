@@ -54,6 +54,8 @@ function mounted(post: ForumPost): ReturnType<typeof mount> {
                 imageTypes: ['image/png'],
                 externalImageUrl: null,
                 externalImageHosts: [],
+                embedUrl: null,
+                embedServices: [],
             },
             mentionsUrl: null,
             mentionNames: {},

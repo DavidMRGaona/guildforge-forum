@@ -6,6 +6,7 @@ import {
     Dices,
     Heading2,
     Heading3,
+    Clapperboard,
     ImageDown,
     ImagePlus,
     Italic,
@@ -32,6 +33,8 @@ const props = defineProps<{
     canUploadImages: boolean;
     /** Whether images from other sites may be put in (permission and sites in the settings) */
     canTakeExternalImages?: boolean;
+    /** Whether posts of other services may be embedded (a session and services on) */
+    canEmbed?: boolean;
     disabled: boolean;
 }>();
 
@@ -39,6 +42,7 @@ const emit = defineEmits<{
     link: [];
     image: [];
     externalImage: [];
+    embed: [];
 }>();
 
 const { t } = useI18n();
@@ -166,6 +170,16 @@ const buttons = computed<Button[]>(() => {
         });
     }
 
+    if (props.canEmbed === true) {
+        core.push({
+            id: 'embed',
+            label: t('forum.editor.toolbar.embed'),
+            icon: Clapperboard,
+            run: () => emit('embed'),
+            isActive: () => false,
+        });
+    }
+
     core.push({
         id: 'ooc',
         label: t('forum.editor.toolbar.ooc'),
@@ -257,6 +271,7 @@ function move(event: KeyboardEvent): void {
                 button.id === 'redo' ||
                 button.id === 'image' ||
                 button.id === 'externalImage' ||
+                button.id === 'embed' ||
                 button.id === 'roll' ||
                 button.id === 'horizontalRule'
                     ? undefined

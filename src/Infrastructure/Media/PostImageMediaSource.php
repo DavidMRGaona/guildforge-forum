@@ -11,15 +11,18 @@ use App\Domain\Media\ValueObjects\MediaFileId;
 use App\Infrastructure\Media\Sources\StoredMediaIdPrefilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Modules\Forum\Application\Content\Nodes\EmbedNode;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Content\Rendering\DocumentRenderer;
+use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
 
 /**
  * The images of forum posts: uploads (forum/posts/) and the forum's copies of images from other
- * sites (forum/external/). A file is in use while any post shows it in its
+ * sites and of the thumbnails of embedded posts (forum/external/). A file is in use while any
+ * post shows it (an embedded post shows its card's thumbnail) in its
  * current body or in one of its earlier versions, whatever the post's status: hidden, pending
  * and deleted posts keep their body for moderators. Posts have no panel page, so no edit link.
  */
@@ -35,9 +38,13 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
      */
     private const string IMAGE_MARKER = '"image"';
 
+    /** The same for documents with an embedded post, whose card may hold a thumbnail */
+    private const string EMBED_MARKER = '"embed"';
+
     public function __construct(
         private DocumentRenderer $renderer,
         private MediaFileIdResolverInterface $resolver,
+        private EmbedCardRepositoryInterface $cards,
     ) {}
 
     public function type(): string
@@ -67,7 +74,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 
     public function usages(): iterable
     {
-        foreach ($this->postsMentioning(self::IMAGE_MARKER)->lazyById(self::CHUNK_SIZE) as $post) {
+        foreach ($this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->lazyById(self::CHUNK_SIZE) as $post) {
             yield from $this->usagesOf($post);
         }
     }
@@ -95,6 +102,19 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
             }
         }
 
+        // A thumbnail is named by a card, not by the documents: the posts embedding its post
+        foreach ($this->cards->withThumbnails() as $card) {
+            if ($card->thumbnailPath === null || $this->resolver->fromStoredPath($card->thumbnailPath)?->equals($file) !== true) {
+                continue;
+            }
+            $piece = StoredMediaIdPrefilter::longestPlainRun($card->embedId);
+            foreach ($this->postsMentioning($piece === '' ? self::EMBED_MARKER : $piece)->lazyById(self::CHUNK_SIZE) as $post) {
+                if (in_array($card->thumbnailPath, $this->pathsOf($post), true)) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -109,15 +129,17 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
      *
      * @return Builder<PostModel>
      */
-    private function postsMentioning(string $text): Builder
+    private function postsMentioning(string ...$texts): Builder
     {
-        $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $text).'%';
         // json columns are compared as text, the same in PostgreSQL and SQLite
         $like = "CAST(body AS TEXT) LIKE ? ESCAPE '\\'";
+        $patterns = array_map(static fn (string $text): string => '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $text).'%', $texts);
 
-        return PostModel::query()->where(static function (Builder $query) use ($like, $pattern): void {
-            $query->whereRaw($like, [$pattern])
-                ->orWhereIn('id', PostRevisionModel::query()->select('post_id')->whereRaw($like, [$pattern]));
+        return PostModel::query()->where(static function (Builder $query) use ($like, $patterns): void {
+            foreach ($patterns as $pattern) {
+                $query->orWhereRaw($like, [$pattern])
+                    ->orWhereIn('id', PostRevisionModel::query()->select('post_id')->whereRaw($like, [$pattern]));
+            }
         });
     }
 
@@ -143,18 +165,32 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
     {
         $documents = [$post->body, ...PostRevisionModel::query()->where('post_id', $post->id)->pluck('body')->all()];
         $image = (new ImageNode)->name();
+        $embed = (new EmbedNode)->name();
 
         $paths = [];
+        $embeds = [];
         foreach ($documents as $document) {
             if (! is_array($document)) {
                 continue;
             }
-            foreach ($this->renderer->attributesOf($document, [$image])[$image] ?? [] as $attributes) {
+            $found = $this->renderer->attributesOf($document, [$image, $embed]);
+            foreach ($found[$image] ?? [] as $attributes) {
                 /** @var array<string, mixed> $attributes */
                 $path = ImageNode::storedPath($attributes);
                 if ($path !== null) {
                     $paths[$path] = true;
                 }
+            }
+            foreach ($found[$embed] ?? [] as $attributes) {
+                if (is_string($attributes['service'] ?? null) && is_string($attributes['id'] ?? null)) {
+                    $embeds[$attributes['service'].' '.$attributes['id']] = [$attributes['service'], $attributes['id']];
+                }
+            }
+        }
+
+        foreach ($this->cards->findMany(array_values($embeds)) as $card) {
+            if ($card->thumbnailPath !== null && str_starts_with($card->thumbnailPath, ImageNode::EXTERNAL_FOLDER)) {
+                $paths[$card->thumbnailPath] = true;
             }
         }
 

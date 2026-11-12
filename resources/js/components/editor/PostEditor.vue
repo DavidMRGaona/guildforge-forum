@@ -7,6 +7,8 @@ import { csrfHeaders, isCsrfFailure } from '@/utils/csrf';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
+    embedServiceOf,
+    type EmbedService,
     IMAGE_ORIGIN_EXTERNAL,
     IMAGE_ORIGIN_UPLOAD,
     IMAGE_TYPES,
@@ -23,6 +25,7 @@ import { createForumExtensions } from '../../editor/extensions';
 import { paragraphsFromText } from '../../editor/extensions/PostQuote';
 import { mentionSuggestion } from '../../editor/mentionSuggestion';
 import type {
+    EmbedAnswer,
     ExternalImage,
     MentionCandidate,
     QuoteSource,
@@ -59,6 +62,10 @@ const props = withDefaults(
         externalImageUrl?: string | null;
         /** The sites images may come from, each with its subdomains */
         externalImageHosts?: string[];
+        /** Where to read a link to a post of another service; null offers no embeds */
+        embedUrl?: string | null;
+        /** The services whose posts the forum embeds */
+        embedServices?: EmbedService[];
         /** Names of the accounts the starting document mentions, by id */
         mentionNames?: Record<string, string>;
         extensions?: AnyExtension[];
@@ -80,6 +87,8 @@ const props = withDefaults(
         imageTypes: () => [...IMAGE_TYPES],
         externalImageUrl: null,
         externalImageHosts: () => [],
+        embedUrl: null,
+        embedServices: () => [],
         mentionNames: () => ({}),
         extensions: () => [],
         toolbarItems: () => [],
@@ -118,6 +127,14 @@ const linkField = ref<HTMLInputElement | null>(null);
 const externalOpen = ref(false);
 const externalInput = ref('');
 const externalField = ref<HTMLInputElement | null>(null);
+const embedOpen = ref(false);
+const embedInput = ref('');
+const embedField = ref<HTMLInputElement | null>(null);
+/** A link just pasted that could be embedded, offered until it is taken or dismissed */
+const embedOffer = ref<{ address: string; label: string } | null>(null);
+/** What the server said of the posts embedded while writing, by «service id» */
+const embedCards = reactive(new Map<string, EmbedAnswer>());
+const canEmbed = computed(() => props.embedUrl !== null && props.embedServices.length > 0);
 const canTakeExternalImages = computed(
     () => props.externalImageUrl !== null && props.externalImageHosts.length > 0
 );
@@ -129,6 +146,17 @@ const editor = useEditor({
     extensions: createForumExtensions({
         placeholder: props.placeholder,
         oocLabel: t('forum.editor.oocLabel'),
+        describeEmbed: (service, id) => {
+            const card = embedCards.get(`${service} ${id}`);
+
+            return {
+                label:
+                    card?.label ??
+                    props.embedServices.find((known) => known.key === service)?.label ??
+                    service,
+                title: card?.card.title ?? card?.url ?? null,
+            };
+        },
         imageUrl: (path) => storedImageUrl(path, (publicId) => buildImageUrl(publicId)),
         mentionNames: { nameOf: (id) => names.get(id) ?? null },
         mentionSuggestion:
@@ -164,7 +192,8 @@ const editor = useEditor({
         },
         handlePaste: (_view, event) =>
             uploadFiles(event.clipboardData?.files) ||
-            pasteExternalImage(event.clipboardData?.getData('text/plain') ?? ''),
+            pasteExternalImage(event.clipboardData?.getData('text/plain') ?? '') ||
+            offerEmbed(event.clipboardData?.getData('text/plain') ?? ''),
         handleDrop: (_view, event) => uploadFiles((event as DragEvent).dataTransfer?.files),
     },
     onUpdate: ({ editor: current }) => {
@@ -314,6 +343,88 @@ function imageCount(): number {
     });
 
     return count;
+}
+
+function openEmbed(): void {
+    embedInput.value = '';
+    embedOpen.value = true;
+    localError.value = null;
+    requestAnimationFrame(() => embedField.value?.focus());
+}
+
+function closeEmbed(): void {
+    embedOpen.value = false;
+    editor.value?.commands.focus();
+}
+
+function applyEmbed(): void {
+    const address = embedInput.value.trim();
+    if (address === '') {
+        return;
+    }
+    embedOpen.value = false;
+    void fetchEmbed(address, props.embedUrl as string);
+}
+
+/**
+ * A pasted link to a post of a service the forum embeds is pasted as a link, and the editor
+ * offers to embed it. Always false: the paste goes on as usual.
+ */
+function offerEmbed(text: string): boolean {
+    const address = text.trim();
+    const service =
+        canEmbed.value && !/\s/u.test(address)
+            ? embedServiceOf(address, props.embedServices)
+            : null;
+    embedOffer.value = service === null ? null : { address, label: service.label };
+
+    return false;
+}
+
+function acceptEmbedOffer(): void {
+    const offer = embedOffer.value;
+    embedOffer.value = null;
+    if (offer !== null) {
+        void fetchEmbed(offer.address, props.embedUrl as string);
+    }
+}
+
+/** Asks the server what the link is and inserts the post; the card comes from the server too */
+async function fetchEmbed(address: string, url: string): Promise<void> {
+    uploading.value++;
+    status.value = t('forum.editor.embed.fetching');
+    localError.value = null;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...csrfHeaders(),
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ url: address }),
+        });
+
+        if (!response.ok) {
+            const answer = (await response.json().catch(() => ({}))) as { message?: string };
+            localError.value = isCsrfFailure(response)
+                ? t('forum.editor.errors.session')
+                : (answer.message ?? t('forum.editor.errors.embed'));
+
+            return;
+        }
+
+        const embed = (await response.json()) as EmbedAnswer;
+        embedCards.set(`${embed.service} ${embed.id}`, embed);
+        editor.value?.chain().focus().insertEmbed(embed.service, embed.id).run();
+        status.value = t('forum.editor.embed.fetched', { service: embed.label });
+    } catch {
+        localError.value = t('forum.editor.errors.embed');
+    } finally {
+        uploading.value--;
+    }
 }
 
 function openExternalImage(): void {
@@ -495,11 +606,62 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             :items="toolbarItems"
             :can-upload-images="uploadUrl !== null"
             :can-take-external-images="canTakeExternalImages"
+            :can-embed="canEmbed"
             :disabled="disabled"
             @link="openLink"
             @image="chooseImage"
             @external-image="openExternalImage"
+            @embed="openEmbed"
         />
+
+        <form
+            v-if="embedOpen"
+            class="border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"
+            @submit.prevent="applyEmbed"
+            @keydown.escape.prevent="closeEmbed"
+        >
+            <label for="forum-editor-embed" class="text-base-secondary w-full text-sm sm:w-auto">{{
+                t('forum.editor.embed.label')
+            }}</label>
+            <input
+                id="forum-editor-embed"
+                ref="embedField"
+                v-model="embedInput"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                :placeholder="t('forum.editor.embed.placeholder')"
+                aria-describedby="forum-editor-embed-hint"
+                class="bg-page border-default text-base-primary w-full min-w-0 rounded-md border px-2 py-1 text-sm sm:w-auto sm:flex-1"
+            />
+            <BaseButton type="submit" size="sm">{{ t('forum.editor.embed.apply') }}</BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="closeEmbed">{{
+                t('forum.editor.embed.cancel')
+            }}</BaseButton>
+            <p id="forum-editor-embed-hint" class="text-base-muted w-full text-xs">
+                {{
+                    t('forum.editor.embed.hint', {
+                        services: embedServices.map((service) => service.label).join(', '),
+                    })
+                }}
+            </p>
+        </form>
+
+        <div
+            v-if="embedOffer"
+            class="border-default bg-info-light text-info flex flex-wrap items-center gap-2 border-b px-3 py-1.5 text-sm"
+            role="status"
+        >
+            <span class="min-w-0 flex-1">{{
+                t('forum.editor.embed.offer', { service: embedOffer.label })
+            }}</span>
+            <BaseButton size="sm" @click="acceptEmbedOffer">{{
+                t('forum.editor.embed.offer_accept')
+            }}</BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="embedOffer = null">{{
+                t('forum.editor.embed.offer_dismiss')
+            }}</BaseButton>
+        </div>
 
         <form
             v-if="externalOpen"

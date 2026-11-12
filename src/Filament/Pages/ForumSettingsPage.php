@@ -22,8 +22,10 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
@@ -179,6 +181,34 @@ final class ForumSettingsPage extends Page implements HasForms
                             }])
                             ->default(ForumSettings::DEFAULT_EXTERNAL_IMAGE_HOSTS),
                     ]),
+                Section::make(__('forum::messages.settings.embeds'))
+                    ->description(__('forum::messages.settings.embeds_help').' '.__('forum::messages.settings.embed_cookie_category_help'))
+                    ->schema([
+                        CheckboxList::make('embed_services')
+                            ->label(__('forum::messages.settings.embed_services'))
+                            ->helperText(__('forum::messages.settings.embed_services_help'))
+                            ->options(self::embedServiceOptions())
+                            // Filament checks only single selects against their options
+                            ->rules([static fn (): Closure => static function (string $attribute, mixed $value, Closure $fail): void {
+                                if (! is_array($value) || array_diff($value, array_keys(self::embedServiceOptions())) !== []) {
+                                    $fail(__('forum::messages.settings.embed_services_invalid'));
+                                }
+                            }])
+                            ->columns(4)
+                            ->default(array_keys(self::embedServiceOptions())),
+                        Grid::make(['default' => 1, 'sm' => 2, '2xl' => 4])
+                            ->schema(array_map(
+                                static fn (string $key, string $label): TextInput => TextInput::make("embed_cookie_categories.{$key}")
+                                    ->label(__('forum::messages.settings.embed_cookie_category', ['service' => $label]))
+                                    ->required()
+                                    ->maxLength(40)
+                                    ->regex(ForumSettings::COOKIE_CATEGORY_PATTERN)
+                                    ->validationMessages(['regex' => __('forum::messages.settings.embed_cookie_category_invalid')])
+                                    ->default(ForumSettings::DEFAULT_EMBED_COOKIE_CATEGORY),
+                                array_keys(self::embedServiceOptions()),
+                                self::embedServiceOptions(),
+                            )),
+                    ]),
             ])
             ->statePath('data');
     }
@@ -217,6 +247,19 @@ final class ForumSettingsPage extends Page implements HasForms
         $options = [];
         foreach (CharacterAccessMode::cases() as $mode) {
             $options[$mode->value] = $mode->label();
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function embedServiceOptions(): array
+    {
+        $options = [];
+        foreach (EmbedProviders::builtIn()->all() as $provider) {
+            $options[$provider->key()] = $provider->label();
         }
 
         return $options;

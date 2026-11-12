@@ -42,9 +42,6 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
 
     private const array REDIRECTS = [301, 302, 303, 307, 308];
 
-    /** curl's code for a transfer stopped by its maximum file size */
-    private const int MAX_FILE_SIZE_ERROR = 63;
-
     private const string USER_AGENT = 'Mozilla/5.0 (compatible; ForumMediaProxy/1.0)';
 
     private Client $client;
@@ -148,7 +145,6 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
                 },
                 'curl' => [
                     CURLOPT_RESOLVE => ["{$url->host}:443:{$pinned->forCurlResolve()}"],
-                    CURLOPT_MAXFILESIZE_LARGE => $maxBytes,
                 ],
                 'on_stats' => static function (TransferStats $stats) use (&$peer): void {
                     $ip = $stats->getHandlerStat('primary_ip');
@@ -157,7 +153,6 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
             ]);
         } catch (RequestException $exception) {
             $tooLarge = $sink->exceeded()
-                || ($exception->getHandlerContext()['errno'] ?? null) === self::MAX_FILE_SIZE_ERROR
                 || ($exception->getPrevious() instanceof RemoteFetchException && $exception->getPrevious()->reason === RemoteFetchException::TOO_LARGE);
 
             throw RemoteFetchException::because(

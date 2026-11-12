@@ -47,6 +47,7 @@ describe('the editor document', () => {
                 '<hr>' +
                 `<img data-path="${IMAGE}" alt="Mapa">` +
                 `<img data-origin="external" data-src="${REMOTE}" data-path="${COPY}" alt="Dragón">` +
+                '<div data-forum-embed data-service="youtube" data-id="dQw4w9WgXcQ"></div>' +
                 '<div data-forum-roll data-expression="2d6+3" data-reason="Ataque"></div>' +
                 '<aside data-ooc><p>Vuelvo luego</p></aside>' +
                 '<p>Fin</p>'

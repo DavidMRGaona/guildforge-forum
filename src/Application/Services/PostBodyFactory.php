@@ -32,6 +32,7 @@ final readonly class PostBodyFactory
         private DiscussionRepositoryInterface $discussions,
         private ForumAccessInterface $access,
         private ExternalImageRules $externalImages,
+        private EmbedRules $embeds,
     ) {}
 
     /**
@@ -44,6 +45,7 @@ final readonly class PostBodyFactory
         $document = $this->schema->validate($raw);
 
         $this->externalImages->assertAllowed($document, $author, $previous);
+        $this->embeds->assertAllowed($document, $previous);
 
         $mentioned = $document->mentionedAccountIds();
         if (array_diff($mentioned, $this->accounts->mentionable($mentioned)) !== []) {

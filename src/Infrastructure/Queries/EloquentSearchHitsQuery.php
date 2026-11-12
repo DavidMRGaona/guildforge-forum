@@ -26,26 +26,32 @@ final readonly class EloquentSearchHitsQuery implements SearchHitsQueryInterface
             ->get(['id', 'number', 'title', 'category_id'])
             ->keyBy('number');
 
+        // Visible posts among the ones asked for and every opening message (a discussion hit quotes it)
         $replyNumbers = array_values(array_unique(array_filter(array_map(static fn (array $address): int => $address[1], $addresses))));
-        $replies = [];
-        if ($replyNumbers !== [] && $discussions->isNotEmpty()) {
+        $posts = [];
+        if ($discussions->isNotEmpty()) {
             foreach (PostModel::query()
                 ->whereIn('discussion_id', $discussions->pluck('id')->all())
-                ->whereIn('number', $replyNumbers)
+                ->whereIn('number', [1, ...$replyNumbers])
                 ->where('status', PostStatus::Visible->value)
                 ->get(['discussion_id', 'number']) as $post) {
-                $replies[strtolower($post->discussion_id).':'.$post->number] = true;
+                $posts[strtolower($post->discussion_id).':'.$post->number] = true;
             }
         }
 
         $visible = [];
         foreach ($addresses as [$number, $reply]) {
             $discussion = $discussions[$number] ?? null;
-            if ($discussion === null || ($reply > 0 && ! isset($replies[strtolower($discussion->id).':'.$reply]))) {
+            if ($discussion === null) {
                 continue;
             }
 
-            $visible["{$number}:{$reply}"] = new VisibleSearchHitDTO(strtolower($discussion->category_id), $discussion->title);
+            $id = strtolower($discussion->id);
+            if ($reply > 0 && ! isset($posts["{$id}:{$reply}"])) {
+                continue;
+            }
+
+            $visible["{$number}:{$reply}"] = new VisibleSearchHitDTO(strtolower($discussion->category_id), $discussion->title, isset($posts["{$id}:1"]));
         }
 
         return $visible;

@@ -143,7 +143,8 @@ final readonly class ForumSearch
             url: $hit->url,
             categoryId: $live->categoryId,
             replyNumber: $reply > 0 ? $reply : null,
-            snippet: $hit->snippet,
+            // The text comes from the index: never quote an opening message that is no longer visible
+            snippet: $reply > 0 || $live->openingVisible ? $hit->snippet : [],
             publishedAt: $hit->publishedAt,
         );
     }

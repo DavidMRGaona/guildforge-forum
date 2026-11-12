@@ -60,6 +60,12 @@ interface PostRepositoryInterface
     public function numberedBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): array;
 
     /**
+     * The lowest number of a numbered post of the discussion in the range (both ends included);
+     * null when every number of it moved away.
+     */
+    public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber;
+
+    /**
      * The numbered posts of the discussion that have these numbers, in order; numbers it does
      * not have are left out.
      *

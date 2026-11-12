@@ -18,4 +18,14 @@ interface MovedPostsQueryInterface
      * @return list<MovedPostRowDTO>
      */
     public function inRange(DiscussionId $from, int $fromNumber, ?int $through): array;
+
+    /**
+     * Where to resume each discussion from a number, when that number moved away: the first
+     * numbered post after it. Discussions whose number did not move are left out (resume there),
+     * and so are those with no post after it.
+     *
+     * @param  array<string, int>  $numbers  by discussion id
+     * @return array<string, int> by discussion id
+     */
+    public function resumeAfterMoves(array $numbers): array;
 }

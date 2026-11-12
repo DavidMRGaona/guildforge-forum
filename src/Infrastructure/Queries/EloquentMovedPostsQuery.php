@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Queries;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Queries\MovedPostRowDTO;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
@@ -31,5 +32,41 @@ final readonly class EloquentMovedPostsQuery implements MovedPostsQueryInterface
                 is_numeric($row->number ?? null) ? (int) $row->number : null,
             ))
             ->all());
+    }
+
+    public function resumeAfterMoves(array $numbers): array
+    {
+        if ($numbers === []) {
+            return [];
+        }
+
+        // Almost always nothing moved: one look at the redirects first
+        $moved = DB::table(EloquentRedirectRepository::POSTS)
+            ->where(static function (Builder $query) use ($numbers): void {
+                foreach ($numbers as $discussionId => $number) {
+                    $query->orWhere(static fn (Builder $pair) => $pair->where('from_discussion_id', $discussionId)->where('from_number', $number));
+                }
+            })
+            ->pluck('from_discussion_id')
+            ->all();
+        if ($moved === []) {
+            return [];
+        }
+
+        $resume = [];
+        $rows = DB::table('forum_posts')
+            ->where(static function (Builder $query) use ($moved, $numbers): void {
+                foreach ($moved as $discussionId) {
+                    $query->orWhere(static fn (Builder $pair) => $pair->where('discussion_id', $discussionId)->where('number', '>', $numbers[$discussionId]));
+                }
+            })
+            ->groupBy('discussion_id')
+            ->selectRaw('discussion_id, MIN(number) as first_number')
+            ->get();
+        foreach ($rows as $row) {
+            $resume[(string) $row->discussion_id] = (int) $row->first_number;
+        }
+
+        return $resume;
     }
 }

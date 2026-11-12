@@ -22,6 +22,7 @@ final readonly class ConversationPageDTO
      * @param  list<PostContentDTO>  $contents  what each of those posts shows to the reader, in the same order
      * @param  list<DiscussionTopic>  $topics
      * @param  list<MovedPostsDTO>  $moved  the posts of the page's numbers that moderation moved away
+     * @param  array<int, int|null>  $pageAnchors  by the first number of each page it links to (and its own): the number that reaches it, null when all its numbers moved away
      */
     public function __construct(
         public Discussion $discussion,
@@ -38,7 +39,18 @@ final readonly class ConversationPageDTO
         public bool $canModerate,
         public bool $guestsRead,
         public array $moved = [],
+        public array $pageAnchors = [],
     ) {}
+
+    /**
+     * The number that reaches the page starting at `$start`: the start itself unless moderation
+     * moved it away (its address would lead where it went); null when every number of the page
+     * moved away, so the page is reached by its place.
+     */
+    public function anchorOf(int $start): ?int
+    {
+        return array_key_exists($start, $this->pageAnchors) ? $this->pageAnchors[$start] : $start;
+    }
 
     public function hasPrevious(): bool
     {

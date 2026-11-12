@@ -8,6 +8,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
@@ -229,7 +230,8 @@ final class SplitAndMergeEndpointsTest extends ModuleTestCase
             ->where('posts.8.number', 9)
             ->where('moved', [['fromNumber' => 10, 'throughNumber' => 10, 'count' => 1, 'title' => 'Otro asunto', 'url' => '/foro/t/3-otro-asunto']])
             ->where('pagination.pageCount', 3)
-            ->where('pagination.nextUrl', '/foro/t/2-larga/11'));
+            // Number 11 moved, so its address leads away: the next page goes by its first post
+            ->where('pagination.nextUrl', '/foro/t/2-larga/12'));
 
         // Number 11 moved: its address leads there; page 2 (11 to 20) holds 12 to 20 and where 11 went
         $this->get('/foro/t/2-larga/11')->assertStatus(301)->assertRedirect('/foro/t/3-otro-asunto/2');
@@ -244,6 +246,54 @@ final class SplitAndMergeEndpointsTest extends ModuleTestCase
             ->where('moved', []));
     }
 
+    public function test_a_page_whose_numbers_all_moved_shows_where_they_went_and_the_way_on(): void
+    {
+        config(['modules.settings.forum.posts_per_page' => 10]);
+        $long = $this->longDiscussion();
+        app(ForumModeration::class)->split($this->moderator, $long->id(), range(11, 20), 'Otro asunto', $this->general->id());
+
+        $this->get('/foro/t/2-larga')->assertInertia(fn (Assert $page) => $page->where('pagination.nextUrl', '/foro/t/2-larga?pagina=2'));
+        $this->get('/foro/t/2-larga?pagina=2')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('posts', 0)
+                ->where('moved', [['fromNumber' => 11, 'throughNumber' => 20, 'count' => 10, 'title' => 'Otro asunto', 'url' => '/foro/t/3-otro-asunto']])
+                ->where('pagination.page', 2)
+                ->where('pagination.previousUrl', '/foro/t/2-larga')
+                ->where('pagination.nextUrl', '/foro/t/2-larga/21')
+                ->where('focusNumber', null)
+                ->where('seo.canonicalUrl', url('/foro/t/2-larga?pagina=2')));
+
+        // A page asked for by its place that has posts goes by its usual address
+        $this->get('/foro/t/2-larga?pagina=1')->assertStatus(301)->assertRedirect('/foro/t/2-larga');
+        $this->get('/foro/t/2-larga?pagina=3')->assertStatus(301)->assertRedirect('/foro/t/2-larga/21');
+    }
+
+    public function test_the_first_unread_post_skips_what_moved_away(): void
+    {
+        config(['modules.settings.forum.posts_per_page' => 10]);
+        $long = $this->longDiscussion();
+        app(ForumModeration::class)->split($this->moderator, $long->id(), [10, 11], 'Otro asunto', $this->general->id());
+        $reader = $this->anAccount();
+        app(DiscussionReadsInterface::class)->advance(strtolower($reader->id), $long->id(), 9, new DateTimeImmutable('2026-11-12 10:00:00'));
+
+        // The discussion opens at post 12, the first after what moved
+        $this->actingAs($reader)->get('/foro/t/2-larga')->assertInertia(fn (Assert $page) => $page
+            ->where('focusNumber', 12)
+            ->where('pagination.page', 2));
+        // And the lists resume there too
+        $this->actingAs($reader)->get('/foro/c/general')->assertInertia(fn (Assert $page) => $page
+            ->where('discussions.items', static function (mixed $items) use ($long): bool {
+                foreach (is_iterable($items) ? $items : [] as $item) {
+                    if (is_array($item) && ($item['id'] ?? null) === $long->id()->value) {
+                        return ($item['resumeUrl'] ?? null) === '/foro/t/2-larga/12';
+                    }
+                }
+
+                return false;
+            }));
+    }
+
     public function test_a_reply_after_a_split_takes_the_next_number_and_its_address(): void
     {
         app(ForumModeration::class)->split($this->moderator, $this->discussion->id(), [5], 'Otro asunto', $this->general->id());
@@ -252,6 +302,19 @@ final class SplitAndMergeEndpointsTest extends ModuleTestCase
 
         $this->assertSame(6, $reply->number()?->value);
         $this->get('/foro/t/1-mesa-del-viernes/6')->assertOk();
+    }
+
+    /**
+     * «Larga» (number 2): 25 posts from 10:00, one a minute.
+     */
+    private function longDiscussion(): Discussion
+    {
+        [$long] = $this->aDiscussion($this->general, '2026-11-01 10:00:00', title: 'Larga');
+        for ($index = 2; $index <= 25; $index++) {
+            $this->aReply($long, sprintf('2026-11-01 10:%02d:00', $index), text: "Mensaje {$index}");
+        }
+
+        return $long;
     }
 
     /**

@@ -84,8 +84,12 @@ final class DiscussionController extends Controller
         }
         abort_unless($found instanceof Discussion, 404);
 
+        // A page whose numbers all moved away is asked for by its place
+        $place = $request->query(ForumPresenter::PAGE_QUERY);
+        $place = $post === null && is_string($place) && preg_match('/^[1-9][0-9]{0,5}$/', $place) === 1 ? (int) $place : null;
+
         try {
-            $page = $this->reader->open($user, $found->id(), $post === null ? null : (int) $post);
+            $page = $this->reader->open($user, $found->id(), $post === null ? null : (int) $post, $place);
         } catch (DiscussionNotFoundException) {
             abort(404);
         }
@@ -96,6 +100,10 @@ final class DiscussionController extends Controller
         if ($discussion !== DiscussionSlug::segment((int) $found->number(), $found->title()->value) || ($asked !== null && ($landed !== $asked || $asked === 1))) {
             return redirect()->to($this->urls->discussion($found, $landed), 301);
         }
+        // A page asked for by its place that has posts after all goes by its usual address
+        if ($place !== null && $page->anchorOf($page->pageStart) !== null) {
+            return redirect()->to($this->presenter->pageUrl($page, $page->pageStart), 301);
+        }
 
         $readable = $this->browser->readableCategories($user);
         $first = $page->posts[0] ?? null;
@@ -105,7 +113,7 @@ final class DiscussionController extends Controller
             noindex: ! $page->guestsRead,
         ))->toArray();
         // Each page of posts is one address, whichever of its posts was asked for
-        $seo['canonicalUrl'] = $this->urls->discussion($found, $page->pageStart, absolute: true);
+        $seo['canonicalUrl'] = $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
 
         $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
         $conversation['posts'] = $this->moderationProps->withReportLinks($conversation['posts'], $user);

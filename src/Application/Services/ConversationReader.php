@@ -47,9 +47,12 @@ final readonly class ConversationReader
      * post (the last page once they read everything), or the first page for guests and for
      * discussions they never opened.
      *
+     * A page may be asked for by its place instead (`$page`, from 1): one whose numbers all
+     * moved away has no post to ask for.
+     *
      * @throws DiscussionNotFoundException when the reader may not read it
      */
-    public function open(?Authenticatable $reader, DiscussionId $id, ?int $number): ConversationPageDTO
+    public function open(?Authenticatable $reader, DiscussionId $id, ?int $number, ?int $page = null): ConversationPageDTO
     {
         $discussion = $this->readable($reader, $id);
         $category = $this->categories->find($discussion->categoryId());
@@ -62,8 +65,17 @@ final readonly class ConversationReader
         $readerId = ForumBrowser::accountId($reader);
         $lastRead = $readerId === null ? null : $this->reads->readThrough($readerId, $id, $discussion->categoryId());
 
-        $focus = $this->focus($number, $highest, $lastRead);
-        $pageStart = $focus === null ? 1 : intdiv($focus - 1, $perPage) * $perPage + 1;
+        if ($number === null && $page !== null && $highest > 0) {
+            $focus = null;
+            $pageStart = (min(max(1, $page), intdiv($highest - 1, $perPage) + 1) - 1) * $perPage + 1;
+        } else {
+            $focus = $this->focus($number, $highest, $lastRead);
+            // The first unread number may have moved away: the first post after it is the one
+            if ($number === null && $focus !== null) {
+                $focus = $this->posts->firstNumberBetween($id, new PostNumber($focus), new PostNumber($highest))->value ?? $focus;
+            }
+            $pageStart = $focus === null ? 1 : intdiv($focus - 1, $perPage) * $perPage + 1;
+        }
 
         // A page is a fixed run of numbers: where posts moved away it holds fewer, and says where they went
         $pageEnd = $pageStart + $perPage - 1;
@@ -95,7 +107,31 @@ final readonly class ConversationReader
             canModerate: $moderates,
             guestsRead: $this->access->canRead(null, $discussion),
             moved: $this->movedRuns($reader, $this->moved->inRange($id, $pageStart, $isLastPage ? null : $pageEnd)),
+            pageAnchors: $highest === 0 ? [] : $this->pageAnchors($id, $pageStart, $perPage, $highest),
         );
+    }
+
+    /**
+     * The number each page the page links to is reached by (its own, the previous, the next and
+     * the last): its first number, or its first post's when that number moved away (its
+     * address leads where the post went); null when all its numbers moved away.
+     *
+     * @return array<int, int|null> by the page's first number
+     */
+    private function pageAnchors(DiscussionId $id, int $pageStart, int $perPage, int $highest): array
+    {
+        $lastStart = intdiv($highest - 1, $perPage) * $perPage + 1;
+        $starts = array_unique(array_filter(
+            [$pageStart, $pageStart - $perPage, $pageStart + $perPage, $lastStart],
+            static fn (int $start): bool => $start >= 1 && $start <= $lastStart,
+        ));
+
+        $anchors = [];
+        foreach ($starts as $start) {
+            $anchors[$start] = $this->posts->firstNumberBetween($id, new PostNumber($start), new PostNumber($start + $perPage - 1))?->value;
+        }
+
+        return $anchors;
     }
 
     /**

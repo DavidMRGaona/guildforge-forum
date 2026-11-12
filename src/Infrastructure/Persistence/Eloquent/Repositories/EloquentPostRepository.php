@@ -112,6 +112,16 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber
+    {
+        $first = PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->whereBetween('number', [$from->value, $through->value])
+            ->min('number');
+
+        return is_numeric($first) ? new PostNumber((int) $first) : null;
+    }
+
     public function withNumbers(DiscussionId $discussionId, array $numbers): array
     {
         if ($numbers === []) {

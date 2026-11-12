@@ -48,7 +48,8 @@ final class FirstEnableTest extends ModuleTestCase
 
         $names = array_map(static fn (Category $category): string => $category->name(), app(CategoryRepositoryInterface::class)->all());
         sort($names);
-        $this->assertSame(['Campañas', 'Eventos', 'General', 'Mesas', 'Partidas por foro'], $names);
+        // No module offers game tables or campaigns here: only the events category, whose source is the core's
+        $this->assertSame(['Eventos', 'General', 'Partidas por foro'], $names);
 
         $accountId = app(SettingsServiceInterface::class)->get(EloquentSystemAccount::SETTING);
         $this->assertIsString($accountId);

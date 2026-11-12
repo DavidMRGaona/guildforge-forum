@@ -24,6 +24,17 @@ describe('SpaceNotices', () => {
         );
     });
 
+    it('tells the forum moderators that nobody else sees a category whose module is missing', () => {
+        const wrapper = mount(SpaceNotices, {
+            props: { isPublicationSpace: false, readOnly: false, unavailable: true },
+        });
+
+        expect(wrapper.find('[data-testid="category-unavailable-notice"]').text()).toBe(
+            'Solo la moderación del foro ve esta categoría: falta el módulo del que depende. Vuelve a verse en cuanto se habilite de nuevo.'
+        );
+        expect(wrapper.find('[data-testid="space-moderation-notice"]').exists()).toBe(false);
+    });
+
     it('draws nothing for an ordinary category', () => {
         const wrapper = mount(SpaceNotices, {
             props: { isPublicationSpace: false, readOnly: false },

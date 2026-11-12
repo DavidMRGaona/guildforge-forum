@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\RosterScope;
+use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -22,6 +23,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Tests\Support\ExampleCampaignSource;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\ModuleTestCase;
 
 /**
@@ -261,6 +263,48 @@ final class CategoryAccessPolicyTest extends ModuleTestCase
         $this->assertTrue($this->policy()->canModerate($director, $space));
         $this->assertFalse($this->policy()->canModerate($player, $space));
         $this->assertFalse($this->policy()->canModerate(null, $space));
+    }
+
+    public function test_a_category_whose_source_is_missing_shows_only_to_the_forum_moderators(): void
+    {
+        $tables = Category::system(CategoryId::generate(), SystemCategory::GameTables, 'Mesas', new CategorySlug('mesas'), 0);
+        $tables->changeAccess(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([$this->role('mods')->id]));
+        app(CategoryRepositoryInterface::class)->save($tables);
+        $child = $this->category(CategoryAudience::everyone(), CategoryAudience::signedIn(), parent: $tables, slug: 'dudas');
+        $categoryModerator = $this->user(['mods']);
+        $forumModerator = $this->userWithPermission(CategoryAccessPolicy::MODERATE_FORUM);
+
+        foreach ([$tables, $child] as $category) {
+            $this->assertFalse($this->policy()->canView(null, $category));
+            $this->assertFalse($this->policy()->canView($this->user(), $category));
+            $this->assertFalse($this->policy()->canWrite($this->user(), $category));
+            $this->assertFalse($this->policy()->canView($categoryModerator, $category));
+            $this->assertFalse($this->policy()->canModerate($categoryModerator, $category));
+            $this->assertTrue($this->policy()->canView($forumModerator, $category));
+            $this->assertTrue($this->policy()->canModerate($forumModerator, $category));
+        }
+
+        // Nothing was deleted: with the source back, everyone sees it again
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+
+        foreach ([$tables, $child] as $category) {
+            $this->assertTrue($this->freshPolicy()->canView(null, $category));
+            $this->assertTrue($this->freshPolicy()->canModerate($categoryModerator, $category));
+        }
+    }
+
+    public function test_a_space_whose_source_is_missing_shows_only_to_the_forum_moderators(): void
+    {
+        $director = $this->user();
+        ExampleCampaignSource::$rosters[self::CAMPAIGN] = new PublicationRosterDTO([], [$director->id]);
+        $space = $this->category(CategoryAudience::everyone(), CategoryAudience::signedIn(), new CategoryModerators([], RosterScope::Leaders), subject: true);
+        $this->assertTrue($this->policy()->canView(null, $space));
+
+        app(PublicationSourceRegistryInterface::class)->unregisterModule('example');
+
+        $this->assertFalse($this->freshPolicy()->canView(null, $space));
+        $this->assertFalse($this->freshPolicy()->canModerate($director, $space));
+        $this->assertTrue($this->freshPolicy()->canView($this->userWithPermission(CategoryAccessPolicy::MODERATE_FORUM), $space));
     }
 
     private function category(

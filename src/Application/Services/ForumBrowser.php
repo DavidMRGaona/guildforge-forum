@@ -52,6 +52,7 @@ final readonly class ForumBrowser
                 canWrite: $this->policy->canWrite($reader, $category),
                 canModerate: $this->policy->canModerate($reader, $category),
                 guestsRead: ! $reader instanceof Authenticatable || $this->policy->canView(null, $category),
+                available: $this->policy->isAvailable($category),
             );
         }
 

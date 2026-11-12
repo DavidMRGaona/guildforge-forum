@@ -11,6 +11,7 @@ use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Forum\Application\Services\CategoryManager;
+use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\SubjectDiscussion;
 use Modules\Forum\Domain\Enums\RosterScope;
@@ -55,6 +56,7 @@ final readonly class CampaignSpaceSync
         private CategoryManager $manager,
         private SubjectDiscussionRepositoryInterface $records,
         private SpaceRosterFollows $rosterFollows,
+        private DefaultCategoriesInstaller $installer,
     ) {}
 
     public function sync(PublicationKey $key): void
@@ -126,7 +128,8 @@ final readonly class CampaignSpaceSync
 
     private function open(CategorySubject $subject, PublicationDTO $publication): void
     {
-        $parent = $this->categories->findBySystemKey(SystemCategory::Campaigns);
+        // Created here when the campaigns arrived after the forum and nothing made it yet
+        $parent = $this->installer->systemCategory(SystemCategory::Campaigns);
         if (! $parent instanceof Category) {
             Log::warning('[Forum] System category missing: campaign space not created', ['campaign' => $subject->id]);
 

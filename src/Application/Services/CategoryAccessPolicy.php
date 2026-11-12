@@ -12,6 +12,7 @@ use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Application\Services\EmailVerificationPolicyInterface;
 use App\Domain\Authorization\Repositories\RoleRepositoryInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\RosterScope;
@@ -37,6 +38,10 @@ use Throwable;
  *   someone suspended in the forum, whoever moderates the whole forum included (they still read).
  * - Whoever moderates the whole forum reads and writes everywhere, so reports can be handled in
  *   any category.
+ * - A category fed by another module's publications whose source is missing (PublicationAvailability:
+ *   «Mesas» or «Campañas» without a module offering game tables, a campaign's space, and their
+ *   subcategories) is read by nobody else, its own moderators included: it is hidden, never deleted,
+ *   and shows again when the source is back.
  *
  * Roles are matched through AuthorizationService, so roles inactive for lack of membership do not
  * count. Answers depend on the request (bound scoped): roles and rosters are read once per request.
@@ -62,6 +67,7 @@ final class CategoryAccessPolicy
         private readonly RoleRepositoryInterface $roles,
         private readonly EmailVerificationPolicyInterface $emailVerification,
         private readonly ForumSuspensions $suspensions,
+        private readonly PublicationAvailability $availability,
     ) {}
 
     public function canView(?Authenticatable $user, Category $category): bool
@@ -98,6 +104,24 @@ final class CategoryAccessPolicy
     }
 
     /**
+     * Whether anyone but the forum's moderators may see it: the sources of the publications it
+     * depends on (its own and its parent's) are there. New discussions never go into one that is not.
+     */
+    public function isAvailable(Category $category): bool
+    {
+        return $this->decide(function () use ($category): bool {
+            $parentId = $category->parentId();
+            if (! $parentId instanceof CategoryId) {
+                return $this->availability->isAvailable($category);
+            }
+
+            $parent = $this->parent($parentId);
+
+            return $parent instanceof Category && $this->availability->isAvailable($category, $parent);
+        });
+    }
+
+    /**
      * Whether the user moderates the whole forum.
      */
     public function canModerateForum(?Authenticatable $user): bool
@@ -118,13 +142,16 @@ final class CategoryAccessPolicy
 
         $parentId = $category->parentId();
         if (! $parentId instanceof CategoryId) {
-            return true;
+            return $this->availability->isAvailable($category);
         }
 
         $parent = $this->parent($parentId);
 
         // Subcategories hold no subcategories: a parent with one of its own is a broken tree
-        return $parent instanceof Category && $parent->isTopLevel() && $this->matches($user, $parent->viewAudience(), $parent->subject());
+        return $parent instanceof Category
+            && $parent->isTopLevel()
+            && $this->matches($user, $parent->viewAudience(), $parent->subject())
+            && $this->availability->isAvailable($category, $parent);
     }
 
     private function parentIsReadOnly(Category $category): bool

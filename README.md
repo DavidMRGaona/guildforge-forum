@@ -27,9 +27,9 @@ Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes
   - Para escribir hace falta una cuenta que pueda ver la categoría y que no tenga pendiente verificar su email.
 - **Moderación**: quien tiene `forum:forum.moderate` ve, escribe y modera en todas las categorías, también en los espacios privados, que lo avisan en su cabecera. Además, cada categoría puede tener sus propios roles moderadores o, en un espacio de campaña, su dirección. Quien modera una categoría modera también sus subcategorías y puede escribir en ellas.
 - **Todo falla cerrado**: una regla ilegible, una madre que no existe o una plantilla que no se puede leer significan que no hay acceso. Lo decide un único servicio, `CategoryAccessPolicy`.
-- **Categorías del sistema**: «Mesas», «Campañas» y «Eventos», con claves estables. Las usan los temas automáticos. Se pueden renombrar y cambiar de aspecto, pero no borrar.
+- **Categorías del sistema**: «Mesas», «Campañas» y «Eventos», con claves estables. Las usan los temas automáticos. Se pueden renombrar y cambiar de aspecto, pero no borrar. Cada una existe solo mientras algún módulo ofrece sus publicaciones (ver [Depende de otros módulos](#depende-de-otros-módulos)).
 - **Etiquetas de sistema de juego** (`game-system.<uuid>`, de los temas de cada publicación): sirven para filtrar, nunca para dar acceso.
-- **Instalación**: al habilitar el módulo se crean «General», «Partidas por foro» y las tres del sistema, todas legibles por cualquiera.
+- **Instalación**: al habilitar el módulo se crean «General», «Partidas por foro» y las del sistema cuyas publicaciones ofrece algún módulo (sin game-tables, solo «Eventos»), todas legibles por cualquiera.
 
 ## Páginas públicas
 
@@ -64,9 +64,9 @@ Cada partida suelta, campaña y evento publicados tiene su tema en el foro sin q
   - Se guarda lo último que se dijo de cada cosa (los hechos), en la misma transacción que el aviso. Por eso, aunque la publicación se guarde dos veces, el aviso sale una sola vez. La primera lectura solo toma nota.
   - El módulo solo reabre lo que cerró él: un tema que cerró la moderación sigue cerrado.
   - Un tema que borra la moderación no se vuelve a abrir.
-- **En cola**: cada cambio encola `SyncPublicationDiscussionJob`, que relee la publicación al ejecutarse. Si la fuente falla, el job falla y se reintenta: nunca se toma por una retirada. Si el tipo se queda sin fuente (su módulo deshabilitado), no se toca nada. Publicar en la web nunca falla por el foro.
+- **En cola**: cada cambio encola `SyncPublicationDiscussionJob`, que relee la publicación al ejecutarse. Si la fuente falla, el job falla y se reintenta: nunca se toma por una retirada. Si el tipo se queda sin fuente (su módulo deshabilitado), no se toca nada: su categoría y sus temas se ocultan (ver [Depende de otros módulos](#depende-de-otros-módulos)). Publicar en la web nunca falla por el foro.
 - **Cierre de inscripciones a su hora**: si la publicación dice cuándo se cierran, se encola una comprobación para ese momento (una sola vez por hora de cierre).
-- **Reconciliación diaria** (`forum:sync-publications`, a las 04:40): comprueba lo que cada fuente da por publicado (`publishedIds()`) y lo que el foro sigue, para lo publicado antes de habilitar el módulo y lo que se pierda por el camino.
+- **Reconciliación diaria** (`forum:sync-publications`, a las 04:40): crea las categorías del sistema que falten y tengan ya fuente, y comprueba lo que cada fuente da por publicado (`publishedIds()`) y lo que el foro sigue, para lo publicado antes de habilitar el módulo y lo que se pierda por el camino. Corre también al habilitar o actualizar cualquier módulo (`SyncPublicationsAfterModuleChangeJob`, en un proceso nuevo, porque el que habilita arrancó sin las fuentes nuevas).
 - **Cuenta del sistema**: una cuenta local con el nombre del sitio (`SiteBrandingServiceInterface::siteName()`, que sigue a cada cambio), creada al habilitar el módulo.
   - No tiene ningún rol, su contraseña es aleatoria y su dirección (`forum-system-<uuid>@system.invalid`) no recibe correo, así que nadie puede entrar con ella. `users:assign-member-role` del core le pondría `member`, que no le da acceso a nada.
   - Se reconoce solo por su id, guardado en el ajuste `forum_system_account_id`, nunca por su dirección: una cuenta que alguien registre no se toma por ella. Si se borra o se anonimiza desde el panel, se crea otra la siguiente vez que haga falta.
@@ -88,6 +88,29 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
   - En una categoría en solo lectura (o con la madre en solo lectura) solo escribe quien tiene `forum:forum.moderate`, también en sus temas ocultos.
 - **Cabecera**: la página de la categoría pinta `SpaceNotices.vue` (`resources/js/components/spaces`), que dice que la moderación puede entrar en un espacio privado y avisa cuando es de solo lectura (`isPublicationSpace` y `readOnly` de la cabecera; una madre en solo lectura cuenta).
 - **Reconciliación diaria**: la de los temas automáticos comprueba también las campañas cuyo espacio aún admite mensajes.
+
+## Depende de otros módulos
+
+El foro nunca pregunta qué módulos hay ni importa nada de ellos: decide por los contratos del core. Una función que depende de un tipo de publicación existe solo mientras `PublicationSourceRegistryInterface::source(<tipo>)` lo encuentra, y la regla está en un único servicio, `PublicationAvailability`, que usan todas las partes (acceso, búsqueda, instalación, panel y fichas). Falla cerrado: si el registro falla, el tipo no está.
+
+- **Sin la fuente**, lo que depende de ella se oculta para todos salvo quien tiene `forum:forum.moderate`, también para los moderadores de la propia categoría. No se borra nada ni hace falta migrar datos: un sitio que ya tiene «Mesas» y «Campañas» sin game-tables las deja ocultas al momento.
+  - No sale en la lista de categorías ni de temas, las páginas dan 404, no se ofrece para abrir temas ni para moverlos (tampoco a la moderación) y no se indexa.
+  - Avisos, correo y seguimientos no entregan nada de lo oculto, y los temas seguidos no cuentan para la marca del menú.
+  - En el panel, el recurso de categorías no la lista ni la ofrece como madre o como destino. Los ajustes no la ofrecen para anunciar. La página de moderación sigue mostrando sus denuncias y pendientes, porque solo la abre la moderación del foro.
+  - La moderación del foro la sigue viendo, con un aviso en la cabecera («Solo la moderación del foro ve esta categoría…»), y puede responder, cerrar o sacar temas de ella.
+- **Al volver la fuente**, todo se ve otra vez tal cual. Si la categoría no existía (el foro se habilitó antes), se crea al habilitar el módulo, en la reconciliación diaria o en cuanto una publicación la necesita.
+
+| Función | Qué contrato lee | Sin el módulo |
+|---|---|---|
+| Temas automáticos de partidas y campañas | Fuentes `game-table` y `campaign` (game-tables) | No hay «Mesas» ni «Campañas»; si ya existían, se ocultan con sus temas |
+| Temas automáticos de eventos | Fuente `event` (del core) | Siempre está |
+| Espacios de campaña | Fuente `campaign` con roster (`PublicationRosterInterface`) | Se ocultan con «Campañas»; sin roster solo entra la moderación del foro |
+| Etiquetas de sistema de juego | `topics` de las publicaciones | No llegan etiquetas nuevas; las de los temas ocultos no salen en los filtros |
+| Conversación en las fichas | Ranura `subject-discussion` y la fuente del tipo | Solo la pintan las páginas que existen; sin fuente, `/foro/fichas/<tipo>/<id>` no devuelve nada |
+| Incrustaciones con consentimiento (#21) | `hasCookieConsent()` (cookie-consent) | Sin el módulo, la incrustación pide un clic antes de cargarse |
+| Anuncio de temas nuevos | Evento `ForumDiscussionStarted` (lo escucha channel-notifications) | El evento se lanza igual y nadie lo atiende |
+
+Las funciones propias del foro (dados, personajes, apartes fuera de personaje, menciones, «me gusta») no dependen de ningún módulo.
 
 ## Me gusta, seguimiento y avisos
 
@@ -254,7 +277,7 @@ El foro ofrece al buscador del sitio dos tipos de documento (`registerSearchSour
 
 En `/buscar` salen como las pestañas «Temas del foro» y «Mensajes del foro».
 
-**Qué se indexa.** La audiencia de un documento sale de la regla de lectura de su categoría: «Cualquiera» es público, «Cuentas» es cualquier cuenta y «Socios» es asociación. Una subcategoría toma la más estricta entre la suya y la de su categoría madre. Lo que el buscador no sabe decir (roles, la plantilla de una campaña) **no se indexa**: falla cerrado, y esos temas se encuentran navegando. Tampoco se indexa lo que está oculto, lo que espera aprobación (temas o respuestas) ni lo que borró su autor. Los autores, los motivos de moderación y los datos privados no llegan nunca al índice.
+**Qué se indexa.** La audiencia de un documento sale de la regla de lectura de su categoría: «Cualquiera» es público, «Cuentas» es cualquier cuenta y «Socios» es asociación. Una subcategoría toma la más estricta entre la suya y la de su categoría madre. Lo que el buscador no sabe decir (roles, la plantilla de una campaña) **no se indexa**: falla cerrado, y esos temas se encuentran navegando. Tampoco lo que depende de un módulo que falta: al habilitar o deshabilitar un módulo, `search:sync` del core lo rehace todo y lo saca o lo devuelve. Tampoco se indexa lo que está oculto, lo que espera aprobación (temas o respuestas) ni lo que borró su autor. Los autores, los motivos de moderación y los datos privados no llegan nunca al índice.
 
 **Cuándo se actualiza.** Al publicar, editar, aprobar, ocultar, mostrar, mover, renombrar o borrar (`ForumSearchObserver`, sobre los eventos de los modelos; los borrados y los movimientos pasan por el modelo para que los dispare), y cuando cambian el nombre, la lectura o la madre de una categoría (un trabajo en cola, `RefreshForumSearchJob`, que repasa sus temas y respuestas). Un fallo del índice se registra y nunca rompe una escritura del foro. La reconciliación diaria del core (`search:sync`) lo deja todo en su sitio, y al desactivar o desinstalar el módulo vacía sus filas.
 
@@ -302,7 +325,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 
 ## Panel
 
-- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
+- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Las que dependen de un módulo que falta no salen (ver [Depende de otros módulos](#depende-de-otros-módulos)). Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
 - **Moderación del foro**: en *Comunicación* (hueco 35), con `forum:forum.moderate`. El número del menú suma denuncias abiertas y mensajes pendientes. Cuatro pestañas (`?pestana=`):
   - *Denuncias*: las abiertas, lo más antiguo primero. «Ocultar el mensaje» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro», «Resolver sin acción» y «Resolver como editado».
   - *Pendientes*: lo que espera aprobación, lo más antiguo primero. «Aprobar» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro» y «Rechazar», que pide un motivo opcional y marcar una casilla.

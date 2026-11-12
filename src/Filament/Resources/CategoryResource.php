@@ -28,6 +28,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
@@ -35,6 +36,7 @@ use Modules\Forum\Domain\Enums\CategoryIcon;
 use Modules\Forum\Domain\Enums\ReadOnlyOrigin;
 use Modules\Forum\Domain\Enums\RosterScope;
 use Modules\Forum\Domain\Exceptions\InvalidCategoryException;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Filament\Resources\CategoryResource\Pages\CreateCategory;
@@ -192,6 +194,38 @@ final class CategoryResource extends BaseResource
         ]);
     }
 
+    /**
+     * Categories that depend on a module that is missing (PublicationAvailability: «Mesas» or
+     * «Campañas» without a module offering game tables, a campaign's space, and their subcategories)
+     * are left out of the list, the edit page, and the parent and move options. Nothing is deleted:
+     * they come back with the module.
+     *
+     * @return Builder<CategoryModel>
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        /** @var Builder<CategoryModel> $query */
+        $query = parent::getEloquentQuery();
+
+        return $query->whereKeyNot(self::unavailableIds());
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function unavailableIds(): array
+    {
+        $policy = app(CategoryAccessPolicy::class);
+        $ids = [];
+        foreach (app(CategoryRepositoryInterface::class)->all() as $category) {
+            if (! $policy->isAvailable($category)) {
+                $ids[] = $category->id()->value;
+            }
+        }
+
+        return $ids;
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -302,7 +336,7 @@ final class CategoryResource extends BaseResource
     public static function parentOptions(?string $exceptId): array
     {
         /** @var array<string, string> */
-        return CategoryModel::query()
+        return self::getEloquentQuery()
             ->whereNull('parent_id')
             ->when($exceptId !== null, fn (Builder $query): Builder => $query->whereKeyNot($exceptId))
             ->orderBy('position')
@@ -317,7 +351,7 @@ final class CategoryResource extends BaseResource
     public static function moveTargets(string $exceptId): array
     {
         /** @var array<string, string> */
-        return EloquentCategoryRepository::inTreeOrder(CategoryModel::query()->whereKeyNot($exceptId))
+        return EloquentCategoryRepository::inTreeOrder(self::getEloquentQuery()->whereKeyNot($exceptId))
             ->pluck('forum_categories.name', 'forum_categories.id')
             ->all();
     }

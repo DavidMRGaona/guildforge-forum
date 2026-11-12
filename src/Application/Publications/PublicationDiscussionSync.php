@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -21,7 +22,6 @@ use Modules\Forum\Domain\Enums\DiscussionStatus;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
-use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
@@ -65,13 +65,13 @@ final readonly class PublicationDiscussionSync
     public function __construct(
         private PublicationSourceRegistryInterface $publications,
         private SubjectDiscussionRepositoryInterface $records,
-        private CategoryRepositoryInterface $categories,
         private DiscussionRepositoryInterface $discussions,
         private ForumWriter $writer,
         private SystemAccountInterface $systemAccount,
         private PublicationPosts $posts,
         private PostRevisionRepositoryInterface $revisions,
         private PublicationSyncQueueInterface $queue,
+        private DefaultCategoriesInstaller $installer,
     ) {}
 
     public static function announces(string $type): bool
@@ -136,7 +136,8 @@ final readonly class PublicationDiscussionSync
             return null;
         }
 
-        $category = $this->categories->findBySystemKey($categoryKey);
+        // Created here when the publications arrived after the forum and nothing made it yet
+        $category = $this->installer->systemCategory($categoryKey);
         if (! $category instanceof Category) {
             Log::warning('[Forum] System category missing: publication discussion not started', ['category' => $categoryKey->value, 'publication' => $record->key()->value()]);
 

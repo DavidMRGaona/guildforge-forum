@@ -268,6 +268,8 @@ export default {
                 'Estás suspendido en el foro: puedes leer, pero no escribir. Motivo: {reason}',
         },
         spaces: {
+            unavailableNotice:
+                'Solo la moderación del foro ve esta categoría: falta el módulo del que depende. Vuelve a verse en cuanto se habilite de nuevo.',
             moderationNotice:
                 'Este espacio es privado, pero la moderación del foro puede entrar en él para atender reportes.',
             readOnlyNotice: 'Solo lectura: ya no se puede escribir en este espacio.',

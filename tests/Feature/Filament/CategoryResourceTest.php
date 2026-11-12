@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Filament;
 
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Filament\Actions\RowDetailsAction;
 use App\Filament\Support\PanelNavigationGroup;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
@@ -30,6 +31,7 @@ use Modules\Forum\Filament\Resources\CategoryResource\Pages\ListCategories;
 use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\Modules\InteractsWithModulePanel;
 use Tests\Support\Modules\ModuleTestCase;
@@ -163,6 +165,30 @@ final class CategoryResourceTest extends ModuleTestCase
         $this->assertArrayHasKey($parent->id()->value, $options);
         $this->assertArrayNotHasKey($child->id()->value, $options);
         $this->assertArrayNotHasKey($parent->id()->value, CategoryResource::parentOptions($parent->id()->value));
+    }
+
+    public function test_categories_of_a_missing_module_are_left_out_until_it_is_back(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+        $general = $this->aCategory('general');
+        $tables = Category::system(CategoryId::generate(), SystemCategory::GameTables, 'Mesas', new CategorySlug('mesas'), 1);
+        app(CategoryRepositoryInterface::class)->save($tables);
+        $child = new Category(CategoryId::generate(), 'Dudas', new CategorySlug('dudas'), parentId: $tables->id());
+        app(CategoryRepositoryInterface::class)->save($child);
+        $hidden = [$tables->id()->value, $child->id()->value];
+
+        Livewire::test(ListCategories::class)
+            ->assertCanSeeTableRecords([$general->id()->value])
+            ->assertCanNotSeeTableRecords($hidden);
+        $this->assertSame([$general->id()->value], array_keys(CategoryResource::parentOptions(null)));
+        $this->assertSame([], CategoryResource::moveTargets($general->id()->value));
+        $this->get(CategoryResource::getUrl('edit', ['record' => $tables->id()->value]))->assertNotFound();
+
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        $this->app->forgetScopedInstances();
+
+        Livewire::test(ListCategories::class)->assertCanSeeTableRecords([$general->id()->value, ...$hidden]);
+        $this->assertArrayHasKey($tables->id()->value, CategoryResource::parentOptions(null));
     }
 
     public function test_slugs_are_unique_and_kebab_case(): void

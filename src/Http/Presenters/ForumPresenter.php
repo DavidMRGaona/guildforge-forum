@@ -124,6 +124,8 @@ final readonly class ForumPresenter
             // The header tells that the forum's moderators may enter a private space, and when it takes no posts
             'isPublicationSpace' => $category->isPublicationSpace(),
             'readOnly' => $readOnly,
+            // Only the forum's moderators reach one that is not: the header tells them nobody else sees it
+            'unavailable' => ! $access->available,
         ];
     }
 

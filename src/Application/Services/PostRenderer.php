@@ -7,15 +7,19 @@ namespace Modules\Forum\Application\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
+use Modules\Forum\Application\Content\Nodes\RollNode;
 use Modules\Forum\Application\Content\PostDocument;
 use Modules\Forum\Application\Content\Rendering\DocumentRenderer;
 use Modules\Forum\Application\Content\Rendering\QuoteSource;
 use Modules\Forum\Application\Content\Rendering\RenderContext;
+use Modules\Forum\Application\Content\Rendering\RollView;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
+use Modules\Forum\Domain\Entities\DiceRoll;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\AccountId;
@@ -39,6 +43,7 @@ final readonly class PostRenderer
         private ForumAccessInterface $access,
         private PostLinksInterface $links,
         private PostImageStorageInterface $images,
+        private DiceRollRepositoryInterface $diceRolls,
     ) {}
 
     /**
@@ -62,6 +67,27 @@ final readonly class PostRenderer
             $document->toArray(),
             new RenderContext(accountNames: $this->accounts->namesOf($document->mentionedAccountIds())),
         );
+    }
+
+    /**
+     * The plain text of a document whose rolls are settled, results included
+     * («2d6+3 Ataque = 11»).
+     *
+     * @param  array<string, mixed>  $document
+     * @param  list<DiceRoll>  $rolls  the document's rolls
+     */
+    public function plainText(array $document, array $rolls): string
+    {
+        $mention = (new MentionNode)->name();
+        $found = $this->renderer->attributesOf($document, [$mention]);
+        $accountIds = array_map(static fn (array $attributes): ?string => AccountId::normalize(is_string($attributes['id'] ?? null) ? $attributes['id'] : ''), $found[$mention] ?? []);
+
+        $views = [];
+        foreach ($rolls as $roll) {
+            $views[$roll->id] = RollView::of($roll);
+        }
+
+        return $this->renderer->toText($document, new RenderContext(accountNames: $this->accounts->namesOf($this->distinct($accountIds)), rolls: $views));
     }
 
     /**
@@ -95,16 +121,21 @@ final readonly class PostRenderer
     {
         $mention = (new MentionNode)->name();
         $quote = (new PostQuoteNode)->name();
+        $roll = (new RollNode)->name();
         $accountIds = [];
         $postIds = [];
+        $rollIds = [];
 
         foreach ($bodies as $body) {
-            $found = $this->renderer->attributesOf($body->document, [$mention, $quote]);
+            $found = $this->renderer->attributesOf($body->document, [$mention, $quote, $roll]);
             foreach ($found[$mention] ?? [] as $attributes) {
                 $accountIds[] = AccountId::normalize(is_string($attributes['id'] ?? null) ? $attributes['id'] : '');
             }
             foreach ($found[$quote] ?? [] as $attributes) {
                 $postIds[] = AccountId::normalize(is_string($attributes['postId'] ?? null) ? $attributes['postId'] : '');
+            }
+            foreach ($found[$roll] ?? [] as $attributes) {
+                $rollIds[] = is_string($attributes['rollId'] ?? null) ? $attributes['rollId'] : null;
             }
         }
 
@@ -112,7 +143,22 @@ final readonly class PostRenderer
             accountNames: $this->accounts->namesOf($this->distinct($accountIds)),
             quotes: $this->quoteSources($this->distinct($postIds), $reader),
             imageUrl: fn (string $path): ?string => $this->images->url($path),
+            rolls: $this->rollViews($this->distinct($rollIds)),
         );
+    }
+
+    /**
+     * @param  list<string>  $rollIds
+     * @return array<string, RollView>
+     */
+    private function rollViews(array $rollIds): array
+    {
+        $views = [];
+        foreach ($this->diceRolls->findMany($rollIds) as $roll) {
+            $views[$roll->id] = RollView::of($roll);
+        }
+
+        return $views;
     }
 
     /**

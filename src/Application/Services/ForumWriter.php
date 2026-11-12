@@ -53,6 +53,7 @@ final readonly class ForumWriter
         private ForumCountersInterface $counters,
         private PostRevisionRepositoryInterface $revisions,
         private ForumNoticesInterface $notices,
+        private PostRolls $rolls,
     ) {}
 
     /**
@@ -83,10 +84,12 @@ final readonly class ForumWriter
                         $discussion->awaitApproval();
                     }
 
+                    $rolled = $this->rolls->settle($firstPostId, $body, editing: false, at: $discussion->createdAt());
                     $post = $needsApproval
-                        ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $body, $discussion->createdAt())
-                        : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $body, $discussion->createdAt());
+                        ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $rolled->body, $discussion->createdAt())
+                        : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $rolled->body, $discussion->createdAt());
                     $this->posts->save($post);
+                    $this->rolls->store($rolled);
 
                     $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
@@ -113,10 +116,12 @@ final readonly class ForumWriter
         return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval): Post {
             $discussion = $this->lockDiscussion($discussionId);
 
+            $rolled = $this->rolls->settle($postId, $body, editing: false, at: $at);
             $post = $needsApproval
-                ? Post::submitForApproval($postId, $discussionId, $authorId, $body, $at)
-                : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $body, $at);
+                ? Post::submitForApproval($postId, $discussionId, $authorId, $rolled->body, $at)
+                : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $rolled->body, $at);
             $this->posts->save($post);
+            $this->rolls->store($rolled);
 
             $this->refresh($discussionId, [$discussion->categoryId()]);
 
@@ -209,15 +214,18 @@ final readonly class ForumWriter
             $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
-            if ($post->body()->sameDocumentAs($body)) {
+            // Its rolls first: the ones it already has are kept, new ones are thrown once
+            $rolled = $this->rolls->settle($postId, $body, editing: true, at: $at);
+            if ($post->body()->sameDocumentAs($rolled->body)) {
                 return $post;
             }
 
             $replaced = $post->body();
-            $post->edit($body, $at);
+            $post->edit($rolled->body, $at);
 
             $this->revisions->save(new PostRevision($postId, $this->revisions->nextNumber($postId), $replaced, $editorId, $at));
             $this->posts->save($post);
+            $this->rolls->store($rolled);
 
             return $post;
         }, self::ATTEMPTS);
@@ -254,7 +262,7 @@ final readonly class ForumWriter
 
     /**
      * Empties a post its author deleted and drops its revisions, so nothing it said is kept
-     * (nor counts as using an image). Only its place in the numbering is left.
+     * (nor counts as using an image, and its rolls go). Only its place in the numbering is left.
      *
      * @throws PostNotFoundException
      * @throws InvalidPostException unless its author deleted it
@@ -267,6 +275,7 @@ final readonly class ForumWriter
             $post = $this->posts->findOrFail($postId);
             $post->purgeContent($at);
             $this->revisions->deleteOfPost($postId);
+            $this->rolls->forget($postId);
             $this->posts->save($post);
 
             return $post;

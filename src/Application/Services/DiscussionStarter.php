@@ -112,8 +112,9 @@ final readonly class DiscussionStarter
             $discussion->close();
         }
 
-        DB::transaction(function () use ($discussion, $body, $topics, $needsApproval): void {
-            $this->writer->startDiscussion($discussion, PostId::generate(), $body, $needsApproval);
+        $firstPost = null;
+        DB::transaction(function () use ($discussion, $body, $topics, $needsApproval, &$firstPost): void {
+            $firstPost = $this->writer->startDiscussion($discussion, PostId::generate(), $body, $needsApproval);
             if ($topics !== []) {
                 $this->discussions->replaceTopics($discussion->id(), $topics);
             }
@@ -123,7 +124,8 @@ final readonly class DiscussionStarter
         $this->follows->followAfterPosting((string) $authorId, $discussion->id());
         if (! $discussion->isAwaitingApproval()) {
             $this->reads->advance((string) $authorId, $discussion->id(), 1, $discussion->createdAt());
-            $this->announcer->announce($discussion, $access->category, $body, $topics);
+            // What was saved, with its dice thrown
+            $this->announcer->announce($discussion, $access->category, $firstPost?->body() ?? $body, $topics);
         }
 
         return $discussion;

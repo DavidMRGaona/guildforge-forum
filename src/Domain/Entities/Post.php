@@ -36,7 +36,7 @@ final class Post
      */
     public function __construct(
         private readonly PostId $id,
-        private readonly DiscussionId $discussionId,
+        private DiscussionId $discussionId,
         private ?PostNumber $number,
         ?string $authorId,
         private PostBody $body,
@@ -80,6 +80,23 @@ final class Post
     public static function submitForApproval(PostId $id, DiscussionId $discussionId, ?string $authorId, PostBody $body, DateTimeImmutable $createdAt, ?CharacterId $characterId = null): self
     {
         return new self($id, $discussionId, null, $authorId, $body, PostStatus::Pending, $createdAt, null, characterId: $characterId);
+    }
+
+    /**
+     * Moved by moderation into another discussion (split off, or merged): a numbered post takes
+     * the number it gets there, one awaiting approval keeps waiting without one. Everything else
+     * (its status, dates, body, character) goes with it.
+     *
+     * @throws InvalidPostException when the number does not match its status
+     */
+    public function moveTo(DiscussionId $discussionId, ?PostNumber $number): void
+    {
+        if ($this->status->isNumbered() !== ($number instanceof PostNumber)) {
+            throw InvalidPostException::numberMismatch($this->status);
+        }
+
+        $this->discussionId = $discussionId;
+        $this->number = $number;
     }
 
     /**

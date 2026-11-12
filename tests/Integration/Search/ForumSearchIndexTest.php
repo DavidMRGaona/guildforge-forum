@@ -287,6 +287,40 @@ final class ForumSearchIndexTest extends ModuleTestCase
         $this->assertSame('public', $this->row('forum-post', $reply->id()->value)?->audience);
     }
 
+    public function test_splitting_posts_off_indexes_them_at_their_new_address(): void
+    {
+        $moderator = $this->anAccount('forum:forum.moderate');
+        $category = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
+        [$discussion] = $this->aDiscussion($category, title: 'Mesa del viernes');
+        $opening = $this->aReply($discussion, '2026-11-10 18:10:00', text: 'Otra cosa');
+        $reply = $this->aReply($discussion, '2026-11-10 18:20:00', text: 'Sigue la otra cosa');
+
+        $new = app(ForumModeration::class)->split($moderator, $discussion->id(), [2, 3], 'Otra cosa', $category->id());
+
+        // The first post it moved is the new discussion's opening message, no reply of its own
+        $this->assertNull($this->row('forum-post', $opening->id()->value));
+        $this->assertSame('Otra cosa', $this->row('forum-discussion', $new->id()->value)?->body);
+        $this->assertSame('/foro/t/2-otra-cosa', $this->row('forum-discussion', $new->id()->value)->url);
+        $this->assertSame('/foro/t/2-otra-cosa/2', $this->row('forum-post', $reply->id()->value)?->url);
+        $this->assertSame('Primer mensaje', $this->row('forum-discussion', $discussion->id()->value)?->body);
+    }
+
+    public function test_merging_moves_the_replies_and_drops_the_merged_discussion(): void
+    {
+        $moderator = $this->anAccount('forum:forum.moderate');
+        $category = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
+        [$into] = $this->aDiscussion($category, '2026-11-10 18:00:00', title: 'Destino');
+        [$absorbed, $opening] = $this->aDiscussion($category, '2026-11-10 19:00:00', title: 'Absorbido');
+        $reply = $this->aReply($absorbed, '2026-11-10 19:10:00');
+
+        app(ForumModeration::class)->merge($moderator, $absorbed->id(), $into->id());
+
+        $this->assertNull($this->row('forum-discussion', $absorbed->id()->value));
+        // Its opening message is a reply where it went
+        $this->assertSame('/foro/t/1-destino/2', $this->row('forum-post', $opening->id()->value)?->url);
+        $this->assertSame('/foro/t/1-destino/3', $this->row('forum-post', $reply->id()->value)?->url);
+    }
+
     public function test_changing_who_reads_a_category_updates_its_documents_and_its_subcategories(): void
     {
         $parent = $this->aCategoryFor(CategoryAudience::everyone(), 'general');

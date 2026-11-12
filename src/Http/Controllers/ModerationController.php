@@ -19,6 +19,7 @@ use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\ModerationLogEntry;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
+use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
@@ -95,6 +96,114 @@ final class ModerationController extends Controller
 
             return response()->json(['url' => $category instanceof Category ? $this->urls->category($category) : $this->urls->index()]);
         });
+    }
+
+    /**
+     * Splits the chosen posts off into a new discussion. It cannot be undone: the menu asks to
+     * tick a box first, and so does this.
+     */
+    public function split(Request $request, string $discussion): JsonResponse
+    {
+        $input = $request->validate([
+            'numbers' => ['required', 'array', 'min:1', 'max:'.ForumModeration::MAX_SPLIT],
+            'numbers.*' => ['required', 'integer', 'min:2'],
+            'title' => ['required', 'string', 'max:500'],
+            'category' => ['required', 'uuid'],
+            'reason' => ['nullable', 'string', 'max:'.ModerationLogEntry::MAX_REASON_LENGTH],
+            'confirmed' => ['accepted'],
+        ]);
+
+        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+            /** @var list<int|string> $numbers */
+            $numbers = $input['numbers'];
+
+            $new = $this->moderation->split(
+                $this->user($request),
+                DiscussionId::fromString($discussion),
+                array_map(intval(...), $numbers),
+                (string) $input['title'],
+                CategoryId::fromString((string) $input['category']),
+                $this->text($input, 'reason'),
+            );
+
+            return response()->json(['url' => $this->urls->discussion($new)]);
+        });
+    }
+
+    /**
+     * Merges the discussion into another. It cannot be undone either: a box to tick here too.
+     */
+    public function merge(Request $request, string $discussion): JsonResponse
+    {
+        $input = $request->validate([
+            'target' => ['required', 'uuid'],
+            'reason' => ['nullable', 'string', 'max:'.ModerationLogEntry::MAX_REASON_LENGTH],
+            'confirmed' => ['accepted'],
+        ]);
+
+        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+            $into = $this->moderation->merge(
+                $this->user($request),
+                DiscussionId::fromString($discussion),
+                DiscussionId::fromString((string) $input['target']),
+                $this->text($input, 'reason'),
+            );
+
+            return response()->json(['url' => $this->urls->discussion($into)]);
+        });
+    }
+
+    /**
+     * The discussion the moderator asks to merge this one into, by its number or its address,
+     * so the menu shows what it is before anything happens.
+     */
+    public function mergeTarget(Request $request, string $discussion): JsonResponse
+    {
+        $input = $request->validate(['tema' => ['required', 'string', 'max:500']]);
+
+        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+            $user = $this->user($request);
+            $absorbed = $this->moderation->moderated($user, DiscussionId::fromString($discussion));
+            $number = self::discussionNumber((string) $input['tema']);
+
+            try {
+                $target = $number === null ? null : $this->moderation->mergeTarget($user, $absorbed, $number);
+            } catch (DiscussionNotFoundException) {
+                $target = null;
+            }
+
+            if (! $target instanceof Discussion) {
+                $message = __('forum::messages.moderation.errors.merge_not_found');
+
+                return response()->json(['message' => $message, 'reason' => 'merge_not_found', 'errors' => ['tema' => [$message]]], 422);
+            }
+
+            $category = $this->categories->find($target->categoryId());
+
+            return response()->json(['discussion' => [
+                'id' => $target->id()->value,
+                'number' => $target->number(),
+                'title' => $target->title()->value,
+                'url' => $this->urls->discussion($target),
+                'categoryName' => $category?->name(),
+            ]]);
+        });
+    }
+
+    /**
+     * A discussion's number from what was typed: the number alone, or an address of it
+     * (/foro/t/42-its-title, with or without a post and the site in front).
+     */
+    public static function discussionNumber(string $typed): ?int
+    {
+        $typed = trim($typed);
+        if (preg_match('/^#?(\d{1,9})$/', $typed, $match) === 1 || preg_match('~/foro/t/(\d{1,9})(?:-|/|$|\?|#)~', $typed, $match) === 1) {
+            $number = (int) $match[1];
+
+            return $number > 0 ? $number : null;
+        }
+
+        return null;
     }
 
     public function post(Request $request, string $post): JsonResponse

@@ -10,6 +10,7 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\MovedPostsDTO;
 use Modules\Forum\Application\DTOs\PostContentDTO;
 use Modules\Forum\Application\DTOs\PostLikesDTO;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
@@ -208,6 +209,14 @@ final readonly class ForumPresenter
                 'nextUrl' => $page->hasNext() ? $pageUrl($page->pageStart + $page->perPage) : null,
                 'lastUrl' => $page->hasNext() ? $pageUrl($lastStart) : null,
             ],
+            // Where the page's posts that moderation moved away went, in their place
+            'moved' => array_map(fn (MovedPostsDTO $moved): array => [
+                'fromNumber' => $moved->fromNumber,
+                'throughNumber' => $moved->throughNumber,
+                'count' => $moved->count,
+                'title' => $moved->target?->title()->value,
+                'url' => $moved->target instanceof Discussion ? $this->urls->discussion($moved->target, $moved->targetNumber) : null,
+            ], $page->moved),
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
             'mentionNames' => $mentionNames,

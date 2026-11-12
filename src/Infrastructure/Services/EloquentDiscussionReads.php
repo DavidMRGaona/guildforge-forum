@@ -42,12 +42,14 @@ final readonly class EloquentDiscussionReads implements DiscussionReadsInterface
             return $own;
         }
 
-        // Posts published up to the category mark were read, whatever their status now
-        $marked = (int) DB::table('forum_posts')
-            ->where('discussion_id', $discussionId->value)
-            ->whereNotNull('number')
-            ->where('published_at', '<=', $markedAt)
-            ->max('number');
+        // Posts published up to the category mark were read, whatever their status now, as far
+        // as the first one published after it: a merge appends older posts after newer ones,
+        // and those newer ones were not read
+        $posts = DB::table('forum_posts')->where('discussion_id', $discussionId->value)->whereNotNull('number');
+        $firstUnread = (clone $posts)->where('published_at', '>', $markedAt)->min('number');
+        $marked = is_numeric($firstUnread)
+            ? (int) $firstUnread - 1
+            : (int) (clone $posts)->max('number');
 
         return max($own, $marked);
     }

@@ -16,11 +16,13 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
+use Modules\Forum\Application\DTOs\RedirectTargetDTO;
 use Modules\Forum\Application\DTOs\StartDiscussionDTO;
 use Modules\Forum\Application\Services\ConversationReader;
 use Modules\Forum\Application\Services\DiscussionStarter;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\ForumRedirects;
 use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -64,12 +66,22 @@ final class DiscussionController extends Controller
         private readonly SuspensionService $suspensionService,
         private readonly ModerationProps $moderationProps,
         private readonly CharacterPresenter $characters,
+        private readonly ForumRedirects $redirects,
     ) {}
 
     public function show(Request $request, string $discussion, ?string $post = null): Response|RedirectResponse
     {
         $user = $request->user();
-        $found = $this->discussions->findByNumber((int) Str::before($discussion, '-'));
+        $number = (int) Str::before($discussion, '-');
+        $found = $this->discussions->findByNumber($number);
+
+        // Moderation moved the post (split off) or the whole discussion (merged): its new place
+        if (! $found instanceof Discussion || $post !== null) {
+            $moved = $this->redirects->resolve($user, $number, $post === null ? null : (int) $post);
+            if ($moved instanceof RedirectTargetDTO) {
+                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber), 301);
+            }
+        }
         abort_unless($found instanceof Discussion, 404);
 
         try {
@@ -123,6 +135,7 @@ final class DiscussionController extends Controller
     private function moderationMenu(Authenticatable $moderator, Discussion $discussion): array
     {
         $targets = $this->moderation->moveTargets($moderator, $discussion);
+        $restructures = $this->moderation->canRestructure($moderator, $discussion);
         $names = [];
         foreach ($this->categories->all() as $category) {
             $names[$category->id()->value] = $category->name();
@@ -132,6 +145,14 @@ final class DiscussionController extends Controller
             'queueUrl' => route('forum.moderation.index'),
             'suspendUrl' => $this->suspensionService->canSuspend($moderator) ? route('forum.suspensions.store') : null,
             'actionsUrl' => route('forum.moderation.discussions', ['discussion' => $discussion->id()->value]),
+            'splitUrl' => $restructures ? route('forum.moderation.discussions.split', ['discussion' => $discussion->id()->value]) : null,
+            'mergeUrl' => $restructures ? route('forum.moderation.discussions.merge', ['discussion' => $discussion->id()->value]) : null,
+            'mergeTargetUrl' => $restructures ? route('forum.moderation.discussions.merge-target', ['discussion' => $discussion->id()->value]) : null,
+            'splitCategories' => array_map(static fn (Category $category): array => [
+                'id' => $category->id()->value,
+                'name' => $category->name(),
+                'parentName' => ($parentId = $category->parentId()) instanceof CategoryId ? ($names[$parentId->value] ?? null) : null,
+            ], $restructures ? $this->moderation->splitCategories($moderator, $discussion) : []),
             'deleteUrl' => $this->moderation->canDelete($moderator, $discussion)
                 ? route('forum.moderation.discussions.destroy', ['discussion' => $discussion->id()->value])
                 : null,
@@ -145,6 +166,7 @@ final class DiscussionController extends Controller
                 'titleMax' => DiscussionStarter::MAX_TITLE_LENGTH,
                 'reasonMax' => ModerationLogEntry::MAX_REASON_LENGTH,
                 'hiddenReasonMax' => Post::MAX_HIDDEN_REASON_LENGTH,
+                'splitMax' => ForumModeration::MAX_SPLIT,
             ],
         ];
     }

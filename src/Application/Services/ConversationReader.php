@@ -10,6 +10,9 @@ use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\MovedPostsDTO;
+use Modules\Forum\Application\Queries\MovedPostRowDTO;
+use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
@@ -36,6 +39,7 @@ final readonly class ConversationReader
         private PostContentPresenter $presenter,
         private DiscussionReadsInterface $reads,
         private ForumSettingsInterface $settings,
+        private MovedPostsQueryInterface $moved,
     ) {}
 
     /**
@@ -61,11 +65,14 @@ final readonly class ConversationReader
         $focus = $this->focus($number, $highest, $lastRead);
         $pageStart = $focus === null ? 1 : intdiv($focus - 1, $perPage) * $perPage + 1;
 
-        $posts = $highest === 0 ? [] : $this->posts->numberedFrom($id, new PostNumber($pageStart), $perPage);
+        // A page is a fixed run of numbers: where posts moved away it holds fewer, and says where they went
+        $pageEnd = $pageStart + $perPage - 1;
+        $posts = $highest === 0 ? [] : $this->posts->numberedBetween($id, new PostNumber($pageStart), new PostNumber($pageEnd));
+        $isLastPage = $pageStart + $perPage > $highest;
         $moderates = $this->access->canModerate($reader, $discussion);
 
         // Posts awaiting approval have no place yet: their author and moderators see them last
-        if ($pageStart + $perPage > $highest && $readerId !== null) {
+        if ($isLastPage && $readerId !== null) {
             foreach ($this->posts->pendingIn($id) as $pending) {
                 if ($moderates || $pending->authorId() === $readerId) {
                     $posts[] = $pending;
@@ -87,7 +94,47 @@ final readonly class ConversationReader
             canPost: $this->posting->canPost($reader, $discussion),
             canModerate: $moderates,
             guestsRead: $this->access->canRead(null, $discussion),
+            moved: $this->movedRuns($reader, $this->moved->inRange($id, $pageStart, $isLastPage ? null : $pageEnd)),
         );
+    }
+
+    /**
+     * Consecutive numbers whose posts went to the same discussion, as one run each.
+     *
+     * @param  list<MovedPostRowDTO>  $rows  in order
+     * @return list<MovedPostsDTO>
+     */
+    private function movedRuns(?Authenticatable $reader, array $rows): array
+    {
+        /** @var list<array{from: int, through: int, count: int, discussion: ?string, number: ?int}> $runs */
+        $runs = [];
+        foreach ($rows as $row) {
+            $last = array_key_last($runs);
+            if ($last !== null && $runs[$last]['through'] === $row->fromNumber - 1 && $runs[$last]['discussion'] === $row->discussionId) {
+                $runs[$last]['through'] = $row->fromNumber;
+                $runs[$last]['count']++;
+
+                continue;
+            }
+            $runs[] = ['from' => $row->fromNumber, 'through' => $row->fromNumber, 'count' => 1, 'discussion' => $row->discussionId, 'number' => $row->number];
+        }
+
+        $readable = [];
+        $moved = [];
+        foreach ($runs as $run) {
+            $target = null;
+            if ($run['discussion'] !== null) {
+                if (! array_key_exists($run['discussion'], $readable)) {
+                    $found = $this->discussions->find(DiscussionId::fromString($run['discussion']));
+                    $readable[$run['discussion']] = $found instanceof Discussion && $this->access->canRead($reader, $found) ? $found : null;
+                }
+                $target = $readable[$run['discussion']];
+            }
+
+            $moved[] = new MovedPostsDTO($run['from'], $run['through'], $run['count'], $target, $target instanceof Discussion ? $run['number'] : null);
+        }
+
+        return $moved;
     }
 
     /**

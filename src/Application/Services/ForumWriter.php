@@ -8,8 +8,10 @@ use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\DiscussionCarryOverInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
+use Modules\Forum\Application\DTOs\PostsMovedDTO;
 use Modules\Forum\Application\DTOs\SpeakerChoice;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
@@ -17,14 +19,17 @@ use Modules\Forum\Domain\Entities\PostRevision;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
+use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\RedirectRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
@@ -56,6 +61,8 @@ final readonly class ForumWriter
         private PostRevisionRepositoryInterface $revisions,
         private ForumNoticesInterface $notices,
         private PostRolls $rolls,
+        private RedirectRepositoryInterface $redirects,
+        private DiscussionCarryOverInterface $carryOver,
     ) {}
 
     /**
@@ -402,6 +409,122 @@ final readonly class ForumWriter
     }
 
     /**
+     * Moves numbered posts of a discussion (never its first) into a new discussion, numbered
+     * from 1 in their order. The original keeps its numbers with gaps where they left, which it
+     * never gives out again; each old number leads to the post's new place. The new discussion
+     * is started by whoever wrote the first post it holds, when that post was published, takes
+     * the original's topics, its follows and its reads, and is announced to nobody: nothing in it
+     * is new. Locks both categories (in id order) and then the original.
+     *
+     * @param  list<int>  $numbers
+     *
+     * @throws DiscussionNotFoundException
+     * @throws ModerationRefusedException when a number is not a numbered post after the first
+     */
+    public function splitDiscussion(DiscussionId $fromId, array $numbers, CategoryId $categoryId, DiscussionTitle $title, DateTimeImmutable $at): PostsMovedDTO
+    {
+        $newId = DiscussionId::generate();
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return DB::transaction(function () use ($fromId, $numbers, $categoryId, $title, $at, $newId): PostsMovedDTO {
+                    $stored = $this->discussions->findOrFail($fromId);
+                    $categories = $this->lockCategories([$stored->categoryId(), $categoryId]);
+                    $from = $this->discussions->findForUpdate($fromId);
+                    if (! $from->categoryId()->equals($stored->categoryId())) {
+                        $this->categories->lockForWrite($from->categoryId());
+                        $categories[] = $from->categoryId();
+                    }
+
+                    $posts = $this->posts->withNumbers($fromId, $numbers);
+                    if ($numbers === [] || count($posts) !== count(array_unique($numbers)) || count($posts) !== count($numbers) || in_array(1, $numbers, true)) {
+                        throw ModerationRefusedException::splitSelection();
+                    }
+
+                    $first = $posts[0];
+                    $new = Discussion::start($newId, $categoryId, $first->authorId(), $title, $first->publishedAt() ?? $first->createdAt());
+                    $new->numberAs($this->discussions->nextNumber());
+                    $this->discussions->save($new);
+                    $this->discussions->replaceTopics($newId, $this->discussions->topicsOf($fromId));
+
+                    $moved = [];
+                    $map = [];
+                    $number = PostNumber::first();
+                    foreach ($posts as $post) {
+                        $old = (int) $post->number()?->value;
+                        $post->moveTo($newId, $number);
+                        $this->posts->save($post);
+                        $moved[$old] = $post->id();
+                        $map[$old] = $number->value;
+                        $number = $number->next();
+                    }
+
+                    $this->redirects->recordMovedPosts($fromId, $moved, $at);
+                    $this->carryOver->afterSplit($fromId, $newId, $map, $at);
+
+                    $this->counters->refreshDiscussion($fromId);
+                    $this->refresh($newId, $categories);
+
+                    return new PostsMovedDTO($new, $map);
+                }, self::ATTEMPTS);
+            } catch (UniqueConstraintViolationException $exception) {
+                // Another discussion took the number meanwhile: tried again with the next one
+                if ($attempt >= self::NUMBER_ATTEMPTS || $this->discussions->find($newId) instanceof Discussion) {
+                    throw $exception;
+                }
+            }
+        }
+    }
+
+    /**
+     * Merges a discussion into another: its numbered posts are appended after the other's
+     * last number, in the order they were published, and its posts awaiting approval go on
+     * waiting there. The merged discussion goes; its number and each of its posts' lead to
+     * their new place, and its reads and follows carry over. Locks both categories and then
+     * both discussions, each kind in id order, so two merges never wait on each other.
+     *
+     * @throws DiscussionNotFoundException
+     */
+    public function mergeDiscussion(DiscussionId $absorbedId, DiscussionId $intoId, DateTimeImmutable $at): PostsMovedDTO
+    {
+        return DB::transaction(function () use ($absorbedId, $intoId, $at): PostsMovedDTO {
+            [$absorbed, $into, $categories] = $this->lockPair($absorbedId, $intoId);
+
+            $intoHighest = $this->posts->highestNumber($intoId)->value ?? 0;
+            $number = $this->nextNumber($intoId);
+
+            $all = $this->posts->inDiscussion($absorbedId);
+            $numbered = array_values(array_filter($all, static fn (Post $post): bool => $post->number() instanceof PostNumber));
+            $pending = array_values(array_filter($all, static fn (Post $post): bool => ! $post->number() instanceof PostNumber));
+            usort($numbered, static fn (Post $a, Post $b): int => [$a->publishedAt(), $a->number()?->value] <=> [$b->publishedAt(), $b->number()?->value]);
+
+            $moved = [];
+            $map = [];
+            foreach ($numbered as $post) {
+                $old = (int) $post->number()?->value;
+                $post->moveTo($intoId, $number);
+                $this->posts->save($post);
+                $moved[$old] = $post->id();
+                $map[$old] = $number->value;
+                $number = $number->next();
+            }
+            foreach ($pending as $post) {
+                $post->moveTo($intoId, null);
+                $this->posts->save($post);
+            }
+
+            $this->redirects->recordMovedPosts($absorbedId, $moved, $at);
+            $this->carryOver->afterMerge($absorbedId, $intoId, $map, $intoHighest, $at);
+            $this->redirects->recordMergedDiscussion((int) $absorbed->number(), $absorbedId, $intoId, $at);
+            $this->discussions->delete($absorbedId);
+
+            $this->refresh($intoId, $categories);
+
+            return new PostsMovedDTO($into, $map, count($pending));
+        }, self::ATTEMPTS);
+    }
+
+    /**
      * Hands a post that got its number to the notices; one awaiting approval waits for it.
      */
     private function announced(Post $post): Post
@@ -438,6 +561,42 @@ final readonly class ForumWriter
     }
 
     /**
+     * Locks the categories of both discussions (in id order) and then both discussions (in id
+     * order). Should another write move one of them between reading its category and locking
+     * it, everything is locked again with the new categories.
+     *
+     * @return array{Discussion, Discussion, list<CategoryId>}
+     *
+     * @throws DiscussionNotFoundException
+     */
+    private function lockPair(DiscussionId $firstId, DiscussionId $secondId): array
+    {
+        $first = $this->discussions->findOrFail($firstId);
+        $second = $this->discussions->findOrFail($secondId);
+
+        for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
+            $categories = $this->lockCategories([$first->categoryId(), $second->categoryId()]);
+
+            $ids = [$firstId->value => $firstId, $secondId->value => $secondId];
+            ksort($ids, SORT_STRING);
+            $locked = [];
+            foreach ($ids as $value => $id) {
+                $locked[$value] = $this->discussions->findForUpdate($id);
+            }
+
+            $lockedFirst = $locked[$firstId->value];
+            $lockedSecond = $locked[$secondId->value];
+            if ($lockedFirst->categoryId()->equals($first->categoryId()) && $lockedSecond->categoryId()->equals($second->categoryId())) {
+                return [$lockedFirst, $lockedSecond, $categories];
+            }
+
+            [$first, $second] = [$lockedFirst, $lockedSecond];
+        }
+
+        throw new RuntimeException("Discussions {$firstId->value} and {$secondId->value} kept moving between categories while they were being merged.");
+    }
+
+    /**
      * @param  list<CategoryId>  $ids
      * @return list<CategoryId> the distinct ids, locked in id order so two writes never wait on each other
      */
@@ -456,9 +615,15 @@ final readonly class ForumWriter
         return array_values($distinct);
     }
 
+    /**
+     * The number after the highest one the discussion ever gave out, including those of posts
+     * that moderation moved away: their old address leads to their new place.
+     */
     private function nextNumber(DiscussionId $discussionId): PostNumber
     {
-        return PostNumber::after($this->posts->highestNumber($discussionId));
+        $highest = max($this->posts->highestNumber($discussionId)->value ?? 0, $this->redirects->highestMovedNumber($discussionId) ?? 0);
+
+        return $highest === 0 ? PostNumber::first() : new PostNumber($highest + 1);
     }
 
     /**

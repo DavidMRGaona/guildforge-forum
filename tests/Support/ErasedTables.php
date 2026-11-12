@@ -61,6 +61,8 @@ final class ErasedTables
             'forum_discussion_topics',
             'forum_subject_discussions',
             'forum_dice_rolls',
+            'forum_post_redirects',
+            'forum_discussion_redirects',
         ];
     }
 }

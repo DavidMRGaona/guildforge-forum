@@ -16,11 +16,13 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
+use Modules\Forum\Application\DTOs\RedirectTargetDTO;
 use Modules\Forum\Application\DTOs\StartDiscussionDTO;
 use Modules\Forum\Application\Services\ConversationReader;
 use Modules\Forum\Application\Services\DiscussionStarter;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\ForumRedirects;
 use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -64,16 +66,30 @@ final class DiscussionController extends Controller
         private readonly SuspensionService $suspensionService,
         private readonly ModerationProps $moderationProps,
         private readonly CharacterPresenter $characters,
+        private readonly ForumRedirects $redirects,
     ) {}
 
     public function show(Request $request, string $discussion, ?string $post = null): Response|RedirectResponse
     {
         $user = $request->user();
-        $found = $this->discussions->findByNumber((int) Str::before($discussion, '-'));
+        $number = (int) Str::before($discussion, '-');
+        $found = $this->discussions->findByNumber($number);
+
+        // Moderation moved the post (split off) or the whole discussion (merged): its new place
+        if (! $found instanceof Discussion || $post !== null) {
+            $moved = $this->redirects->resolve($user, $number, $post === null ? null : (int) $post);
+            if ($moved instanceof RedirectTargetDTO) {
+                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber), 301);
+            }
+        }
         abort_unless($found instanceof Discussion, 404);
 
+        // A page whose numbers all moved away is asked for by its place
+        $place = $request->query(ForumPresenter::PAGE_QUERY);
+        $place = $post === null && is_string($place) && preg_match('/^[1-9][0-9]{0,5}$/', $place) === 1 ? (int) $place : null;
+
         try {
-            $page = $this->reader->open($user, $found->id(), $post === null ? null : (int) $post);
+            $page = $this->reader->open($user, $found->id(), $post === null ? null : (int) $post, $place);
         } catch (DiscussionNotFoundException) {
             abort(404);
         }
@@ -84,6 +100,10 @@ final class DiscussionController extends Controller
         if ($discussion !== DiscussionSlug::segment((int) $found->number(), $found->title()->value) || ($asked !== null && ($landed !== $asked || $asked === 1))) {
             return redirect()->to($this->urls->discussion($found, $landed), 301);
         }
+        // A page asked for by its place that has posts after all goes by its usual address
+        if ($place !== null && $page->anchorOf($page->pageStart) !== null) {
+            return redirect()->to($this->presenter->pageUrl($page, $page->pageStart), 301);
+        }
 
         $readable = $this->browser->readableCategories($user);
         $first = $page->posts[0] ?? null;
@@ -93,7 +113,7 @@ final class DiscussionController extends Controller
             noindex: ! $page->guestsRead,
         ))->toArray();
         // Each page of posts is one address, whichever of its posts was asked for
-        $seo['canonicalUrl'] = $this->urls->discussion($found, $page->pageStart, absolute: true);
+        $seo['canonicalUrl'] = $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
 
         $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
         $conversation['posts'] = $this->moderationProps->withReportLinks($conversation['posts'], $user);
@@ -123,6 +143,7 @@ final class DiscussionController extends Controller
     private function moderationMenu(Authenticatable $moderator, Discussion $discussion): array
     {
         $targets = $this->moderation->moveTargets($moderator, $discussion);
+        $restructures = $this->moderation->canRestructure($moderator, $discussion);
         $names = [];
         foreach ($this->categories->all() as $category) {
             $names[$category->id()->value] = $category->name();
@@ -132,6 +153,14 @@ final class DiscussionController extends Controller
             'queueUrl' => route('forum.moderation.index'),
             'suspendUrl' => $this->suspensionService->canSuspend($moderator) ? route('forum.suspensions.store') : null,
             'actionsUrl' => route('forum.moderation.discussions', ['discussion' => $discussion->id()->value]),
+            'splitUrl' => $restructures ? route('forum.moderation.discussions.split', ['discussion' => $discussion->id()->value]) : null,
+            'mergeUrl' => $restructures ? route('forum.moderation.discussions.merge', ['discussion' => $discussion->id()->value]) : null,
+            'mergeTargetUrl' => $restructures ? route('forum.moderation.discussions.merge-target', ['discussion' => $discussion->id()->value]) : null,
+            'splitCategories' => array_map(static fn (Category $category): array => [
+                'id' => $category->id()->value,
+                'name' => $category->name(),
+                'parentName' => ($parentId = $category->parentId()) instanceof CategoryId ? ($names[$parentId->value] ?? null) : null,
+            ], $restructures ? $this->moderation->splitCategories($moderator, $discussion) : []),
             'deleteUrl' => $this->moderation->canDelete($moderator, $discussion)
                 ? route('forum.moderation.discussions.destroy', ['discussion' => $discussion->id()->value])
                 : null,
@@ -145,6 +174,7 @@ final class DiscussionController extends Controller
                 'titleMax' => DiscussionStarter::MAX_TITLE_LENGTH,
                 'reasonMax' => ModerationLogEntry::MAX_REASON_LENGTH,
                 'hiddenReasonMax' => Post::MAX_HIDDEN_REASON_LENGTH,
+                'splitMax' => ForumModeration::MAX_SPLIT,
             ],
         ];
     }

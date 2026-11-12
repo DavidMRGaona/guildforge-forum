@@ -25,6 +25,7 @@ use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\Repositories\RedirectRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ReportRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -56,7 +57,11 @@ final readonly class ForumModeration
         private ModerationLogger $logger,
         private DiscussionAnnouncer $announcer,
         private ReportRepositoryInterface $reports,
+        private RedirectRepositoryInterface $redirects,
     ) {}
+
+    /** At most this many posts are split off at once */
+    public const int MAX_SPLIT = 500;
 
     /**
      * @throws DiscussionNotFoundException
@@ -125,11 +130,7 @@ final readonly class ForumModeration
      */
     public function rename(Authenticatable $moderator, DiscussionId $id, string $title): Discussion
     {
-        $title = trim((string) preg_replace('/\s+/u', ' ', $title));
-        $length = mb_strlen($title);
-        if ($length < DiscussionStarter::MIN_TITLE_LENGTH || $length > DiscussionStarter::MAX_TITLE_LENGTH) {
-            throw ModerationRefusedException::title();
-        }
+        $title = $this->checkedTitle($title);
 
         $before = $this->moderated($moderator, $id)->title()->value;
 
@@ -196,6 +197,150 @@ final readonly class ForumModeration
             $this->categories->all(),
             fn (Category $category): bool => ! $category->id()->equals($discussion->categoryId()) && $this->isMoveTarget($moderator, $category),
         ));
+    }
+
+    /**
+     * Whether the person may split posts off the discussion or merge it into another: they
+     * moderate it, it is not a publication's own discussion and it does not await approval.
+     */
+    public function canRestructure(?Authenticatable $user, Discussion $discussion): bool
+    {
+        return $user instanceof Authenticatable
+            && ! $discussion->isAwaitingApproval()
+            && $this->access->canModerate($user, $discussion)
+            && ! $this->subjects->findByDiscussion($discussion->id()) instanceof SubjectDiscussion;
+    }
+
+    /**
+     * Where posts split off the discussion may go: its own category first, then every other
+     * the moderator may move discussions into.
+     *
+     * @return list<Category>
+     */
+    public function splitCategories(Authenticatable $moderator, Discussion $discussion): array
+    {
+        if (! $this->canRestructure($moderator, $discussion)) {
+            return [];
+        }
+
+        $own = $this->categories->find($discussion->categoryId());
+
+        return [
+            // Its own one too, unless it is hidden for want of its module: nothing new goes there
+            ...($own instanceof Category && $this->policy->isAvailable($own) ? [$own] : []),
+            ...array_values(array_filter(
+                $this->categories->all(),
+                fn (Category $category): bool => ! $category->id()->equals($discussion->categoryId()) && $this->isMoveTarget($moderator, $category),
+            )),
+        ];
+    }
+
+    /**
+     * Splits numbered posts off the discussion (never its first) into a new one with its own
+     * title, in its category or another the moderator may move discussions into. They are
+     * numbered from 1 there, in their order; the original keeps its gaps, and each old address
+     * leads to the post's new place. Logged on the original.
+     *
+     * @param  list<int>  $numbers
+     *
+     * @throws DiscussionNotFoundException
+     * @throws ForumActionDeniedException
+     * @throws ModerationRefusedException
+     */
+    public function split(Authenticatable $moderator, DiscussionId $id, array $numbers, string $title, CategoryId $categoryId, ?string $reason = null): Discussion
+    {
+        $discussion = $this->moderated($moderator, $id);
+        $this->assertRestructurable($discussion);
+
+        $unique = array_values(array_unique($numbers));
+        if ($numbers === [] || count($unique) !== count($numbers) || count($numbers) > self::MAX_SPLIT || min($numbers) < 2) {
+            throw ModerationRefusedException::splitSelection();
+        }
+        sort($unique);
+        if (count($this->posts->withNumbers($id, $unique)) !== count($unique)) {
+            throw ModerationRefusedException::splitSelection();
+        }
+
+        $title = $this->checkedTitle($title);
+        $target = $this->categories->find($categoryId);
+        $allowed = $target instanceof Category && ($categoryId->equals($discussion->categoryId())
+            ? $this->policy->isAvailable($target)
+            : $this->isMoveTarget($moderator, $target));
+        if (! $allowed) {
+            throw ModerationRefusedException::moveTarget($categoryId->value);
+        }
+        $this->checkedReason($reason);
+
+        return DB::transaction(function () use ($moderator, $discussion, $unique, $title, $categoryId, $reason): Discussion {
+            $moved = $this->writer->splitDiscussion($discussion->id(), $unique, $categoryId, new DiscussionTitle($title), CarbonImmutable::now());
+            $this->logger->record(ModerationAction::DiscussionSplit, $moderator, $discussion, reason: $reason, details: [
+                'to_number' => $moved->discussion->number(),
+                'to_title' => $moved->discussion->title()->value,
+                'posts' => $moved->count(),
+                'numbers' => implode(', ', $unique),
+            ]);
+
+            return $moved->discussion;
+        });
+    }
+
+    /**
+     * The discussion the moderator may merge this one into, by its public number (or the
+     * number a discussion had before it was merged into another).
+     *
+     * @throws DiscussionNotFoundException when there is none the moderator may read
+     * @throws ModerationRefusedException
+     */
+    public function mergeTarget(Authenticatable $moderator, Discussion $absorbed, int $number): Discussion
+    {
+        $target = $this->discussions->findByNumber($number);
+        if (! $target instanceof Discussion) {
+            $into = $this->redirects->mergedDiscussion($number)?->into;
+            $target = $into instanceof DiscussionId ? $this->discussions->find($into) : null;
+        }
+
+        if (! $target instanceof Discussion || ! $this->access->canRead($moderator, $target)) {
+            throw DiscussionNotFoundException::withId((string) $number);
+        }
+
+        $this->assertMergeTarget($moderator, $absorbed, $target);
+
+        return $target;
+    }
+
+    /**
+     * Merges the discussion into another the moderator also moderates: its posts are appended
+     * after that one's last, in the order they were published, and it goes away; its address
+     * and its posts' lead to their new place. Logged on the merged discussion.
+     *
+     * @return Discussion the discussion it joined
+     *
+     * @throws DiscussionNotFoundException
+     * @throws ForumActionDeniedException
+     * @throws ModerationRefusedException
+     */
+    public function merge(Authenticatable $moderator, DiscussionId $id, DiscussionId $intoId, ?string $reason = null): Discussion
+    {
+        $absorbed = $this->moderated($moderator, $id);
+        $this->assertRestructurable($absorbed);
+
+        $into = $this->discussions->find($intoId);
+        if (! $into instanceof Discussion || ! $this->access->canRead($moderator, $into)) {
+            throw DiscussionNotFoundException::withId($intoId->value);
+        }
+        $this->assertMergeTarget($moderator, $absorbed, $into);
+        $this->checkedReason($reason);
+
+        return DB::transaction(function () use ($moderator, $absorbed, $into, $reason): Discussion {
+            $moved = $this->writer->mergeDiscussion($absorbed->id(), $into->id(), CarbonImmutable::now());
+            $this->logger->record(ModerationAction::DiscussionMerged, $moderator, $absorbed, reason: $reason, details: [
+                'to_number' => $into->number(),
+                'to_title' => $into->title()->value,
+                'posts' => $moved->count(),
+            ]);
+
+            return $this->discussions->findOrFail($into->id());
+        });
     }
 
     /**
@@ -469,6 +614,51 @@ final readonly class ForumModeration
         }
 
         return [$post, $discussion];
+    }
+
+    /**
+     * @throws ModerationRefusedException
+     */
+    private function assertRestructurable(Discussion $discussion): void
+    {
+        if ($this->subjects->findByDiscussion($discussion->id()) instanceof SubjectDiscussion) {
+            throw ModerationRefusedException::automaticDiscussion($discussion->id()->value);
+        }
+
+        if ($discussion->isAwaitingApproval()) {
+            throw ModerationRefusedException::awaitingApproval($discussion->id()->value);
+        }
+    }
+
+    /**
+     * @throws ModerationRefusedException
+     */
+    private function assertMergeTarget(Authenticatable $moderator, Discussion $absorbed, Discussion $target): void
+    {
+        // Never into a discussion hidden for want of its category's module
+        $category = $this->categories->find($target->categoryId());
+        if ($target->id()->equals($absorbed->id()) || ! $this->access->canModerate($moderator, $target)
+            || ! $category instanceof Category || ! $this->policy->isAvailable($category)) {
+            throw ModerationRefusedException::mergeTarget($target->id()->value);
+        }
+
+        $this->assertRestructurable($target);
+    }
+
+    /**
+     * The title with its spaces tidied.
+     *
+     * @throws ModerationRefusedException for a title out of bounds
+     */
+    private function checkedTitle(string $title): string
+    {
+        $title = trim((string) preg_replace('/\s+/u', ' ', $title));
+        $length = mb_strlen($title);
+        if ($length < DiscussionStarter::MIN_TITLE_LENGTH || $length > DiscussionStarter::MAX_TITLE_LENGTH) {
+            throw ModerationRefusedException::title();
+        }
+
+        return $title;
     }
 
     private function isMoveTarget(Authenticatable $moderator, Category $category): bool

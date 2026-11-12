@@ -25,10 +25,15 @@ const props = withDefaults(
         askReason?: boolean;
         reasonMax?: number;
         askTitle?: boolean;
+        /** The title field's label (a new title by default) */
+        titleLabel?: string | null;
         initialTitle?: string;
         titleMin?: number;
         titleMax?: number;
         moveTargets?: ForumMoveTarget[];
+        /** The category field's label («Mover a» by default) and the one it starts on */
+        categoryLabel?: string | null;
+        initialCategory?: string;
         confirmation?: string | null;
         busy?: boolean;
         error?: string | null;
@@ -39,10 +44,13 @@ const props = withDefaults(
         askReason: false,
         reasonMax: 500,
         askTitle: false,
+        titleLabel: null,
         initialTitle: '',
         titleMin: 3,
         titleMax: 120,
         moveTargets: () => [],
+        categoryLabel: null,
+        initialCategory: '',
         confirmation: null,
         busy: false,
         error: null,
@@ -80,7 +88,7 @@ watch(
         if (isOpen) {
             reason.value = '';
             newTitle.value = props.initialTitle;
-            category.value = '';
+            category.value = props.initialCategory;
             confirmed.value = false;
             dialog.value?.showModal();
         } else {
@@ -109,7 +117,7 @@ function submit(): void {
     <Teleport to="body">
         <dialog
             ref="dialog"
-            class="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border-0 bg-transparent p-0 backdrop:bg-neutral-900/60"
+            class="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-lg border-0 bg-transparent p-0 backdrop:bg-neutral-900/60"
             :aria-labelledby="`moderation-dialog-${uid}`"
             @cancel.prevent="cancel"
         >
@@ -127,7 +135,7 @@ function submit(): void {
                         :for="`moderation-title-${uid}`"
                         class="block text-sm font-medium text-base-primary"
                     >
-                        {{ t('forum.moderation.fields.title') }}
+                        {{ titleLabel ?? t('forum.moderation.fields.title') }}
                     </label>
                     <input
                         :id="`moderation-title-${uid}`"
@@ -151,7 +159,7 @@ function submit(): void {
                         :for="`moderation-category-${uid}`"
                         class="block text-sm font-medium text-base-primary"
                     >
-                        {{ t('forum.moderation.fields.category') }}
+                        {{ categoryLabel ?? t('forum.moderation.fields.category') }}
                     </label>
                     <select
                         :id="`moderation-category-${uid}`"

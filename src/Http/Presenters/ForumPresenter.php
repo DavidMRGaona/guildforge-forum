@@ -10,12 +10,14 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
+use Modules\Forum\Application\DTOs\MovedPostsDTO;
 use Modules\Forum\Application\DTOs\PostContentDTO;
 use Modules\Forum\Application\DTOs\PostLikesDTO;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
+use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -31,12 +33,16 @@ use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
  */
 final readonly class ForumPresenter
 {
+    /** The query that asks a discussion's page by its place, for a page whose numbers all moved away */
+    public const string PAGE_QUERY = 'pagina';
+
     public function __construct(
         private ForumUrlsInterface $urls,
         private AccountDirectoryInterface $accounts,
         private TimezoneServiceInterface $timezone,
         private CategoryStatsQueryInterface $stats,
         private CharacterPresenter $characters,
+        private MovedPostsQueryInterface $moved,
     ) {}
 
     /**
@@ -146,7 +152,16 @@ final readonly class ForumPresenter
             ...array_map(static fn (DiscussionRowDTO $row): ?string => $row->lastPostAuthorId, $rows),
         ])));
 
-        $present = fn (DiscussionRowDTO $row): array => $this->discussionRow($row, $categories[$row->categoryId] ?? null, $names);
+        // Where a row resumes when the first unread number moved away: the first post after it
+        $resumeFrom = [];
+        foreach ($rows as $row) {
+            if ($row->lastReadNumber !== null && $row->lastReadNumber > 0 && $row->lastPostNumber !== null && $row->lastReadNumber < $row->lastPostNumber) {
+                $resumeFrom[$row->id] = $row->lastReadNumber + 1;
+            }
+        }
+        $resume = $this->moved->resumeAfterMoves($resumeFrom);
+
+        $present = fn (DiscussionRowDTO $row): array => $this->discussionRow($row, $categories[$row->categoryId] ?? null, $names, $resume[$row->id] ?? null);
 
         return [
             'pinned' => array_map($present, $page->pinned),
@@ -179,7 +194,7 @@ final readonly class ForumPresenter
             }
         }
 
-        $pageUrl = fn (int $start): string => $this->urls->discussion($discussion, $start);
+        $pageUrl = fn (int $start): string => $this->pageUrl($page, $start);
         $lastStart = ($page->pageCount() - 1) * $page->perPage + 1;
 
         return [
@@ -208,10 +223,33 @@ final readonly class ForumPresenter
                 'nextUrl' => $page->hasNext() ? $pageUrl($page->pageStart + $page->perPage) : null,
                 'lastUrl' => $page->hasNext() ? $pageUrl($lastStart) : null,
             ],
+            // Where the page's posts that moderation moved away went, in their place
+            'moved' => array_map(fn (MovedPostsDTO $moved): array => [
+                'fromNumber' => $moved->fromNumber,
+                'throughNumber' => $moved->throughNumber,
+                'count' => $moved->count,
+                'title' => $moved->target?->title()->value,
+                'url' => $moved->target instanceof Discussion ? $this->urls->discussion($moved->target, $moved->targetNumber) : null,
+            ], $page->moved),
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
             'mentionNames' => $mentionNames,
         ];
+    }
+
+    /**
+     * The address of the discussion's page starting at `$start`: by its first number, by its
+     * first post's when that number moved away (its address leads where it went), or by its
+     * place (?pagina=) when all its numbers did.
+     */
+    public function pageUrl(ConversationPageDTO $page, int $start, bool $absolute = false): string
+    {
+        $anchor = $page->anchorOf($start);
+        if ($anchor !== null) {
+            return $this->urls->discussion($page->discussion, $anchor, $absolute);
+        }
+
+        return $this->urls->discussion($page->discussion, absolute: $absolute).'?'.http_build_query([self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1]);
     }
 
     /**
@@ -366,7 +404,7 @@ final readonly class ForumPresenter
      * @param  array<string, string>  $names
      * @return array<string, mixed>
      */
-    private function discussionRow(DiscussionRowDTO $row, ?Category $category, array $names): array
+    private function discussionRow(DiscussionRowDTO $row, ?Category $category, array $names, ?int $resumeAt = null): array
     {
         $unreadCount = $row->lastReadNumber === null || $row->lastPostNumber === null
             ? null
@@ -380,7 +418,7 @@ final readonly class ForumPresenter
             // Where reading should resume: the first unread post, or the last one once all is read
             'resumeUrl' => $row->lastReadNumber === null || $row->lastPostNumber === null || $row->lastReadNumber === 0
                 ? null
-                : $this->urls->discussionFrom($row->number, $row->title, min($row->lastReadNumber + 1, $row->lastPostNumber)),
+                : $this->urls->discussionFrom($row->number, $row->title, min($resumeAt ?? $row->lastReadNumber + 1, $row->lastPostNumber)),
             'category' => $category instanceof Category
                 ? ['name' => $category->name(), 'url' => $this->urls->category($category), 'color' => $category->appearance()->color]
                 : null,

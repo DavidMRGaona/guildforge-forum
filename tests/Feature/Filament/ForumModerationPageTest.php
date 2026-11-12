@@ -158,6 +158,23 @@ final class ForumModerationPageTest extends ModuleTestCase
             ->assertCountTableRecords(1);
     }
 
+    public function test_the_history_says_where_split_and_merged_posts_went(): void
+    {
+        $moderator = $this->panelUser([self::MODERATE]);
+        $this->actingAs($moderator);
+        [$discussion] = $this->aDiscussion($this->general);
+        $this->aReply($discussion, '2026-11-10 18:10:00');
+        $this->aReply($discussion, '2026-11-10 18:20:00');
+        $split = app(ForumModeration::class)->split($moderator, $discussion->id(), [2, 3], 'Otro asunto', $this->general->id());
+        [$into] = $this->aDiscussion($this->general, '2026-11-11 10:00:00', title: 'Destino');
+        app(ForumModeration::class)->merge($moderator, $split->id(), $into->id());
+
+        Livewire::test(ForumModerationPage::class)->set('activeTab', ForumModerationPage::TAB_HISTORY)
+            ->assertTableColumnFormattedStateSet('action', 'Mensajes separados', ModerationLogModel::query()->where('action', ModerationAction::DiscussionSplit->value)->sole())
+            ->assertTableColumnStateSet('details', '2 mensajes (2, 3) a «Otro asunto» (tema 2)', ModerationLogModel::query()->where('action', ModerationAction::DiscussionSplit->value)->sole())
+            ->assertTableColumnStateSet('details', '2 mensajes a «Destino» (tema 3)', ModerationLogModel::query()->where('action', ModerationAction::DiscussionMerged->value)->sole());
+    }
+
     public function test_a_link_opens_its_tab(): void
     {
         $this->actingAs($this->panelUser([self::MODERATE]));

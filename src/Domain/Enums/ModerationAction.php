@@ -18,6 +18,8 @@ enum ModerationAction: string
     case DiscussionRenamed = 'discussion_renamed';
     case DiscussionMoved = 'discussion_moved';
     case DiscussionDeleted = 'discussion_deleted';
+    case DiscussionSplit = 'discussion_split';
+    case DiscussionMerged = 'discussion_merged';
     case PostHidden = 'post_hidden';
     case PostShown = 'post_shown';
     case PostEdited = 'post_edited';

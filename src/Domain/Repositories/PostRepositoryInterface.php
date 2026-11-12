@@ -52,6 +52,29 @@ interface PostRepositoryInterface
     public function numberedFrom(DiscussionId $discussionId, PostNumber $from, int $limit): array;
 
     /**
+     * The numbered posts of the discussion whose numbers lie in the range (both ends included),
+     * in order, whatever their status: one page of it, which holds fewer posts where some left.
+     *
+     * @return list<Post>
+     */
+    public function numberedBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): array;
+
+    /**
+     * The lowest number of a numbered post of the discussion in the range (both ends included);
+     * null when every number of it moved away.
+     */
+    public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber;
+
+    /**
+     * The numbered posts of the discussion that have these numbers, in order; numbers it does
+     * not have are left out.
+     *
+     * @param  list<int>  $numbers
+     * @return list<Post>
+     */
+    public function withNumbers(DiscussionId $discussionId, array $numbers): array;
+
+    /**
      * The last `limit` numbered posts of the discussion from `from` on and below `before` (to
      * the end when null), in order, whatever their status: a conversation read from its end.
      *

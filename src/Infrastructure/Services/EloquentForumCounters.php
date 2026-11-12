@@ -33,12 +33,15 @@ final class EloquentForumCounters implements ForumCountersInterface
             ->where('discussion_id', $id->value)
             ->where('status', PostStatus::Visible->value);
 
-        $last = (clone $visible)->orderByDesc('number')->first(['id', 'published_at']);
+        $last = (clone $visible)->orderByDesc('number')->first(['id']);
+        // The latest publication, not the last number: posts merged in after the last one are
+        // older, and joining them does not make the discussion look older
+        $latest = (clone $visible)->orderByDesc('published_at')->orderByDesc('number')->first(['id', 'published_at']);
 
         DiscussionModel::query()->whereKey($id->value)->toBase()->update([
             'post_count' => (clone $visible)->count(),
             'last_post_id' => $last?->id,
-            'last_activity_at' => $last instanceof PostModel ? $last->getRawOriginal('published_at') : $discussion->getRawOriginal('created_at'),
+            'last_activity_at' => $latest instanceof PostModel ? $latest->getRawOriginal('published_at') : $discussion->getRawOriginal('created_at'),
         ]);
     }
 

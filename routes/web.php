@@ -118,6 +118,15 @@ Route::prefix('foro')
                 Route::delete('temas/{discussion}', [ModerationController::class, 'destroyDiscussion'])
                     ->whereUuid('discussion')
                     ->name('moderation.discussions.destroy');
+                Route::post('temas/{discussion}/separar', [ModerationController::class, 'split'])
+                    ->whereUuid('discussion')
+                    ->name('moderation.discussions.split');
+                Route::post('temas/{discussion}/unir', [ModerationController::class, 'merge'])
+                    ->whereUuid('discussion')
+                    ->name('moderation.discussions.merge');
+                Route::get('temas/{discussion}/unir/destino', [ModerationController::class, 'mergeTarget'])
+                    ->whereUuid('discussion')
+                    ->name('moderation.discussions.merge-target');
                 Route::post('mensajes/{post}/moderacion', [ModerationController::class, 'post'])
                     ->whereUuid('post')
                     ->name('moderation.posts');

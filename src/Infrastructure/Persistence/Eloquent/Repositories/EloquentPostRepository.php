@@ -101,6 +101,42 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function numberedBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): array
+    {
+        return array_values(PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->whereBetween('number', [$from->value, $through->value])
+            ->orderBy('number')
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all());
+    }
+
+    public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber
+    {
+        $first = PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->whereBetween('number', [$from->value, $through->value])
+            ->min('number');
+
+        return is_numeric($first) ? new PostNumber((int) $first) : null;
+    }
+
+    public function withNumbers(DiscussionId $discussionId, array $numbers): array
+    {
+        if ($numbers === []) {
+            return [];
+        }
+
+        return array_values(PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->whereIn('number', $numbers)
+            ->orderBy('number')
+            ->get()
+            ->map(fn (PostModel $model): Post => $this->toEntity($model))
+            ->all());
+    }
+
     public function lastNumbered(DiscussionId $discussionId, PostNumber $from, ?PostNumber $before, int $limit): array
     {
         $query = PostModel::query()

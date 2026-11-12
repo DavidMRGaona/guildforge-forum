@@ -112,6 +112,11 @@ export default {
             markCategoryRead: 'Marcar como leída la categoría {name}',
         },
         posts: {
+            moved: {
+                to: 'Un mensaje movido a | {count} mensajes movidos a',
+                elsewhere: 'Un mensaje movido a otro tema | {count} mensajes movidos a otro tema',
+                numbers: 'n.º {numbers}',
+            },
             reply: 'Responder',
             replyLabel: 'Tu respuesta',
             replyGoesLast: 'Tu respuesta se publicará al final del tema.',
@@ -191,6 +196,10 @@ export default {
                 categoryPlaceholder: 'Elige una categoría',
                 reason: 'Motivo (opcional)',
                 reasonHelp: 'Queda en el historial de moderación.',
+                splitTitle: 'Título del tema nuevo',
+                splitCategory: 'Categoría del tema nuevo',
+                mergeTarget: 'Tema destino',
+                mergeTargetHelp: 'Su número o su dirección, por ejemplo 42 o /foro/t/42-su-titulo.',
             },
             discussion: {
                 menu: 'Moderar',
@@ -213,6 +222,31 @@ export default {
                     'Se borrarán el tema y todos sus mensajes para siempre. Si solo quieres retirarlo, ocúltalo.',
                 deleteConfirmation:
                     'Entiendo que se borran todos los mensajes y que no se puede deshacer',
+                split: 'Separar mensajes',
+                splitChoosing: 'Elige los mensajes que pasan a un tema nuevo',
+                splitChoosingHelp:
+                    'Marca sus casillas; puedes cambiar de página sin perder lo elegido. El primer mensaje se queda.',
+                splitPick: 'Elegir el mensaje n.º {number}',
+                splitChosen:
+                    'Ningún mensaje elegido | 1 mensaje elegido | {count} mensajes elegidos',
+                splitContinue: 'Separar…',
+                splitCancel: 'Cancelar',
+                splitTitle: 'Separar mensajes en un tema nuevo',
+                splitMessage:
+                    'Pasarán al tema nuevo, numerados desde 1: n.º {numbers}. Aquí quedará un aviso con el enlace.',
+                splitConfirm: 'Separar',
+                splitConfirmation:
+                    'Entiendo que los mensajes salen de este tema y que no se puede deshacer',
+                merge: 'Unir a otro tema',
+                mergeTitle: 'Unir este tema a otro',
+                mergeMessage:
+                    'Sus mensajes pasarán al final del tema destino y este tema desaparecerá. Sus enlaces llevarán al destino.',
+                mergeLookup: 'Buscar',
+                mergeFound: 'Se unirá a «{title}»',
+                mergeFoundIn: 'en {category}',
+                mergeConfirm: 'Unir',
+                mergeConfirmation:
+                    'Entiendo que este tema desaparece dentro del destino y que no se puede deshacer',
             },
             post: {
                 menu: 'Moderar',

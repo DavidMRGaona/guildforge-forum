@@ -622,6 +622,15 @@ final class ForumModerationPage extends Page implements HasTable
             ModerationAction::DiscussionRenamed->value => __('forum::messages.moderation.details.renamed', ['from' => (string) $from, 'to' => (string) $to]),
             ModerationAction::DiscussionMoved->value => __('forum::messages.moderation.details.moved', ['from' => (string) $from, 'to' => (string) $to]),
             ModerationAction::DiscussionDeleted->value => __('forum::messages.moderation.details.posts', ['count' => (int) ($details['posts'] ?? 0)]),
+            ModerationAction::DiscussionSplit->value => trans_choice('forum::messages.moderation.details.split', (int) ($details['posts'] ?? 0), [
+                'numbers' => (string) ($details['numbers'] ?? ''),
+                'title' => (string) ($details['to_title'] ?? ''),
+                'number' => (string) ($details['to_number'] ?? ''),
+            ]),
+            ModerationAction::DiscussionMerged->value => trans_choice('forum::messages.moderation.details.merged', (int) ($details['posts'] ?? 0), [
+                'title' => (string) ($details['to_title'] ?? ''),
+                'number' => (string) ($details['to_number'] ?? ''),
+            ]),
             ModerationAction::PostRejected->value => ($details['whole_discussion'] ?? false) === true ? __('forum::messages.moderation.details.whole_discussion') : null,
             ModerationAction::ReportResolved->value => __('forum::messages.moderation.details.resolved', [
                 'resolution' => self::label('forum::messages.reports.resolutions.'.(ReportResolution::tryFrom((string) ($details['resolution'] ?? '')) ?? ReportResolution::NoAction)->value, ''),

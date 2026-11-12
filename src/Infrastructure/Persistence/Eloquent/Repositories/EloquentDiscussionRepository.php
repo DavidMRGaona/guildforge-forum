@@ -56,7 +56,8 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
 
     public function nextNumber(): int
     {
-        return (int) DiscussionModel::query()->max('number') + 1;
+        // A merged discussion's number still leads to the one it joined: never given again
+        return max((int) DiscussionModel::query()->max('number'), (int) DB::table(EloquentRedirectRepository::DISCUSSIONS)->max('from_number')) + 1;
     }
 
     public function findForUpdate(DiscussionId $id): Discussion

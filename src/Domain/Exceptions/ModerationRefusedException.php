@@ -32,6 +32,16 @@ final class ModerationRefusedException extends RuntimeException
         return new self("Discussion {$discussionId} belongs to a publication and stays where the forum put it.", 'automatic_discussion');
     }
 
+    public static function splitSelection(): self
+    {
+        return new self('Only numbered posts after the first one, each once, can be split off.', 'split_selection');
+    }
+
+    public static function mergeTarget(string $discussionId): self
+    {
+        return new self("Discussion {$discussionId} cannot take this merge.", 'merge_target');
+    }
+
     public static function title(): self
     {
         return new self('The title is out of bounds.', 'title');

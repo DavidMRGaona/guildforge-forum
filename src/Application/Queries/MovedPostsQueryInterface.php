@@ -28,4 +28,14 @@ interface MovedPostsQueryInterface
      * @return array<string, int> by discussion id
      */
     public function resumeAfterMoves(array $numbers): array;
+
+    /**
+     * How many numbers in (after, through] left each discussion: the gaps inside what a reader
+     * has not read, to subtract from the span of numbers when counting the posts that are left.
+     * Discussions with none are left out.
+     *
+     * @param  array<string, array{after: int, through: int}>  $ranges  by discussion id
+     * @return array<string, int> by discussion id
+     */
+    public function countInRanges(array $ranges): array;
 }

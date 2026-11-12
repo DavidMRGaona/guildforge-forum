@@ -278,6 +278,11 @@ export default {
             listChanged: 'Un tema tiene novedades | {count} temas tienen novedades',
             refreshList: 'Actualizar la lista',
             updated: 'Con novedades',
+            unreadFollowed:
+                'Hay un tema sin leer entre los que sigues en el foro | Hay {count} temas sin leer entre los que sigues en el foro',
+            unreadFollowedMany: 'Hay muchos temas sin leer entre los que sigues en el foro',
+            unreadFollowedBadge: 'un tema sin leer | {count} temas sin leer',
+            unreadFollowedBadgeMany: 'muchos temas sin leer',
         },
         subjects: {
             title: 'Conversación',

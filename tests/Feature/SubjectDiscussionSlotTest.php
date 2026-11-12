@@ -27,4 +27,15 @@ final class SubjectDiscussionSlotTest extends ModuleTestCase
         $this->assertSame('components/subjects/SubjectConversation.vue', $registration['component']);
         $this->assertFileExists(__DIR__.'/../../resources/js/'.$registration['component']);
     }
+
+    public function test_it_marks_the_menu_from_the_after_header_slot(): void
+    {
+        $payload = app(ModuleSlotRegistryInterface::class)->toInertiaPayload();
+
+        $this->assertArrayHasKey('after-header', $payload);
+        $registration = collect($payload['after-header'])->firstWhere('module', 'forum');
+        $this->assertIsArray($registration);
+        $this->assertSame('components/live/ForumMenuPulse.vue', $registration['component']);
+        $this->assertFileExists(__DIR__.'/../../resources/js/'.$registration['component']);
+    }
 }

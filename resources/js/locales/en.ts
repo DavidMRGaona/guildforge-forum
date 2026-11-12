@@ -275,6 +275,11 @@ export default {
             listChanged: 'One discussion has news | {count} discussions have news',
             refreshList: 'Refresh the list',
             updated: 'Has news',
+            unreadFollowed:
+                'One discussion you follow in the forum is unread | {count} discussions you follow in the forum are unread',
+            unreadFollowedMany: 'Many discussions you follow in the forum are unread',
+            unreadFollowedBadge: 'one unread discussion | {count} unread discussions',
+            unreadFollowedBadgeMany: 'many unread discussions',
         },
         subjects: {
             title: 'Conversation',

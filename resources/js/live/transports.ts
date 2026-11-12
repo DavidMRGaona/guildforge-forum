@@ -8,6 +8,9 @@ export const POSTS_INTERVAL_MS = 20_000;
 /** How often the menu and the lists ask for what changed */
 export const PULSE_INTERVAL_MS = 60_000;
 
+/** The most unread followed discussions the server counts (`ForumPulse::UNREAD_CAP`) */
+export const PULSE_UNREAD_CAP = 100;
+
 /** New posts of a discussion by consultation: the posts after the page's last one */
 export function pollNewPosts(
     discussionId: string | (() => string),

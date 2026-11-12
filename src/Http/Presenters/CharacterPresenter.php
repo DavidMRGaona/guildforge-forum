@@ -132,6 +132,7 @@ final readonly class CharacterPresenter
         return [
             'items' => $items,
             'suggestedId' => null,
+            'categoryId' => null,
             ...$this->form($user, $this->rules->bindableCategories($user)),
         ];
     }
@@ -167,6 +168,7 @@ final readonly class CharacterPresenter
             'categories' => array_map(static fn (Category $category): array => [
                 'id' => $category->id()->value,
                 'name' => $category->name(),
+                'parentId' => $category->parentId()?->value,
                 'parentName' => ($parentId = $category->parentId()) instanceof CategoryId ? ($names[$parentId->value] ?? null) : null,
             ], $categories),
             'limits' => [

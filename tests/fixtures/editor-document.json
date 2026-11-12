@@ -195,6 +195,20 @@
             }
         },
         {
+            "type": "ooc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Vuelvo luego"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             "type": "paragraph",
             "content": [
                 {

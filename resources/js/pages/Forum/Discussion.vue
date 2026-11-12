@@ -103,13 +103,13 @@ function refresh(): void {
     });
 }
 
-async function send(document: JSONContent): Promise<void> {
+async function send(document: JSONContent, characterId: string | null): Promise<void> {
     sending.value = true;
     replyError.value = null;
     const answer = await sendJson<{ post: { number: number | null } }>(
         props.reply.postUrl,
         'POST',
-        { document }
+        { document, character: characterId }
     );
     sending.value = false;
 
@@ -254,6 +254,7 @@ async function send(document: JSONContent): Promise<void> {
                 :focused="post.number !== null && post.number === focusNumber"
                 :can-quote="reply.canPost"
                 :editor="reply"
+                :characters="reply.characters ?? null"
                 :mentions-url="reply.mentionsUrl"
                 :mention-names="allMentionNames"
                 :hidden-reason-max="moderation?.limits.hiddenReasonMax"

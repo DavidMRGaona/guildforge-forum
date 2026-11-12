@@ -45,6 +45,7 @@ describe('the editor document', () => {
                 '<hr>' +
                 `<img data-path="${IMAGE}" alt="Mapa">` +
                 '<div data-forum-roll data-expression="2d6+3" data-reason="Ataque"></div>' +
+                '<aside data-ooc><p>Vuelvo luego</p></aside>' +
                 '<p>Fin</p>'
         ).getJSON();
 

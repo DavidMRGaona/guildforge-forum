@@ -144,6 +144,10 @@ export interface ForumPost {
     moderationUrl: string | null;
     /** Where to report it; null for its author, guests and whoever is suspended */
     reportUrl: string | null;
+    /** Who it speaks as, when the reader may see that character; null out of character */
+    character: ForumPostCharacter | null;
+    /** The character its editor starts from, only for posts the reader may edit */
+    characterId: string | null;
 }
 
 export interface ForumConversation {
@@ -239,6 +243,8 @@ export interface ForumReplySettings extends ForumEditorSettings {
     mentionsUrl: string | null;
     /** Why the reader may not write: a suspension in the forum */
     suspension?: ForumSuspensionNotice | null;
+    /** «Hablar como»: the characters the reader may write as here; null when characters are off for them */
+    characters?: ForumCharacterPicker | null;
 }
 
 export interface ForumCategoryOption {
@@ -357,4 +363,86 @@ export interface ForumNewPosts {
 export interface ForumPulse {
     unreadFollowed: number;
     discussions: Record<string, number>;
+}
+
+/** What every character shows: its name and its portrait, or its initials without one */
+export interface ForumCharacterBasics {
+    id: string;
+    name: string;
+    initials: string;
+    portraitUrl: string | null;
+}
+
+/** What may be done with a character: its owner's and its moderators' addresses */
+export interface ForumCharacterActions {
+    updateUrl: string;
+    /** null once retired (for its owner) or retired by moderation */
+    retireUrl: string | null;
+    /** null unless retired and the viewer may bring it back */
+    restoreUrl: string | null;
+    deleteUrl: string;
+}
+
+/** Who a post speaks as */
+export interface ForumPostCharacter extends ForumCharacterBasics {
+    description: string | null;
+    isRetired: boolean;
+    /** For whoever moderates it; null for everyone else */
+    actions: ForumCharacterActions | null;
+}
+
+export interface ForumCharacterCategory {
+    id: string;
+    name: string;
+    parentId: string | null;
+    parentName: string | null;
+}
+
+export interface ForumCharacterLimits {
+    nameMax: number;
+    descriptionMax: number;
+    portraitKilobytes: number;
+    /** MIME types */
+    portraitTypes: string[];
+    perAccount: number;
+}
+
+/** What the character form needs */
+export interface ForumCharacterForm {
+    /** null when the person may not create characters */
+    createUrl: string | null;
+    /** Where a character of the person may be tied */
+    categories: ForumCharacterCategory[];
+    limits: ForumCharacterLimits;
+}
+
+export interface ForumCharacterOption extends ForumCharacterBasics {
+    /** Where it may be used, when the page chooses the category (starting a discussion) */
+    categoryIds?: string[];
+}
+
+/** The editor's «Hablar como» */
+export interface ForumCharacterPicker extends ForumCharacterForm {
+    items: ForumCharacterOption[];
+    /** The last character the person used in the discussion, still usable */
+    suggestedId: string | null;
+    /** The category the post is written in; null where the page chooses it */
+    categoryId: string | null;
+}
+
+/** A character in its owner's «Personajes» tab */
+export interface ForumOwnedCharacter extends ForumCharacterBasics {
+    description: string | null;
+    categoryId: string | null;
+    categoryName: string | null;
+    isRetired: boolean;
+    isRetirementLocked: boolean;
+    retiredLabel: string | null;
+    /** Deleting it then retires it */
+    hasPosts: boolean;
+    actions: ForumCharacterActions;
+}
+
+export interface ForumCharacterProfile extends ForumCharacterForm {
+    items: ForumOwnedCharacter[];
 }

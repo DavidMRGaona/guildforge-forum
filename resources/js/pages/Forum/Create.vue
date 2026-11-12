@@ -4,6 +4,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import SpeakAsSelect from '../../components/characters/SpeakAsSelect.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import { sendJson } from '../../forum/api';
@@ -12,6 +13,7 @@ import type {
     ForumEditorSettings,
     ForumSuspensionNotice,
     ForumTopic,
+    ForumCharacterPicker,
 } from '../../types/forum';
 
 const props = defineProps<{
@@ -21,6 +23,8 @@ const props = defineProps<{
     storeUrl: string;
     cancelUrl: string;
     editor: ForumEditorSettings;
+    /** «Hablar como»: the reader's characters with where each may be used; null when off for them */
+    characters?: ForumCharacterPicker | null;
     suspension: ForumSuspensionNotice | null;
     limits: { titleMin: number; titleMax: number; topicsMax: number };
 }>();
@@ -28,6 +32,7 @@ const props = defineProps<{
 const { t } = useI18n();
 
 const title = ref('');
+const speaker = ref<string | null>(null);
 const categoryId = ref<string>(
     props.selectedCategoryId ?? (props.categories.length === 1 ? props.categories[0]!.id : '')
 );
@@ -85,6 +90,7 @@ async function submit(document: JSONContent): Promise<void> {
         pinned: canModerate.value && pinned.value,
         closed: canModerate.value && closed.value,
         document,
+        character: speaker.value,
     });
     sending.value = false;
 
@@ -252,6 +258,14 @@ async function submit(document: JSONContent): Promise<void> {
                 <p id="forum-first-post" class="mb-1 text-sm font-medium text-base-primary">
                     {{ t('forum.create.firstPostLabel') }}
                 </p>
+                <SpeakAsSelect
+                    v-if="characters"
+                    v-model="speaker"
+                    class="mb-2"
+                    :picker="characters"
+                    :category-id="categoryId === '' ? null : categoryId"
+                    :disabled="sending"
+                />
                 <PostEditor
                     ref="postEditor"
                     :label="t('forum.create.firstPostLabel')"

@@ -336,3 +336,43 @@
     outline: 2px solid var(--color-primary-500);
     outline-offset: 2px;
 }
+
+/* Characters: their portrait or initials, framed apart from the round account avatars */
+.forum-character-avatar {
+    box-shadow: 0 0 0 2px var(--color-primary-500);
+}
+
+/* An aside out of character: dashed and muted, with its label in words */
+.forum-ooc {
+    margin: 0.75rem 0;
+    border: 1px dashed var(--color-border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--color-bg-muted);
+    color: var(--color-text-secondary);
+    font-size: 0.9375em;
+}
+
+.forum-ooc > :last-child {
+    margin-bottom: 0;
+}
+
+.forum-ooc__label {
+    margin: 0 0 0.25rem !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+/* In the editor the label is not part of the document: the border says it, and so does its button */
+.forum-editor .tiptap aside.forum-ooc::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}

@@ -65,6 +65,8 @@ final class ErasedTables
             'forum_discussion_redirects',
             // Copies of images from other sites: an address and a stored file, nobody's
             'forum_external_images',
+            // Cards of embedded posts: the author named is the post's on the other service, not an account
+            'forum_embeds',
         ];
     }
 }

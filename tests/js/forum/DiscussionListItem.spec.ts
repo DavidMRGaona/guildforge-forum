@@ -20,6 +20,7 @@ function row(overrides: Partial<ForumDiscussionRow> = {}): ForumDiscussionRow {
             atLabel: '10/11/2026 18:00',
             url: '/foro/t/42-mesa-del-viernes/4',
         },
+        lastPostNumber: 4,
         isPinned: false,
         isClosed: false,
         isHidden: false,

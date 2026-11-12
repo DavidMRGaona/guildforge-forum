@@ -178,16 +178,16 @@ describe('SubjectConversation', () => {
         serve({ [BASE]: { status: 500 } });
         const wrapper = await mountIt();
 
-        expect(wrapper.find('[role="status"]').text()).toContain(
+        expect(wrapper.find('p[role="status"]').text()).toContain(
             'No se ha podido cargar la conversación.'
         );
         expect(wrapper.find('section').exists()).toBe(false);
 
         serve({ [BASE]: { body: { conversation: aConversation() } } });
-        await wrapper.find('[role="status"] button').trigger('click');
+        await wrapper.find('p[role="status"] button').trigger('click');
         await flushPromises();
 
-        expect(wrapper.find('[role="status"]').exists()).toBe(false);
+        expect(wrapper.find('p[role="status"]').exists()).toBe(false);
         expect(wrapper.findAll('article')).toHaveLength(5);
     });
 

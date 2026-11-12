@@ -9,6 +9,8 @@ import type { ForumDiscussionRow } from '../../types/forum';
 const props = defineProps<{
     discussion: ForumDiscussionRow;
     showCategory?: boolean;
+    /** The forum says it has newer posts than the ones this row was drawn with */
+    changed?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -49,6 +51,13 @@ const href = computed(() => props.discussion.resumeUrl ?? props.discussion.url);
                         }})
                     </span>
                 </Link>
+                <span
+                    v-if="changed"
+                    class="inline-flex items-center rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"
+                    data-testid="discussion-changed"
+                >
+                    {{ t('forum.live.updated') }}
+                </span>
                 <span
                     v-if="discussion.isPinned"
                     class="inline-flex items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"

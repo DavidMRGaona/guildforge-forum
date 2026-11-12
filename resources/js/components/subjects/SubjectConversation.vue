@@ -4,8 +4,11 @@ import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import ReplyBox from '../forum/ReplyBox.vue';
+import NewPostsNotice from '../live/NewPostsNotice.vue';
 import SubjectConversationThread from './SubjectConversationThread.vue';
+import { useNewPosts } from '../../composables/useNewPosts';
 import { sendJson, subjectConversationUrl } from '../../forum/api';
+import { pollNewPosts } from '../../live/transports';
 import type { ForumPost, ForumSubjectConversation } from '../../types/forum';
 
 /**
@@ -45,9 +48,19 @@ const sending = ref(false);
 const replyError = ref<string | null>(null);
 
 const posts = computed<ForumPost[]>(() => [...earlier.value, ...(conversation.value?.posts ?? [])]);
+// New posts while the page is open, after the last one shown. The opening post is never one of
+// them: nothing at or below the highest number the conversation had is asked for
+const live = useNewPosts({
+    posts: () => posts.value,
+    transport: pollNewPosts(() => conversation.value?.discussion.id ?? ''),
+    enabled: () => conversation.value !== null && !conversation.value.discussion.isClosed,
+    floor: () => conversation.value?.highestNumber ?? 0,
+});
+
 const mentionNames = computed(() => ({
     ...earlierNames.value,
     ...(conversation.value?.mentionNames ?? {}),
+    ...live.mentionNames.value,
 }));
 
 /**
@@ -93,6 +106,8 @@ async function load(): Promise<void> {
     olderNext.value = loaded?.olderNext ?? 0;
     olderError.value = false;
     loads.value++;
+    // What the server just sent is newer than anything that arrived before
+    live.reset();
 }
 
 async function loadOlder(): Promise<void> {
@@ -195,9 +210,9 @@ watch(() => [props.subjectType, props.subjectId], load);
         </div>
 
         <SubjectConversationThread
-            v-if="posts.length > 0"
+            v-if="live.posts.value.length > 0"
             :key="`${loads}-${tracking}`"
-            :posts="posts"
+            :posts="live.posts.value"
             :read-url="tracking ? conversation.readUrl : null"
             :last-read-number="conversation.lastReadNumber"
             :can-quote="conversation.reply.canPost"
@@ -214,6 +229,8 @@ watch(() => [props.subjectType, props.subjectId], load);
                     : t('forum.subjects.emptyReadOnly')
             }}
         </p>
+        <!-- Always drawn: a live region must exist before its text changes to be announced -->
+        <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
 
         <ReplyBox
             ref="reply"

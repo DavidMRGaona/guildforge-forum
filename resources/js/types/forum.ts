@@ -89,6 +89,8 @@ export interface ForumDiscussionRow {
         atLabel: string;
         url: string | null;
     };
+    /** The number of its last post when the page was drawn; null without visible posts */
+    lastPostNumber: number | null;
     isPinned: boolean;
     isClosed: boolean;
     isHidden: boolean;
@@ -340,4 +342,19 @@ export interface ForumSearchBox {
     url: string;
     category: string | null;
     categories: ForumSearchCategoryOption[];
+}
+
+/** What the endpoint of new posts answers (when there are any) */
+export interface ForumNewPosts {
+    posts: ForumPost[];
+    mentionNames: Record<string, string>;
+    highestNumber: number;
+    /** More posts wait: the page asks again at once */
+    more: boolean;
+}
+
+/** What the forum's summary answers: unread followed discussions, and the last post of the ones asked about */
+export interface ForumPulse {
+    unreadFollowed: number;
+    discussions: Record<string, number>;
 }

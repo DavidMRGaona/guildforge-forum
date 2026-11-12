@@ -336,3 +336,16 @@
     outline: 2px solid var(--color-primary-500);
     outline-offset: 2px;
 }
+
+/* The «Foro» link of the site menu, when followed discussions have posts to read. The module
+ * puts the mark on <html> (ForumMenuPulse), so it survives the menu being drawn again. */
+html[data-forum-unread] header a[href='/foro']::after {
+    content: '';
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-inline-start: 0.375rem;
+    border-radius: 9999px;
+    background-color: var(--color-primary-500);
+    vertical-align: middle;
+}

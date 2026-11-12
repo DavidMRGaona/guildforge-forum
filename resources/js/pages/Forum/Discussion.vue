@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -7,10 +7,13 @@ import { EyeOff, Lock, Pin } from '@lucide/vue';
 import { useAuth } from '@/composables/useAuth';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
+import NewPostsNotice from '../../components/live/NewPostsNotice.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import ReplyBox from '../../components/forum/ReplyBox.vue';
 import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
+import { useNewPosts } from '../../composables/useNewPosts';
 import { useReadTracker } from '../../composables/useReadTracker';
+import { pollNewPosts } from '../../live/transports';
 import { sendJson } from '../../forum/api';
 import type {
     ForumConversation,
@@ -48,7 +51,7 @@ const breadcrumbs = computed(() => [
 
 const isLastPage = computed(() => props.pagination.nextUrl === null);
 
-useReadTracker({
+const tracker = useReadTracker({
     readUrl: props.readUrl,
     lastReadNumber: props.lastReadNumber,
     container: list,
@@ -59,6 +62,21 @@ useReadTracker({
         }
     },
 });
+
+// New posts after the last one, while the page is open: only where the end of the discussion
+// is on the page (the last one), so what comes in goes right after what the reader has
+const live = useNewPosts({
+    posts: () => props.posts,
+    transport: pollNewPosts(props.discussion.id),
+    enabled: isLastPage,
+});
+const allMentionNames = computed(() => ({ ...props.mentionNames, ...live.mentionNames.value }));
+
+// The tracker watches the posts that arrive too, and counts them read only once they were seen
+watch(
+    () => live.posts.value.length,
+    () => void nextTick(() => tracker.refresh())
+);
 
 onMounted(() => {
     if (props.focusNumber === null) {
@@ -78,7 +96,11 @@ function onQuote(source: { postId: string; text: string }): void {
 }
 
 function refresh(): void {
-    router.reload({ only: ['posts', 'mentionNames'] });
+    router.reload({
+        only: ['posts', 'mentionNames'],
+        // What the page holds is now the server's: what came in afterwards is asked for again
+        onSuccess: () => live.reset(),
+    });
 }
 
 async function send(document: JSONContent): Promise<void> {
@@ -226,14 +248,14 @@ async function send(document: JSONContent): Promise<void> {
 
         <div ref="list" class="space-y-4">
             <PostItem
-                v-for="post in posts"
+                v-for="post in live.posts.value"
                 :key="post.id"
                 :post="post"
                 :focused="post.number !== null && post.number === focusNumber"
                 :can-quote="reply.canPost"
                 :editor="reply"
                 :mentions-url="reply.mentionsUrl"
-                :mention-names="mentionNames"
+                :mention-names="allMentionNames"
                 :hidden-reason-max="moderation?.limits.hiddenReasonMax"
                 :reason-max="moderation?.limits.reasonMax"
                 :suspend-url="moderation?.suspendUrl ?? null"
@@ -241,6 +263,7 @@ async function send(document: JSONContent): Promise<void> {
                 @quote="onQuote"
                 @changed="refresh"
             />
+            <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
         </div>
 
         <nav

@@ -9,7 +9,7 @@ use App\Application\Mail\DTOs\MailCategoryDTO;
 /**
  * The forum's mail categories, in the «Foro» section of the profile. Their keys are stored with
  * each person's choice, so they never change. Every one also shows notices on the site; likes
- * only there.
+ * only there. Suspensions are the only mandatory one: whoever is suspended must be told why.
  */
 final class ForumMailCategories
 {
@@ -25,6 +25,15 @@ final class ForumMailCategories
     /** Likes of the person's posts: on the site only */
     public const string LIKES = 'forum.likes';
 
+    /** Moderation published a post or discussion of the person that was waiting for approval */
+    public const string APPROVALS = 'forum.approvals';
+
+    /** The person was suspended in the forum: always sent, never held for a digest */
+    public const string SUSPENSIONS = 'forum.suspensions';
+
+    /** For whoever moderates: someone reported a post */
+    public const string REPORTS = 'forum.reports';
+
     private const string SECTION = 'forum::messages.notices.categories.section';
 
     /**
@@ -37,6 +46,17 @@ final class ForumMailCategories
             self::category(self::DISCUSSIONS, 'discussions', digestible: true),
             self::category(self::MENTIONS, 'mentions'),
             self::category(self::LIKES, 'likes', mail: false),
+            self::category(self::APPROVALS, 'approvals'),
+            MailCategoryDTO::mandatory(
+                key: self::SUSPENSIONS,
+                section: self::SECTION,
+                label: 'forum::messages.notices.categories.suspensions.label',
+                description: 'forum::messages.notices.categories.suspensions.description',
+                reason: 'forum::messages.notices.categories.suspensions.reason',
+                icon: 'users',
+                site: true,
+            ),
+            self::category(self::REPORTS, 'reports'),
         ];
     }
 

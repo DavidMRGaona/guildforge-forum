@@ -424,6 +424,19 @@ return [
                 'label' => 'Me gusta',
                 'description' => 'Cuando a alguien le gusta un mensaje tuyo. Solo en la web.',
             ],
+            'approvals' => [
+                'label' => 'Mensajes y temas aprobados',
+                'description' => 'Cuando la moderación aprueba un mensaje o un tema tuyo que esperaba revisión.',
+            ],
+            'suspensions' => [
+                'label' => 'Suspensiones en el foro',
+                'description' => 'Cuando la moderación te suspende en el foro, con el motivo y hasta cuándo.',
+                'reason' => 'Te avisa de una restricción en tu cuenta del foro, con su motivo.',
+            ],
+            'reports' => [
+                'label' => 'Denuncias de mensajes',
+                'description' => 'Para quien modera: cuando alguien denuncia un mensaje que te toca revisar. Solo se avisa de la primera denuncia de cada mensaje por correo.',
+            ],
         ],
         'subjects' => [
             'discussion' => 'Tema del foro',
@@ -454,6 +467,22 @@ return [
         ],
         'space' => [
             'title' => 'Te han añadido a la campaña «:campaign»: ya puedes entrar en su espacio del foro',
+        ],
+        'approved' => [
+            'post' => 'Tu mensaje se ha publicado en «:discussion»',
+            'discussion' => 'Tu tema «:discussion» se ha publicado',
+        ],
+        'suspended' => [
+            'until' => 'Se te ha suspendido en el foro hasta el :date',
+            'until_lifted' => 'Se te ha suspendido en el foro hasta que se levante',
+            'reason' => 'Motivo: :reason',
+            'action' => 'Ir al foro',
+        ],
+        'reported' => [
+            'title' => 'Han denunciado un mensaje en «:discussion»',
+            'grouped' => 'Han denunciado :count veces un mensaje en «:discussion»',
+            'reason' => 'Motivo: :reason',
+            'action' => 'Revisar el mensaje',
         ],
     ],
 ];

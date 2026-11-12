@@ -66,7 +66,8 @@ final class GuardedRemoteFetcherTest extends TestCase
         $this->assertIsArray($curl);
         // The connection goes to the address that was checked, not to a second lookup
         $this->assertSame(['i.imgur.com:443:'.self::PUBLIC_IP], $curl[CURLOPT_RESOLVE]);
-        $this->assertSame(1000, $curl[CURLOPT_MAXFILESIZE_LARGE]);
+        // Only the options Guzzle still takes raw: the size is capped by on_headers and the sink
+        $this->assertSame([CURLOPT_RESOLVE], array_keys($curl));
         $this->assertSame(['https'], $options['protocols']);
         // No proxy from the environment
         $this->assertSame('', $options['proxy']);
@@ -201,15 +202,6 @@ final class GuardedRemoteFetcherTest extends TestCase
         $this->answers[] = $this->answer(new Response(200, [], str_repeat('x', 1001)));
 
         $this->assertRefused(RemoteFetchException::TOO_LARGE, 'https://i.imgur.com/a.png', 1000);
-    }
-
-    public function test_a_transfer_cut_for_its_size_is_refused_as_too_large(): void
-    {
-        $this->answers[] = static fn (RequestInterface $request): PromiseInterface => Create::rejectionFor(
-            new RequestException('cURL error 63: Maximum file size exceeded', $request, null, null, ['errno' => 63]),
-        );
-
-        $this->assertRefused(RemoteFetchException::TOO_LARGE, 'https://i.imgur.com/a.png');
     }
 
     public function test_a_body_growing_past_the_limit_stops_the_transfer_as_it_arrives(): void

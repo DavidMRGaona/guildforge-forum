@@ -147,7 +147,7 @@ final class EmbedEndpointsTest extends ModuleTestCase
     public function test_a_post_of_x_shows_its_text_from_the_oembed_markup_without_tags(): void
     {
         $this->fetcher->answer(
-            'https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=https%3A%2F%2Ftwitter.com%2Fi%2Fstatus%2F1790000000000000000',
+            'https://publish.x.com/oembed?omit_script=1&dnt=true&url=https%3A%2F%2Fx.com%2Fi%2Fstatus%2F1790000000000000000',
             (string) json_encode(['author_name' => 'Rolero', 'html' => '<blockquote><p lang="es">Esta noche <a href="https://t.co/x">partida</a> &amp; dados</p>&mdash; Rolero</blockquote>']),
         );
 

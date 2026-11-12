@@ -36,7 +36,8 @@ final class XProvider extends AbstractEmbedProvider
 
     public function oembedUrl(string $id): ?RemoteUrl
     {
-        return $this->oembed('https://publish.twitter.com/oembed?omit_script=1&dnt=true', "https://twitter.com/i/status/{$id}");
+        // publish.twitter.com now answers with a redirect to publish.x.com, another host
+        return $this->oembed('https://publish.x.com/oembed?omit_script=1&dnt=true', "https://x.com/i/status/{$id}");
     }
 
     public function player(string $id, ?EmbedCard $card, string $siteHost): EmbedPlayer

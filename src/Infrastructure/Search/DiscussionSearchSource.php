@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Search;
 
+use App\Application\Search\Contracts\ChecksSearchHits;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Application\Search\DTOs\SearchDocumentDTO;
 use Illuminate\Support\Str;
@@ -12,12 +13,13 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 /**
  * The discussions readers can find: the title and the opening message.
  */
-final readonly class DiscussionSearchSource implements IndexedSearchSourceInterface
+final readonly class DiscussionSearchSource implements ChecksSearchHits, IndexedSearchSourceInterface
 {
     public const string TYPE = 'forum-discussion';
 
     public function __construct(
         private ForumSearchDocuments $documents,
+        private ForumSearchHitChecks $checks,
     ) {}
 
     public function type(): string
@@ -50,6 +52,15 @@ final readonly class DiscussionSearchSource implements IndexedSearchSourceInterf
         $discussion = ForumSearchDocuments::discussions()->whereKey(strtolower($id))->first();
 
         return $discussion instanceof DiscussionModel ? ($this->documents->discussionDocuments([$discussion])[0] ?? null) : null;
+    }
+
+    /**
+     * @param  non-empty-list<string>  $ids
+     * @return list<string>
+     */
+    public function visibleSearchHits(array $ids, ?object $user): array
+    {
+        return $this->checks->discussions($ids, $user);
     }
 
     /**

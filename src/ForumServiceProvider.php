@@ -10,6 +10,7 @@ use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
+use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Domain\Publications\Events\PublicationChanged;
 use App\Domain\Publications\Events\PublicationRemoved;
 use App\Domain\Publications\Events\PublicationRosterChanged;
@@ -45,6 +46,7 @@ use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
 use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
+use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
@@ -86,6 +88,10 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSuspe
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentModerationQueueQuery;
+use Modules\Forum\Infrastructure\Queries\EloquentSearchHitsQuery;
+use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
+use Modules\Forum\Infrastructure\Search\ForumSearchObserver;
+use Modules\Forum\Infrastructure\Search\PostSearchSource;
 use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
@@ -161,6 +167,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
         $this->app->bind(ModerationQueueQueryInterface::class, EloquentModerationQueueQuery::class);
+        $this->app->bind(SearchHitsQueryInterface::class, EloquentSearchHitsQuery::class);
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
 
@@ -215,6 +222,19 @@ final class ForumServiceProvider extends ModuleServiceProvider
         );
         PostModel::saved($observer->saved(...));
         PostModel::deleted($observer->deleted(...));
+
+        // The site search learns at once what was written, moved, hidden, approved or deleted
+        ForumSearchObserver::register();
+    }
+
+    /**
+     * Discussions (title and opening message) and replies, for the site search and the forum's own search.
+     *
+     * @return array<class-string<IndexedSearchSourceInterface>>
+     */
+    public function registerSearchSources(): array
+    {
+        return [DiscussionSearchSource::class, PostSearchSource::class];
     }
 
     /**

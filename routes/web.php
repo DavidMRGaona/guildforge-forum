@@ -9,6 +9,7 @@ use Modules\Forum\Http\Controllers\DiscussionController;
 use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
+use Modules\Forum\Http\Controllers\ForumSearchController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\ModerationController;
 use Modules\Forum\Http\Controllers\ModerationQueueController;
@@ -36,6 +37,10 @@ Route::prefix('foro')
     ->group(function (): void {
         // Public pages: what a reader may not read answers 404, never 403
         Route::get('/', ForumIndexController::class)->name('index');
+        // The forum's own search; the engine is the site's, so a query costs about as much as in /buscar
+        Route::get('buscar', ForumSearchController::class)
+            ->middleware('throttle:60,1,forum-search')
+            ->name('search');
         Route::get('c/{category}', [CategoryController::class, 'show'])
             ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
             ->name('categories.show');

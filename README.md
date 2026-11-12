@@ -225,6 +225,21 @@ Un nodo nuevo (por ejemplo, los apartes fuera de personaje) se añade en los dos
 
 `resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl` (solo a quien tiene el permiso de subir imágenes), `maxImages` e `imageTypes` (de los ajustes), `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
 
+## Búsqueda
+
+El foro ofrece al buscador del sitio dos tipos de documento (`registerSearchSources()`, core ≥ 3.36):
+
+- `forum-discussion`: el título y el mensaje de apertura de cada tema.
+- `forum-post`: cada respuesta (el mensaje nº 1 es del documento de su tema), en su propia dirección `/foro/t/<n>-<título>/<respuesta>`.
+
+En `/buscar` salen como las pestañas «Temas del foro» y «Mensajes del foro».
+
+**Qué se indexa.** La audiencia de un documento sale de la regla de lectura de su categoría: «Cualquiera» es público, «Cuentas» es cualquier cuenta y «Socios» es asociación. Una subcategoría toma la más estricta entre la suya y la de su categoría madre. Lo que el buscador no sabe decir (roles, la plantilla de una campaña) **no se indexa**: falla cerrado, y esos temas se encuentran navegando. Tampoco se indexa lo que está oculto, lo que espera aprobación (temas o respuestas) ni lo que borró su autor. Los autores, los motivos de moderación y los datos privados no llegan nunca al índice.
+
+**Cuándo se actualiza.** Al publicar, editar, aprobar, ocultar, mostrar, mover, renombrar o borrar (`ForumSearchObserver`, sobre los eventos de los modelos; los borrados y los movimientos pasan por el modelo para que los dispare), y cuando cambian el nombre, la lectura o la madre de una categoría (un trabajo en cola, `RefreshForumSearchJob`, que repasa sus temas y respuestas). Un fallo del índice se registra y nunca rompe una escritura del foro. La reconciliación diaria del core (`search:sync`) lo deja todo en su sitio, y al desactivar o desinstalar el módulo vacía sus filas.
+
+**Buscar dentro del foro.** `/foro/buscar?q=<texto>[&categoria=<slug>][&pagina=<n>]` usa el mismo motor (Meilisearch o la base de datos de reserva) limitado a los dos tipos y, además, comprueba cada resultado contra las tablas: un índice atrasado nunca enseña un mensaje que ya está oculto o borrado, ni una categoría que el lector ya no puede leer. Mira los 100 primeros resultados del motor (y avisa si hay más), en páginas de 10. Un fallo del motor da una página con el aviso, nunca un 500. Es una página con `noindex`, con un límite de 60 peticiones por minuto.
+
 ## Permisos
 
 Ninguno se concede solo: cada asociación los da a los roles que cree en el editor de roles. La administración los tiene todos.

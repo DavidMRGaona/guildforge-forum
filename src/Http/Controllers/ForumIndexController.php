@@ -39,6 +39,7 @@ final class ForumIndexController extends Controller
         return Inertia::render('Forum/Index', [
             'categories' => $this->presenter->categoryTree($readable),
             ...$this->listProps($request, $readable, pinnedFirst: false, baseUrl: $this->urls->index()),
+            'search' => $this->presenter->searchBox($readable),
             'canStart' => array_filter($readable, static fn (CategoryAccessDTO $access): bool => $access->canStartDiscussions()) !== [],
             'newDiscussionUrl' => route('forum.discussions.create'),
             'markReadUrl' => $reader === null ? null : route('forum.read'),

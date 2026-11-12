@@ -3,16 +3,23 @@ import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { Plus, ShieldCheck } from '@lucide/vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
-import type { ForumCategoryCard, ForumDiscussionList, ForumListFilters } from '../../types/forum';
+import type {
+    ForumCategoryCard,
+    ForumDiscussionList,
+    ForumListFilters,
+    ForumSearchBox,
+} from '../../types/forum';
 import CategoryList from '../../components/forum/CategoryList.vue';
 import DiscussionFilters from '../../components/forum/DiscussionFilters.vue';
 import DiscussionList from '../../components/forum/DiscussionList.vue';
+import ForumSearchForm from '../../components/forum/ForumSearchForm.vue';
 import MarkReadButton from '../../components/forum/MarkReadButton.vue';
 
 defineProps<{
     categories: ForumCategoryCard[];
     discussions: ForumDiscussionList;
     filters: ForumListFilters;
+    search: ForumSearchBox;
     canStart: boolean;
     newDiscussionUrl: string;
     markReadUrl: string | null;
@@ -62,6 +69,12 @@ const { t } = useI18n();
     </div>
 
     <div class="mx-auto max-w-7xl space-y-10 px-4 py-8 sm:px-6 lg:px-8">
+        <ForumSearchForm
+            :action="search.url"
+            :category="search.category"
+            :categories="search.categories"
+        />
+
         <section aria-labelledby="forum-categories">
             <h2 id="forum-categories" class="mb-4 text-xl font-semibold text-base-primary">
                 {{ t('forum.categories.title') }}

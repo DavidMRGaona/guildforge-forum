@@ -355,17 +355,17 @@ async function remove(): Promise<void> {
                         </span>
                     </p>
                     <p
-                        class="truncate text-xs text-base-secondary"
+                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
                         data-testid="post-character-player"
                     >
-                        {{
+                        <span class="min-w-0 truncate">{{
                             t('forum.characters.playedBy', {
                                 name: post.authorName ?? t('forum.posts.deletedAccount'),
                             })
-                        }}
+                        }}</span>
                         <span
                             v-if="post.isStarter"
-                            class="ml-1 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-medium text-base-secondary"
+                            class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
                         >
                             {{ t('forum.posts.starter') }}
                         </span>

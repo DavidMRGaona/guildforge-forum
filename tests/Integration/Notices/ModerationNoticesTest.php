@@ -15,6 +15,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\ForumModeration;
@@ -27,6 +28,8 @@ use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\FollowLevel;
 use Modules\Forum\Domain\Enums\ReportReason;
 use Modules\Forum\Domain\Enums\ReportResolution;
+use Modules\Forum\Domain\Events\ForumUserSuspensionLifted;
+use Modules\Forum\Domain\Exceptions\InvalidModerationRecordException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryModerators;
@@ -35,6 +38,7 @@ use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Notifications\PostApprovedNotification;
 use Modules\Forum\Notifications\PostReportedNotification;
 use Modules\Forum\Notifications\ReplyPostedNotification;
+use Modules\Forum\Notifications\SuspensionLiftedNotification;
 use Modules\Forum\Notifications\UserSuspendedNotification;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Tests\Support\Modules\ModuleTestCase;
@@ -200,6 +204,129 @@ final class ModerationNoticesTest extends ModuleTestCase
         $suspended->delete();
 
         $this->assertFalse($notification->shouldSend($suspended, 'site'));
+    }
+
+    // Suspension lifted
+
+    public function test_lifting_a_suspension_tells_the_person_on_the_site_and_by_mail(): void
+    {
+        $suspended = $this->anAccount();
+        $suspension = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Spam', null);
+        $this->mailed = [];
+        $before = app(SiteNotificationServiceInterface::class)->total($suspended);
+
+        $this->suspensions()->lift($this->moderator, $suspension->id(), 'Se ha disculpado');
+
+        $this->assertSame([SuspensionLiftedNotification::class], array_column($this->mailsTo($suspended), 1));
+        $this->assertSame($before + 1, app(SiteNotificationServiceInterface::class)->total($suspended));
+        $notice = $this->latest($suspended);
+        $this->assertSame('Se ha levantado tu suspensión en el foro', $notice->title);
+        $this->assertStringStartsWith('/foro', $notice->url);
+        // Nothing of the reason a moderator gave, nor who lifted it
+        $this->assertStringNotContainsString('disculpado', (string) $notice->body);
+        $this->assertSame([], $this->mailsTo($this->moderator));
+    }
+
+    public function test_the_event_carries_the_suspension_the_person_and_who_lifted_it(): void
+    {
+        $suspended = $this->anAccount();
+        $suspension = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Spam', null);
+        Event::fake([ForumUserSuspensionLifted::class]);
+
+        $this->suspensions()->lift($this->moderator, $suspension->id());
+
+        Event::assertDispatched(ForumUserSuspensionLifted::class, fn (ForumUserSuspensionLifted $event): bool => $event->suspensionId === $suspension->id()->value
+            && $event->userId === strtolower($suspended->id)
+            && $event->liftedBy === strtolower($this->moderator->id));
+    }
+
+    public function test_a_failed_lift_dispatches_nothing(): void
+    {
+        $suspended = $this->anAccount();
+        $suspension = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Spam', null);
+        $this->suspensions()->lift($this->moderator, $suspension->id());
+        Event::fake([ForumUserSuspensionLifted::class]);
+
+        try {
+            $this->suspensions()->lift($this->moderator, $suspension->id());
+            $this->fail('A suspension was lifted twice.');
+        } catch (InvalidModerationRecordException) {
+            // expected
+        }
+
+        Event::assertNotDispatched(ForumUserSuspensionLifted::class);
+    }
+
+    public function test_lifting_an_end_already_past_does_not_announce_anything(): void
+    {
+        $suspended = $this->anAccount();
+        $suspension = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Spam', CarbonImmutable::now()->addHour());
+        $this->mailed = [];
+        $total = app(SiteNotificationServiceInterface::class)->total($suspended);
+        $this->travel(2)->hours();
+        app()->forgetScopedInstances();
+
+        $this->suspensions()->lift($this->moderator, $suspension->id());
+
+        $this->assertSame([], $this->mailsTo($suspended));
+        $this->assertSame($total, app(SiteNotificationServiceInterface::class)->total($suspended));
+    }
+
+    public function test_lifting_one_suspension_while_another_is_in_force_tells_nothing(): void
+    {
+        $suspended = $this->anAccount();
+        $first = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Primera', null);
+        // The newer one replaces the older, which is then lifted by the replacement itself
+        $second = $this->suspensions()->suspend($this->moderator, $suspended->id, 'Segunda', null);
+        $this->mailed = [];
+        $total = app(SiteNotificationServiceInterface::class)->total($suspended);
+
+        // A notice for the replaced one, delivered late, finds the newer suspension in force
+        $notification = new SuspensionLiftedNotification($first->id()->value);
+        $this->assertFalse($notification->shouldSend($suspended, 'mail'));
+        $this->assertFalse($notification->shouldSend($suspended, 'site'));
+        $this->assertSame([], $this->mailsTo($suspended));
+        $this->assertSame($total, app(SiteNotificationServiceInterface::class)->total($suspended));
+
+        // And once the newer one is lifted, the person does hear it
+        $this->suspensions()->lift($this->moderator, $second->id());
+        $this->assertSame([SuspensionLiftedNotification::class], array_column($this->mailsTo($suspended), 1));
+    }
+
+    public function test_an_anonymized_or_deactivated_account_is_not_told_its_suspension_was_lifted(): void
+    {
+        $anonymized = $this->anAccount();
+        $suspension = $this->suspensions()->suspend($this->moderator, $anonymized->id, 'Spam', null);
+        $this->mailed = [];
+        $total = app(SiteNotificationServiceInterface::class)->total($anonymized);
+        $anonymized->forceFill(['anonymized_at' => now()])->save();
+
+        $this->suspensions()->lift($this->moderator, $suspension->id());
+
+        $this->assertSame([], $this->mailsTo($anonymized));
+        $this->assertSame($total, app(SiteNotificationServiceInterface::class)->total($anonymized));
+
+        $deactivated = $this->anAccount();
+        $other = $this->suspensions()->suspend($this->moderator, $deactivated->id, 'Spam', null);
+        $this->mailed = [];
+        $notification = new SuspensionLiftedNotification($other->id()->value);
+        $this->suspensions()->lift($this->moderator, $other->id());
+        $deactivated->delete();
+
+        $this->assertFalse($notification->shouldSend($deactivated, 'site'));
+    }
+
+    public function test_the_system_account_is_never_told_its_suspension_was_lifted(): void
+    {
+        $system = UserModel::query()->findOrFail(app(SystemAccountInterface::class)->id());
+
+        $this->assertFalse((new SuspensionLiftedNotification((string) Str::uuid()))->shouldSend($system, 'mail'));
+        $this->assertSame([], $this->mailsTo($system));
+    }
+
+    public function test_suspension_lifted_notices_use_the_mandatory_category(): void
+    {
+        $this->assertSame(ForumMailCategories::SUSPENSIONS, (new SuspensionLiftedNotification('x'))->mailCategory());
     }
 
     // Reported

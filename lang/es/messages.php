@@ -505,6 +505,10 @@ return [
             'reason' => 'Motivo: :reason',
             'action' => 'Ir al foro',
         ],
+        'suspension_lifted' => [
+            'title' => 'Se ha levantado tu suspensión en el foro',
+            'action' => 'Ir al foro',
+        ],
         'reported' => [
             'title' => 'Han denunciado un mensaje en «:discussion»',
             'grouped' => 'Han denunciado :count veces un mensaje en «:discussion»',

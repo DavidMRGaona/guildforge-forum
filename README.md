@@ -105,7 +105,7 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
 | `forum.mentions` | Menciones y citas de un mensaje tuyo | Al momento |
 | `forum.likes` | «Me gusta» de tus mensajes (agrupados por mensaje) | Nunca: solo en la web |
 | `forum.approvals` | La moderación ha aprobado un mensaje o un tema tuyo que esperaba revisión (`ForumPostApproved`) | Al momento |
-| `forum.suspensions` | Te han suspendido en el foro, con el motivo y la fecha de fin o «hasta que se levante» (`ForumUserSuspended`). Obligatoria | Siempre, al momento |
+| `forum.suspensions` | Te han suspendido en el foro, con el motivo y la fecha de fin o «hasta que se levante» (`ForumUserSuspended`), y que se ha levantado (`ForumUserSuspensionLifted`, solo si seguía en vigor y no hay otra). Obligatoria | Siempre, al momento |
 | `forum.reports` | Para quien modera: han denunciado un mensaje (`ForumPostReported`). En la web se agrupan por mensaje mientras haya denuncias abiertas | Solo por la primera denuncia abierta de cada mensaje |
 
 - Cada persona recibe un solo aviso por mensaje: mención antes que cita y cita antes que seguimiento. Al editar un mensaje, solo avisa a quien menciona o cita por primera vez.
@@ -143,7 +143,7 @@ Modera un tema quien tiene `forum:forum.moderate` (todo el foro) o modera su cat
 - **Suspensiones** (`forum_suspensions`): quien modera todo el foro suspende a una persona unos días o sin fecha de fin, con un motivo que esa persona ve en el foro. Mientras dura, lee, pero no escribe, no denuncia y no modera nada; «me gusta» debe preguntarlo igual (`ForumSuspensions::isSuspended()`). Se levanta sola al terminar (no hace falta ninguna tarea) o antes, a mano.
   - Nadie se suspende a sí mismo ni a la cuenta del sistema, y a quien modera todo el foro solo lo suspende el rol `admin` (dos moderadores no pueden suspenderse entre sí). Nadie levanta su propia suspensión, y solo `admin` levanta la que puso `admin` (o alguien cuya cuenta ya no existe) o la de quien modera todo el foro. Quien está suspendido no modera nada, aunque modere todo el foro. Una suspensión nueva sustituye a la que estuviera en vigor.
   - Si no se pueden leer las suspensiones, nadie escribe (falla cerrada).
-  - Al suspender se lanza `ForumUserSuspended` (tras guardarse), y al aprobar un mensaje, `ForumPostApproved`, para los avisos.
+  - Al suspender se lanza `ForumUserSuspended` (tras guardarse), al levantarla a mano mientras seguía en vigor, `ForumUserSuspensionLifted` (una que termina sola no avisa), y al aprobar un mensaje, `ForumPostApproved`, para los avisos.
 - **Página «Moderación»** del foro (`/foro/moderacion`, enlace en la portada y en cada tema para quien modera algo): las denuncias pendientes y lo que espera aprobación en las categorías que la persona modera, para resolverlo sin el panel. Quien no modera nada recibe 404.
 - **Historial** (`forum_moderation_log`): quién hizo qué, a quién, dónde, cuándo y por qué. Solo se añaden filas: nada lo cambia ni lo borra. Guarda el título y el número del tema, así que se lee aunque el tema ya no exista.
 

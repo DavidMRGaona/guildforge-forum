@@ -6,10 +6,12 @@ namespace Modules\Forum\Application\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\DTOs\CharacterInputDTO;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
+use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Exceptions\CharacterNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Exceptions\InvalidCharacterException;
@@ -20,8 +22,9 @@ use Modules\Forum\Domain\ValueObjects\CharacterId;
 /**
  * What people do with characters: their owner creates, changes, retires, brings back and
  * deletes them (one with posts is retired instead); moderators change, retire, bring back and
- * delete any they moderate. A character the person may neither own nor moderate answers as if
- * it did not exist. Who may do what is CharacterRules'.
+ * delete any they moderate; what moderation does goes to the moderation log, with the
+ * character's name. A character the person may neither own nor moderate answers as if it did
+ * not exist. Who may do what is CharacterRules'.
  */
 final readonly class CharacterService
 {
@@ -32,6 +35,7 @@ final readonly class CharacterService
         private CharacterRepositoryInterface $characters,
         private CharacterRules $rules,
         private CharacterPortraitUploader $portraits,
+        private ModerationLogger $logger,
     ) {}
 
     /**
@@ -96,7 +100,7 @@ final readonly class CharacterService
             $character->changePortrait(null, $now);
         }
 
-        $this->characters->save($character);
+        $this->saveLogged($actor, $character, ModerationAction::CharacterEdited);
 
         return $character;
     }
@@ -112,7 +116,7 @@ final readonly class CharacterService
     {
         $character = $this->manageable($actor, $id);
         $character->retire(CarbonImmutable::now(), byModeration: ! $this->rules->owns($actor, $character));
-        $this->characters->save($character);
+        $this->saveLogged($actor, $character, ModerationAction::CharacterRetired);
 
         return $character;
     }
@@ -131,7 +135,7 @@ final readonly class CharacterService
         }
 
         $character->restore(CarbonImmutable::now(), byModeration: $moderates);
-        $this->characters->save($character);
+        $this->saveLogged($actor, $character, ModerationAction::CharacterRestored);
 
         return $character;
     }
@@ -146,11 +150,43 @@ final readonly class CharacterService
     public function delete(Authenticatable $actor, string $id): void
     {
         $character = $this->manageable($actor, $id);
-        if (! $this->rules->moderates($actor, $character) && $this->characters->hasPosts($character->id())) {
+        $hasPosts = $this->characters->hasPosts($character->id());
+        if (! $this->rules->moderates($actor, $character) && $hasPosts) {
             throw InvalidCharacterException::because(InvalidCharacterException::HAS_POSTS, 'character', "Character {$id} has posts: it is retired instead.");
         }
 
-        $this->characters->delete($character->id());
+        DB::transaction(function () use ($actor, $character, $hasPosts): void {
+            $this->characters->delete($character->id());
+            $this->logIfModeration($actor, $character, ModerationAction::CharacterDeleted, ['had_posts' => $hasPosts]);
+        });
+    }
+
+    /**
+     * Saves the character and, when moderation changed it (not its owner), logs what was done
+     * in the same transaction.
+     */
+    private function saveLogged(Authenticatable $actor, Character $character, ModerationAction $action): void
+    {
+        DB::transaction(function () use ($actor, $character, $action): void {
+            $this->characters->save($character);
+            $this->logIfModeration($actor, $character, $action);
+        });
+    }
+
+    /**
+     * @param  array<string, string|int|bool|null>  $details
+     */
+    private function logIfModeration(Authenticatable $actor, Character $character, ModerationAction $action, array $details = []): void
+    {
+        if ($this->rules->owns($actor, $character)) {
+            return;
+        }
+
+        $this->logger->recordForAccount($action, $actor, $character->ownerId(), details: [
+            'character_id' => $character->id()->value,
+            'character_name' => $character->name(),
+            ...$details,
+        ]);
     }
 
     /**

@@ -16,6 +16,7 @@ use Modules\Forum\Application\Services\CharacterService;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
+use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
@@ -24,6 +25,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
@@ -184,6 +186,9 @@ final class CharacterEndpointsTest extends ModuleTestCase
         $this->actingAs($this->owner)->postJson("/foro/personajes/{$used->id()->value}/recuperar")
             ->assertOk()
             ->assertJsonPath('character.isRetired', false);
+
+        // What owners do with their own characters is not moderation
+        $this->assertSame(0, ModerationLogModel::query()->count());
     }
 
     public function test_moderation_retires_for_good_and_deletes_what_has_posts(): void
@@ -206,6 +211,18 @@ final class CharacterEndpointsTest extends ModuleTestCase
 
         $this->actingAs($moderator)->deleteJson("/foro/personajes/{$id}")->assertNoContent();
         $this->assertNull(app(CharacterRepositoryInterface::class)->find($used->id()));
+
+        // What moderation did is in its log, with the character's name and whose it was
+        $log = ModerationLogModel::query()->orderBy('created_at')->orderBy('id')->get();
+        $this->assertSame(
+            [ModerationAction::CharacterEdited->value, ModerationAction::CharacterRetired->value, ModerationAction::CharacterDeleted->value],
+            $log->pluck('action')->all(),
+        );
+        $this->assertSame([$moderator->id], array_values(array_unique($log->pluck('moderator_id')->all())));
+        $this->assertSame([$this->owner->id], array_values(array_unique($log->pluck('subject_user_id')->all())));
+        $deleted = $log->last()->details ?? [];
+        $this->assertSame('Nombre cambiado', $deleted['character_name'] ?? null);
+        $this->assertTrue($deleted['had_posts'] ?? false);
         // Its posts show their account from then on
         $this->assertSame(0, PostModel::query()->whereNotNull('character_id')->count());
     }

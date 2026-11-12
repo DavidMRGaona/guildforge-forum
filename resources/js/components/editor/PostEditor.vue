@@ -507,9 +507,11 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             @submit.prevent="applyExternalImage"
             @keydown.escape.prevent="closeExternalImage"
         >
-            <label for="forum-editor-external-image" class="text-base-secondary text-sm">{{
-                t('forum.editor.externalImage.label')
-            }}</label>
+            <label
+                for="forum-editor-external-image"
+                class="text-base-secondary w-full text-sm sm:w-auto"
+                >{{ t('forum.editor.externalImage.label') }}</label
+            >
             <input
                 id="forum-editor-external-image"
                 ref="externalField"
@@ -519,7 +521,7 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
                 autocomplete="off"
                 :placeholder="t('forum.editor.externalImage.placeholder')"
                 aria-describedby="forum-editor-external-image-hint"
-                class="bg-page border-default text-base-primary min-w-0 flex-1 rounded-md border px-2 py-1 text-sm"
+                class="bg-page border-default text-base-primary w-full min-w-0 rounded-md border px-2 py-1 text-sm sm:w-auto sm:flex-1"
             />
             <BaseButton type="submit" size="sm">{{
                 t('forum.editor.externalImage.apply')

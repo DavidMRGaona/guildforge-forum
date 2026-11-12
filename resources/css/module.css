@@ -107,17 +107,21 @@
     border-radius: 0.5rem;
 }
 
-/* Where an image from another site comes from: the copy is shown, the original is linked */
+/*
+ * Where an image from another site comes from: the copy is shown, the original is linked.
+ * Module sheets sit in a cascade layer below the typography plugin, so what .prose also sets
+ * for captions and links is marked important.
+ */
 .forum-image__source {
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
+    margin-top: 0.25rem !important;
+    font-size: 0.75rem !important;
+    color: var(--color-text-muted) !important;
     overflow-wrap: anywhere;
 }
 
 .forum-image__source a,
 .forum-image--unavailable a {
-    color: var(--color-text-secondary);
+    color: var(--color-text-secondary) !important;
     text-decoration: underline;
     text-underline-offset: 2px;
 }

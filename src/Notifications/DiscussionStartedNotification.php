@@ -46,7 +46,7 @@ final class DiscussionStartedNotification extends PostNotification implements Ha
     {
         $notice = $this->notice($notifiable);
 
-        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url) : null;
+        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url, $notice->post->authorId()) : null;
     }
 
     protected function stillHolds(PostNoticeDTO $notice, string $channel): bool

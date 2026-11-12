@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Search;
 
+use App\Application\Search\Contracts\ChecksSearchHits;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Application\Search\DTOs\SearchDocumentDTO;
 use Illuminate\Support\Str;
@@ -13,12 +14,13 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
  * The replies readers can find (the opening message belongs to its discussion's document), each at
  * its own address.
  */
-final readonly class PostSearchSource implements IndexedSearchSourceInterface
+final readonly class PostSearchSource implements ChecksSearchHits, IndexedSearchSourceInterface
 {
     public const string TYPE = 'forum-post';
 
     public function __construct(
         private ForumSearchDocuments $documents,
+        private ForumSearchHitChecks $checks,
     ) {}
 
     public function type(): string
@@ -50,6 +52,15 @@ final readonly class PostSearchSource implements IndexedSearchSourceInterface
         $post = ForumSearchDocuments::replies()->with('discussion')->whereKey(strtolower($id))->first();
 
         return $post instanceof PostModel && $post->discussion !== null ? $this->documents->reply($post, $post->discussion) : null;
+    }
+
+    /**
+     * @param  non-empty-list<string>  $ids
+     * @return list<string>
+     */
+    public function visibleSearchHits(array $ids, ?object $user): array
+    {
+        return $this->checks->replies($ids, $user);
     }
 
     /**

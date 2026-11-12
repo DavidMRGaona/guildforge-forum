@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Notices;
 
+use App\Application\Mail\Services\MailPreferenceServiceInterface;
 use App\Application\Mail\Services\MailSubjectMuteServiceInterface;
+use App\Application\Services\UserServiceInterface;
 use App\Application\SiteNotifications\DTOs\SiteNotificationItemDTO;
 use App\Application\SiteNotifications\Services\SiteNotificationServiceInterface;
+use App\Domain\Mail\Enums\MailDelivery;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -31,6 +34,7 @@ use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Notifications\DiscussionStartedNotification;
+use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Notifications\MentionedNotification;
 use Modules\Forum\Notifications\PostLikedNotification;
 use Modules\Forum\Notifications\ReplyPostedNotification;
@@ -105,6 +109,37 @@ final class PostNoticesTest extends ModuleTestCase
         $this->assertSame('Ana ha respondido en «La tumba»', $notice->title);
         $this->assertSame('Nos vemos el viernes', $notice->body);
         $this->assertStringStartsWith('/foro/t/', $notice->url);
+    }
+
+    public function test_a_reply_line_of_the_digest_names_who_wrote_and_goes_when_that_account_is_anonymized(): void
+    {
+        app(MailPreferenceServiceInterface::class)->update($this->follower, [ForumMailCategories::REPLIES => MailDelivery::Digest]);
+
+        $this->replyBy($this->author, 'Nos vemos el viernes');
+
+        $this->assertSame([], $this->mailsTo($this->follower));
+        $line = DB::table('user_mail_digest_items')->where('user_id', $this->follower->id)->sole();
+        $this->assertSame(strtolower($this->author->id), strtolower((string) $line->actor_id));
+
+        app(UserServiceInterface::class)->anonymize((string) $this->author->id);
+
+        $this->assertSame(0, DB::table('user_mail_digest_items')->where('user_id', $this->follower->id)->count());
+    }
+
+    public function test_a_new_discussion_line_of_the_digest_names_who_opened_it_and_goes_when_that_account_is_anonymized(): void
+    {
+        $follower = UserModel::factory()->create();
+        $this->access->letRead($follower);
+        $this->follows()->followCategory(strtolower($follower->id), $this->category->id(), CategoryFollowOrigin::Person, CarbonImmutable::now());
+        app(MailPreferenceServiceInterface::class)->update($follower, [ForumMailCategories::DISCUSSIONS => MailDelivery::Digest]);
+
+        $this->aDiscussion($this->category, authorId: $this->author->id, title: 'Nueva campaña');
+
+        $this->assertSame(strtolower($this->author->id), strtolower((string) DB::table('user_mail_digest_items')->where('user_id', $follower->id)->sole()->actor_id));
+
+        app(UserServiceInterface::class)->anonymize((string) $this->author->id);
+
+        $this->assertSame(0, DB::table('user_mail_digest_items')->where('user_id', $follower->id)->count());
     }
 
     public function test_the_author_never_hears_about_their_own_post(): void

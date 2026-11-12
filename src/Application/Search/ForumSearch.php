@@ -58,7 +58,8 @@ final readonly class ForumSearch
                 type: null,
                 offset: 0,
                 limit: self::FETCH,
-                user: null,
+                // The sources check their results for this reader
+                user: $reader,
                 includeHelp: false,
             ));
 

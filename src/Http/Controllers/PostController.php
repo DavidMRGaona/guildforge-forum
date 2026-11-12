@@ -15,13 +15,11 @@ use Modules\Forum\Application\Services\PostBodyFactory;
 use Modules\Forum\Application\Services\PostContentPresenter;
 use Modules\Forum\Application\Services\PostingService;
 use Modules\Forum\Domain\Entities\Post;
-use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostId;
-use Modules\Forum\Http\Presenters\MergedDiscussionAnswer;
 
 /**
  * Replying, editing and deleting from the editor (moderators edit other people's posts too). The body is
@@ -40,24 +38,18 @@ final class PostController extends Controller
         private readonly ForumModeration $moderation,
         private readonly PostBodyFactory $bodies,
         private readonly PostRepositoryInterface $posts,
-        private readonly MergedDiscussionAnswer $merged,
     ) {}
 
     public function store(Request $request, string $discussion): JsonResponse
     {
-        return $this->respond(function () use ($request, $discussion): JsonResponse {
+        // A page left open on a discussion that was merged is told where it went (410)
+        return $this->respond($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion): JsonResponse {
             $user = $this->user($request);
             [, $characterId] = $this->speakerFrom($request);
-
-            try {
-                $post = $this->posting->reply($user, DiscussionId::fromString($discussion), $this->documentFrom($request), $characterId);
-            } catch (DiscussionNotFoundException $exception) {
-                // A page left open on a discussion that was merged: say where it went (410)
-                return $this->merged->for($user, $discussion) ?? throw $exception;
-            }
+            $post = $this->posting->reply($user, DiscussionId::fromString($discussion), $this->documentFrom($request), $characterId);
 
             return response()->json(['post' => $this->present($post, $user)], 201);
-        });
+        }));
     }
 
     public function update(Request $request, string $post): JsonResponse

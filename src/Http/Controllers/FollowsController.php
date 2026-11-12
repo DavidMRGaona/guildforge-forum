@@ -31,11 +31,11 @@ final class FollowsController extends Controller
     {
         $validated = $request->validate(['level' => ['required', 'string', Rule::enum(FollowLevel::class)]]);
 
-        return $this->respond(function () use ($request, $discussion, $validated): JsonResponse {
+        return $this->respond($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $validated): JsonResponse {
             $level = $this->follows->setLevel($this->user($request), DiscussionId::fromString($discussion), FollowLevel::from((string) $validated['level']));
 
             return response()->json(['level' => $level->value]);
-        });
+        }));
     }
 
     public function category(Request $request, string $category): JsonResponse

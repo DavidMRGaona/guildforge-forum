@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Http\Controllers;
 
 use Closure;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Forum\Application\Content\DocumentLimits;
@@ -16,13 +17,15 @@ use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostingTooFastException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
+use Modules\Forum\Http\Presenters\MergedDiscussionAnswer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * How the editor's JSON endpoints answer what went wrong: what the person may not read is not
  * found (404), what they may not do is forbidden (403), a document the schema refuses is 422
  * with its reason, posting too fast is 429 with Retry-After, and a post in the wrong state
- * (already deleted) or a discussion in the wrong state (already closed) is 409.
+ * (already deleted) or a discussion in the wrong state (already closed) is 409. An action on a
+ * discussion that was merged into another, from a page left open on it, is 410 with where it went.
  */
 trait RespondsWithForumErrors
 {
@@ -63,6 +66,28 @@ trait RespondsWithForumErrors
         } catch (InvalidDiscussionException) {
             return response()->json(['message' => __('forum::messages.errors.discussion_state')], 409);
         }
+    }
+
+    /**
+     * The action on the discussion with this id, told (410) where the discussion went when it was
+     * merged into another and the person may read that. Anything else that is not found stays as
+     * it was: a discussion that never existed, one that may not be read, or another one the action
+     * names (the target of a merge).
+     *
+     * @param  Closure(): JsonResponse  $action
+     * @return Closure(): JsonResponse
+     */
+    private function orMergedAnswer(Request $request, string $discussion, Closure $action): Closure
+    {
+        return static function () use ($request, $discussion, $action): JsonResponse {
+            try {
+                return $action();
+            } catch (DiscussionNotFoundException $exception) {
+                $user = $request->user();
+
+                return app(MergedDiscussionAnswer::class)->for($user instanceof Authenticatable ? $user : null, $discussion) ?? throw $exception;
+            }
+        };
     }
 
     /**

@@ -30,7 +30,8 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 /**
  * The moderation menus of a discussion and of each post, all JSON. What the person may not
  * read is not found (404), what they may not do is forbidden (403), something moderation never
- * does is 422 with its reason, and an action on something already in that state is 409.
+ * does is 422 with its reason, and an action on something already in that state is 409. A
+ * discussion merged into another answers 410 with where it went, to whoever may read that.
  */
 final class ModerationController extends Controller
 {
@@ -58,7 +59,7 @@ final class ModerationController extends Controller
             'category' => ['required_if:action,move', 'nullable', 'uuid'],
         ]);
 
-        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+        return $this->refusals($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $input): JsonResponse {
             $user = $this->user($request);
             $id = DiscussionId::fromString($discussion);
             $reason = $this->text($input, 'reason');
@@ -76,7 +77,7 @@ final class ModerationController extends Controller
             };
 
             return response()->json(['discussion' => $this->presentDiscussion($changed)]);
-        });
+        }));
     }
 
     public function destroyDiscussion(Request $request, string $discussion): JsonResponse
@@ -87,7 +88,7 @@ final class ModerationController extends Controller
             'confirmed' => ['accepted'],
         ]);
 
-        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+        return $this->refusals($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $input): JsonResponse {
             $user = $this->user($request);
             $id = DiscussionId::fromString($discussion);
             $category = $this->categories->find($this->moderation->moderated($user, $id)->categoryId());
@@ -95,7 +96,7 @@ final class ModerationController extends Controller
             $this->moderation->delete($user, $id, $this->text($input, 'reason'));
 
             return response()->json(['url' => $category instanceof Category ? $this->urls->category($category) : $this->urls->index()]);
-        });
+        }));
     }
 
     /**
@@ -113,7 +114,7 @@ final class ModerationController extends Controller
             'confirmed' => ['accepted'],
         ]);
 
-        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+        return $this->refusals($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $input): JsonResponse {
             /** @var list<int|string> $numbers */
             $numbers = $input['numbers'];
 
@@ -127,7 +128,7 @@ final class ModerationController extends Controller
             );
 
             return response()->json(['url' => $this->urls->discussion($new)]);
-        });
+        }));
     }
 
     /**
@@ -141,7 +142,7 @@ final class ModerationController extends Controller
             'confirmed' => ['accepted'],
         ]);
 
-        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+        return $this->refusals($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $input): JsonResponse {
             $into = $this->moderation->merge(
                 $this->user($request),
                 DiscussionId::fromString($discussion),
@@ -150,7 +151,7 @@ final class ModerationController extends Controller
             );
 
             return response()->json(['url' => $this->urls->discussion($into)]);
-        });
+        }));
     }
 
     /**
@@ -161,7 +162,7 @@ final class ModerationController extends Controller
     {
         $input = $request->validate(['tema' => ['required', 'string', 'max:500']]);
 
-        return $this->refusals(function () use ($request, $discussion, $input): JsonResponse {
+        return $this->refusals($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $input): JsonResponse {
             $user = $this->user($request);
             $absorbed = $this->moderation->moderated($user, DiscussionId::fromString($discussion));
             $number = self::discussionNumber((string) $input['tema']);
@@ -187,7 +188,7 @@ final class ModerationController extends Controller
                 'url' => $this->urls->discussion($target),
                 'categoryName' => $category?->name(),
             ]]);
-        });
+        }));
     }
 
     /**

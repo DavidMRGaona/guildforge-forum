@@ -1,6 +1,8 @@
 import { computePosition, flip, offset, shift } from '@floating-ui/dom';
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
 import { VueRenderer } from '@tiptap/vue-3';
+import { mergedTarget } from '../forum/api';
+import type { ForumMergedInto } from '../types/forum';
 import MentionList from './MentionList.vue';
 import type { MentionCandidate } from './types';
 
@@ -9,6 +11,8 @@ export interface MentionSuggestionOptions {
     url: string;
     /** Called with each person picked, so the editor can show their name */
     onPick: (candidate: MentionCandidate) => void;
+    /** Hears that the discussion was merged into another and where it went (nobody is offered) */
+    onMerged?: (target: ForumMergedInto) => void;
     fetcher?: typeof fetch;
 }
 
@@ -48,6 +52,14 @@ export function mentionSuggestion(
                     }
                 );
                 if (!response.ok) {
+                    const target =
+                        response.status === 410
+                            ? mergedTarget(response.status, await response.json().catch(() => null))
+                            : null;
+                    if (target !== null) {
+                        options.onMerged?.(target);
+                    }
+
                     return [];
                 }
                 const body = (await response.json()) as { data?: MentionCandidate[] };

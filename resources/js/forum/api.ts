@@ -80,15 +80,7 @@ async function readAnswer<T>(response: Response): Promise<JsonAnswer<T>> {
             ? (record.errors as Record<string, string[]>)
             : {};
 
-    const merged = record.mergedInto;
-    const mergedInto =
-        response.status === 410 &&
-        typeof merged === 'object' &&
-        merged !== null &&
-        typeof (merged as Record<string, unknown>).title === 'string' &&
-        typeof (merged as Record<string, unknown>).url === 'string'
-            ? (merged as ForumMergedInto)
-            : null;
+    const mergedInto = mergedTarget(response.status, record);
 
     return {
         ok: response.ok,
@@ -98,6 +90,24 @@ async function readAnswer<T>(response: Response): Promise<JsonAnswer<T>> {
         errors,
         mergedInto,
     };
+}
+
+/**
+ * Where the discussion went, when the server answered 410 because it was merged into another
+ * (MergedDiscussionAnswer); null for any other answer.
+ */
+export function mergedTarget(status: number, payload: unknown): ForumMergedInto | null {
+    if (status !== 410 || typeof payload !== 'object' || payload === null) {
+        return null;
+    }
+    const merged = (payload as Record<string, unknown>).mergedInto;
+
+    return typeof merged === 'object' &&
+        merged !== null &&
+        typeof (merged as Record<string, unknown>).title === 'string' &&
+        typeof (merged as Record<string, unknown>).url === 'string'
+        ? (merged as ForumMergedInto)
+        : null;
 }
 
 /** Where a record's page asks for its conversation (SubjectConversationController) */

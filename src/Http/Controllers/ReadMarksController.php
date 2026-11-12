@@ -32,11 +32,11 @@ final class ReadMarksController extends Controller
     {
         $validated = $request->validate(['number' => ['required', 'integer', 'min:1', 'max:4294967295']]);
 
-        return $this->respond(function () use ($request, $discussion, $validated): JsonResponse {
+        return $this->respond($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion, $validated): JsonResponse {
             $this->reader->markRead($this->user($request), DiscussionId::fromString($discussion), (int) $validated['number'], CarbonImmutable::now());
 
             return response()->json(['read' => true]);
-        });
+        }));
     }
 
     public function forum(Request $request): RedirectResponse

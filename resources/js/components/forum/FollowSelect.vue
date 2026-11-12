@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Bell, BellOff, BellRing } from '@lucide/vue';
+import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
 import type { ForumDiscussionFollow, ForumFollowLevel } from '../../types/forum';
 
@@ -14,6 +15,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+const reportMerged = useMergedDiscussion();
 
 const LEVELS: ForumFollowLevel[] = ['following', 'normal', 'muted'];
 
@@ -50,6 +52,8 @@ async function change(event: Event): Promise<void> {
     }
 
     level.value = previous;
+    // Merged into another discussion: the server's message says so, and the page shows the way
+    reportMerged(answer.mergedInto);
     error.value = answer.message ?? t('forum.follow.error');
 }
 </script>

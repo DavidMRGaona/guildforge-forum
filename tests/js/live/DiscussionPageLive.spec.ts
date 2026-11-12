@@ -186,6 +186,64 @@ describe('Discussion page, when its discussion is merged into another', () => {
         );
         expect(router.visit).not.toHaveBeenCalled();
     });
+
+    it('offers the same way on when following it from the old page is refused', async () => {
+        const fetchMock = serveMerged();
+        const page = props('/foro/t/7-partida/4');
+        (page.discussion as Record<string, unknown>).follow = {
+            level: 'normal',
+            url: '/foro/temas/discussion-1/seguimiento',
+        };
+        const wrapper = mount(Discussion, { props: page as never, attachTo: document.body });
+        mounted.push(wrapper);
+
+        await wrapper.get('select').setValue('following');
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/foro/temas/discussion-1/seguimiento',
+            expect.anything()
+        );
+        expect(wrapper.get('[data-testid="merged-notice"] a').attributes('href')).toBe(
+            '/foro/t/2-destino'
+        );
+    });
+
+    it('offers the same way on when the old page reports what was read', async () => {
+        let see: (entries: Partial<IntersectionObserverEntry>[]) => void = () => {};
+        vi.stubGlobal(
+            'IntersectionObserver',
+            class {
+                constructor(callback: typeof see) {
+                    see = callback;
+                }
+                observe(): void {}
+                disconnect(): void {}
+            }
+        );
+        const fetchMock = serveMerged();
+        const page = props('/foro/t/7-partida/4');
+        page.readUrl = '/foro/temas/discussion-1/leido';
+        const wrapper = mount(Discussion, { props: page as never, attachTo: document.body });
+        mounted.push(wrapper);
+
+        see([
+            {
+                target: wrapper.get('[data-post-number="2"]').element,
+                isIntersecting: true,
+                intersectionRatio: 1,
+                intersectionRect: { height: 100 } as DOMRectReadOnly,
+                rootBounds: { height: 800 } as DOMRectReadOnly,
+            },
+        ]);
+        await vi.advanceTimersByTimeAsync(2_000);
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledWith('/foro/temas/discussion-1/leido', expect.anything());
+        expect(wrapper.get('[data-testid="merged-notice"] a').attributes('href')).toBe(
+            '/foro/t/2-destino'
+        );
+    });
 });
 
 describe('Discussion page, while it stays open', () => {

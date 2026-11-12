@@ -129,3 +129,210 @@
 .forum-editor:focus-within {
     border-color: var(--color-primary-500);
 }
+
+/* Dice rolls: as the server renders them (Application/Content/Nodes/RollNode) and while writing */
+.forum-roll {
+    margin: 0.75rem 0;
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-primary-500);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--color-bg-muted);
+    color: var(--color-text-primary);
+}
+
+.forum-roll p {
+    margin: 0;
+}
+
+.forum-roll__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.5rem;
+}
+
+.forum-roll__label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll__expression {
+    font-weight: 700;
+}
+
+.forum-roll__reason {
+    color: var(--color-text-secondary);
+}
+
+.forum-roll__badge {
+    border-radius: 9999px;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-warning);
+    background-color: var(--color-warning-bg);
+}
+
+.forum-roll__dice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    margin-top: 0.375rem !important;
+}
+
+.forum-roll__group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.forum-roll__die {
+    display: inline-flex;
+    min-width: 1.75rem;
+    justify-content: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.375rem;
+    padding: 0 0.375rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background-color: var(--color-bg-surface);
+}
+
+/* Struck through and faded: the die was dropped (the strike is also an <s> and said in words) */
+.forum-roll__die--dropped {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+}
+
+/* Marked with a bold outline and a spark: the die was added by an explosion */
+.forum-roll__die--exploded {
+    border-width: 2px;
+    border-color: var(--color-primary-600);
+}
+
+.forum-roll__die--exploded::after {
+    content: '!';
+    margin-left: 0.125rem;
+    color: var(--color-primary-600);
+}
+
+.forum-roll__op,
+.forum-roll__const,
+.forum-roll__subtotal {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll__note {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.forum-roll__total {
+    margin-top: 0.375rem !important;
+    font-size: 1.125rem;
+}
+
+.forum-roll__total-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll--error {
+    border-left-color: var(--color-error);
+}
+
+.forum-roll__problem {
+    margin-top: 0.25rem !important;
+    font-weight: 600;
+}
+
+.dark .forum-roll__die--exploded {
+    border-color: var(--color-primary-400);
+}
+
+.dark .forum-roll__die--exploded::after {
+    color: var(--color-primary-300);
+}
+
+/* While writing */
+.forum-roll--editing .forum-roll__fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.forum-roll__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-primary-600);
+}
+
+.forum-roll__input {
+    min-width: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-primary);
+}
+
+.forum-roll__input--expression {
+    width: 10rem;
+    font-family: ui-monospace, monospace;
+}
+
+.forum-roll__input--reason {
+    flex: 1 1 10rem;
+}
+
+.forum-roll__input:read-only {
+    background-color: transparent;
+    border-style: dashed;
+}
+
+.forum-roll__input:focus-visible,
+.forum-roll__remove:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+}
+
+.forum-roll__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.375rem;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll__remove:hover {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-error);
+}
+
+.forum-roll__hint {
+    margin-top: 0.25rem !important;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll.ProseMirror-selectednode {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+}

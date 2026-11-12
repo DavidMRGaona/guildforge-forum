@@ -187,6 +187,14 @@
             }
         },
         {
+            "type": "roll",
+            "attrs": {
+                "expression": "2d6+3",
+                "reason": "Ataque",
+                "rollId": null
+            }
+        },
+        {
             "type": "paragraph",
             "content": [
                 {

@@ -20,7 +20,7 @@ final class EloquentDiceRollRepository implements DiceRollRepositoryInterface
         if ($stored instanceof DiceRollModel) {
             // What was thrown never changes: only where it sits and whether it was taken out
             $stored->position = $roll->position;
-            $stored->removed_at = $roll->removedAt === null ? null : CarbonImmutable::instance($roll->removedAt);
+            $stored->removed_at = $roll->removedAt instanceof \DateTimeImmutable ? CarbonImmutable::instance($roll->removedAt) : null;
             $stored->save();
 
             return;

@@ -38,6 +38,6 @@ final class InvalidNotation extends InvalidArgumentException
 
     public function __construct(public readonly string $reason)
     {
-        parent::__construct($reason);
+        parent::__construct("Invalid dice notation: {$reason}");
     }
 }

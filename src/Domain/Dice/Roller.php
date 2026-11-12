@@ -110,10 +110,15 @@ final readonly class Roller
         // The dice that explosions added are in the pool: «kh3» keeps three of all of them
         $kept = $keeps ? $term->keepCount : max(1, count($dice) - $term->keepCount);
 
+        $counts = [];
         foreach ($order as $rank => $index) {
-            $dice[$index]['k'] = $rank < $kept;
+            $counts[$index] = $rank < $kept;
         }
 
-        return $dice;
+        return array_map(
+            static fn (array $die, int $index): array => ['v' => $die['v'], 'k' => $counts[$index] ?? true, 'x' => $die['x']],
+            $dice,
+            array_keys($dice),
+        );
     }
 }

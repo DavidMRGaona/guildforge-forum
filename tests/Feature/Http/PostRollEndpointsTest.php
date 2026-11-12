@@ -14,6 +14,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiceRollModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeForumAccess;
 use Modules\Forum\Tests\Unit\Domain\Dice\FixedNumbers;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -90,6 +91,7 @@ final class PostRollEndpointsTest extends ModuleTestCase
 
     /**
      * @param  list<array<string, mixed>>  $rolls
+     * @return TestResponse<Response>
      */
     private function reply(array $rolls): TestResponse
     {

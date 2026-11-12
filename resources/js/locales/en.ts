@@ -284,6 +284,7 @@ export default {
                 link: 'Link',
                 horizontal_rule: 'Divider',
                 image: 'Image',
+                roll: 'Dice roll',
                 undo: 'Undo',
                 redo: 'Redo',
             },
@@ -298,6 +299,16 @@ export default {
                 uploading: 'Uploading the image…',
                 uploaded: 'Image added',
                 alt: 'Image description',
+            },
+            roll: {
+                label: 'Roll',
+                expression_placeholder: '2d6+3',
+                reason: 'Reason for the roll (optional)',
+                reason_placeholder: 'Reason (optional)',
+                remove: 'Remove the roll',
+                hint: 'The server throws it when you publish, and no one can choose the result. Examples: 2d6+3, 4d6kh3, 5d10>=7, 3d6!',
+                thrown_hint:
+                    'It is already thrown and will show as it came out. To throw another, remove it and add a new one.',
             },
             mentions: {
                 label: 'People you can mention',

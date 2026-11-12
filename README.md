@@ -179,13 +179,20 @@ El editor es TipTap en el navegador. Lo que se envía y se guarda es su document
 | `codeBlock` | texto sin marcas | `language` opcional (`[a-z0-9][a-z0-9+#.-]{0,29}`) |
 | `horizontalRule`, `image` | — | `image`: `origin` (`upload`; otros orígenes podrán añadirse sin migrar datos), `src` (ruta en `forum/posts/`) y `alt` opcional (300 caracteres) |
 | `hardBreak`, `mention` (inline) | — | `mention`: `id` de la cuenta |
+| `roll` | — | `expression` y `reason` (hasta 200 y 100 caracteres) y `rollId` (id de la tirada, solo lo pone el servidor); nunca un resultado |
 
 Marcas: `bold`, `italic`, `strike`, `code` y `link` (solo `href`, a `http`, `https` o `mailto`, sin credenciales).
 
-Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 caracteres de texto, 20 menciones y 10 citas por mensaje; las imágenes por mensaje, según los ajustes. Un mensaje sin texto, imagen ni mención está vacío.
+Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 caracteres de texto, 20 menciones, 10 citas y 10 tiradas por mensaje; las imágenes por mensaje, según los ajustes. Un mensaje sin texto, imagen, mención ni tirada está vacío.
 
 - **Menciones y citas** guardan solo el id. El nombre y el enlace se buscan al pintar el mensaje, así que cambiar de nombre no rompe nada. Una cita muestra autor y enlace solo a quien puede leer el original, y al guardarla su texto tiene que estar en el mensaje citado (se comparan letras y cifras), para que nadie atribuya a otra persona lo que no dijo.
 - **Imágenes**: las sube quien tiene `forum:posts.upload_images` a `POST /foro/imagenes`, con los formatos (de JPEG, PNG, WebP y GIF; nunca SVG), el peso, el lado máximo, las imágenes por mensaje y las subidas por hora de los ajustes. El tipo se lee de los bytes. Se guardan en `forum/posts/<año>/<mes>/`. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado (hasta que se vacía).
+- **Tiradas** (`roll`): el editor guarda la expresión y el motivo, nunca el resultado. El servidor tira los dados al publicar (`random_int`, a través de `Domain\Dice\NumberGenerator`) y guarda la tirada aparte, en `forum_dice_rolls` (mensaje, posición, expresión, dados, total y fecha); el nodo solo lleva su id. Botón «Tirada de dados» o, en una línea propia, `/tirada 2d6+3 Ataque` y Intro.
+  - **Sintaxis** (`Domain\Dice\Parser`): `2d6+3`, `1d20-1`, `3d6+1d4` (dados y constantes que suman o restan; `d%` es `d100`); `4dF` (Fate: -1, 0, +1); `5d10>=7` (reserva: cuántos dados llegan a 7; admite `>=`, `>`, `<=`, `<`, `=`); `5d10>=8f=1` (resta los que sacan 1); `4d6kh3`, `4d6dl1`, `2d20kl1` (quedarse con los más altos o bajos, o descartarlos: `kh`, `kl`, `dh`, `dl`); `3d6!`, `3d10!>=9` (el dado que saca el máximo, o cumple la condición, se vuelve a tirar). Mayúsculas y espacios alrededor de `+` y `-` no importan.
+  - **Límites** (`Domain\Dice\Limits`, constantes): 10 tiradas y 300 dados por mensaje; 100 dados y 1000 caras por grupo; 10 grupos y 200 caracteres por expresión; 100 dados añadidos por las explosiones de un grupo. Una tirada que no se entiende o pasa un límite no se tira: se guarda con su error (`forum::messages.dice.errors.*`), se muestra con él y el resto del mensaje se publica. Pasar las 10 tiradas rechaza el documento (`too_many_rolls`).
+  - **Nadie fabrica un resultado**: el esquema rechaza cualquier atributo que no sea `expression`, `reason` y `rollId`. Al guardar, `Application\Services\PostRolls` (dentro de la transacción de `ForumWriter`, también al editar como moderación) comprueba cada `rollId`: en un mensaje nuevo no puede haber ninguno, y al editar solo valen los de las tiradas vigentes de ese mismo mensaje, una vez cada uno y con la expresión con la que se tiraron (`unknown_roll`, 422).
+  - **Al editar** no se repite ninguna tirada: las que siguen, con su id, conservan lo que salió; una expresión nueva se tira una vez y queda «Añadida al editar» (`added_on_edit`); las que ya no están se marcan `removed_at` y siguen en el historial, y las versiones anteriores del mensaje las pintan como salieron. Al vaciar un mensaje borrado (`forum:purge-deleted-posts`) sus tiradas se borran con él.
+  - **Se ve** la expresión, cada dado (descartados tachados y dichos «(descartado)»; explosiones marcadas y dichas «(explosión)»), el total y el motivo; en texto plano, `2d6+3 Ataque = 11`. Los colores salen de las variables del tema, así que valen en claro y oscuro.
 - **Texto plano**: sale del mismo documento (bloques por línea, listas con su marca, citas tras «> », menciones con el nombre del momento).
 - **Borrar**: el autor borra su mensaje y en su sitio queda «Mensaje borrado». Quien modera sigue viendo el cuerpo y las versiones durante 30 días; después `forum:purge-deleted-posts` (cada día) los vacía y sus imágenes dejan de contar como uso.
 - **Límite de envío**: *Mensajes por minuto y persona* en los ajustes (6 por defecto). Al pasarse responde 429 con `Retry-After`.
@@ -209,10 +216,10 @@ Lo que la persona no puede leer responde 404; lo que no puede hacer, 403.
 
 ### Añadir un nodo
 
-Un nodo nuevo (tiradas, apartes fuera de personaje) se añade en los dos lados:
+Un nodo nuevo (por ejemplo, los apartes fuera de personaje) se añade en los dos lados:
 
-1. **Servidor**: una clase que implemente `Application\Content\Contracts\NodeTypeInterface` (o extienda `Nodes\AbstractNodeType`), con su contenido, sus atributos tipados, su HTML (escapando todo el texto) y su texto plano. Se registra con la etiqueta `ForumServiceProvider::NODE_TYPES_TAG` (`$this->app->tag([RollNode::class], self::NODE_TYPES_TAG)`), y el esquema la incluye.
-2. **Editor**: una extensión de TipTap cuyo JSON tenga solo esos atributos, pasada en `extensions` de `PostEditor` (y, si lleva botón, un `ToolbarItem` en `toolbarItems`). Conviene añadirla al fixture `tests/fixtures/editor-document.json`, que comprueban los dos lados.
+1. **Servidor**: una clase que implemente `Application\Content\Contracts\NodeTypeInterface` (o extienda `Nodes\AbstractNodeType`), con su contenido, sus atributos tipados, su HTML (escapando todo el texto) y su texto plano. Se registra con la etiqueta `ForumServiceProvider::NODE_TYPES_TAG` (`$this->app->tag([AsideNode::class], self::NODE_TYPES_TAG)`), y el esquema la incluye.
+2. **Editor**: una extensión de TipTap cuyo JSON tenga solo esos atributos, pasada en `extensions` de `PostEditor` (las de los nodos del núcleo, como `roll`, van en `editor/extensions/index.ts`) (y, si lleva botón, un `ToolbarItem` en `toolbarItems`). Conviene añadirla al fixture `tests/fixtures/editor-document.json`, que comprueban los dos lados.
 
 ### Componente
 

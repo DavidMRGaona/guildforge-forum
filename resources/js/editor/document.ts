@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
+import { MAX_EXPRESSION_LENGTH, MAX_REASON_LENGTH } from './rollText';
 
 /**
  * The editor's side of the post document schema (src/Application/Content on the server).
@@ -25,6 +26,7 @@ export type HeadingLevel = (typeof HEADING_LEVELS)[number];
 export const MAX_IMAGES = 10;
 export const MAX_MENTIONS = 20;
 export const MAX_QUOTES = 10;
+export { MAX_ROLLS } from './rollText';
 
 const MAX_LINK_LENGTH = 2048;
 
@@ -81,9 +83,9 @@ export function normalizeHref(input: string): string | null {
 }
 
 /** The nodes of the schema that hold text or something to see, so a post made of them is not empty */
-const SUBSTANTIAL_NODES = new Set(['image', 'mention']);
+const SUBSTANTIAL_NODES = new Set(['image', 'mention', 'roll']);
 
-/** Whether a document has nothing to publish: no text but spaces, no image and no mention */
+/** Whether a document has nothing to publish: no text but spaces, no image, no mention and no roll */
 export function isDocumentEmpty(document: JSONContent | null | undefined): boolean {
     if (document === null || document === undefined) {
         return true;
@@ -112,6 +114,27 @@ export function sanitizeContent(node: JSONContent): JSONContent | null {
                   attrs: { origin: IMAGE_ORIGIN_UPLOAD, src, alt: node.attrs?.['alt'] ?? null },
               }
             : null;
+    }
+
+    // A roll that is pasted or converted is a new one: its expression and reason, never an id or a result
+    if (node.type === 'roll') {
+        const expression: unknown = node.attrs?.['expression'];
+        const reason: unknown = node.attrs?.['reason'];
+
+        return {
+            type: 'roll',
+            attrs: {
+                expression:
+                    typeof expression === 'string'
+                        ? expression.slice(0, MAX_EXPRESSION_LENGTH)
+                        : '',
+                reason:
+                    typeof reason === 'string' && reason !== ''
+                        ? reason.slice(0, MAX_REASON_LENGTH)
+                        : null,
+                rollId: null,
+            },
+        };
     }
 
     const sanitized: JSONContent = { ...node };

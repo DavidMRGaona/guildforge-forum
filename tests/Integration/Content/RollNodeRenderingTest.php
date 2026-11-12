@@ -10,8 +10,8 @@ use Modules\Forum\Application\Content\Rendering\RenderContext;
 use Modules\Forum\Application\Content\Rendering\RollView;
 use Modules\Forum\Domain\Dice\Parser;
 use Modules\Forum\Domain\Dice\Roller;
-use Tests\Support\Modules\ModuleTestCase;
 use Modules\Forum\Tests\Unit\Domain\Dice\FixedNumbers;
+use Tests\Support\Modules\ModuleTestCase;
 
 /**
  * A roll shows its expression, every die (dropped ones struck through, exploded ones marked,

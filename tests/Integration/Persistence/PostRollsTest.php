@@ -11,6 +11,7 @@ use Modules\Forum\Application\Services\PostRenderer;
 use Modules\Forum\Domain\Dice\Limits;
 use Modules\Forum\Domain\Dice\NumberGenerator;
 use Modules\Forum\Domain\Entities\DiceRoll;
+use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
@@ -128,7 +129,7 @@ final class PostRollsTest extends ModuleTestCase
 
         $atTheLimit = $this->document(array_fill(0, Limits::MAX_ROLLS_PER_POST, $this->roll('1d6')));
         $this->assertSame(Limits::MAX_ROLLS_PER_POST, count(app(PostBodyFactory::class)->fromInput($atTheLimit, $author)->document['content']) - 1);
-        $this->assertSame(0, $this->countRolls($discussion->id()->value));
+        $this->assertSame(0, $this->countRolls());
     }
 
     public function test_a_new_post_cannot_name_a_roll(): void
@@ -169,7 +170,8 @@ final class PostRollsTest extends ModuleTestCase
         $this->assertTrue($byId[$damage->id]->isRemoved(), 'The removed roll stays, marked');
         $this->assertSame(6, $byId[$damage->id]->result?->total);
 
-        $new = array_values(array_filter($rolls, static fn (DiceRoll $roll): bool => ! in_array($roll->id, [$attack->id, $damage->id], true)))[0];
+        $new = array_first(array_filter($rolls, static fn (DiceRoll $roll): bool => ! in_array($roll->id, [$attack->id, $damage->id], true)));
+        $this->assertNotNull($new);
         $this->assertTrue($new->addedOnEdit);
         $this->assertSame(2, $new->position);
         $this->assertSame(3, $new->result?->total);
@@ -283,7 +285,7 @@ final class PostRollsTest extends ModuleTestCase
     /**
      * @param  list<array<string, mixed>>  $rolls
      */
-    private function reply(object $discussion, array $rolls): Post
+    private function reply(Discussion $discussion, array $rolls): Post
     {
         return $this->writer()->reply($discussion->id(), PostId::generate(), null, $this->body($rolls), new DateTimeImmutable('2026-11-10 19:00:00'), needsApproval: false);
     }
@@ -347,7 +349,7 @@ final class PostRollsTest extends ModuleTestCase
         return app(DiceRollRepositoryInterface::class)->ofPost($postId);
     }
 
-    private function countRolls(string $discussionId): int
+    private function countRolls(): int
     {
         return DiceRollModel::query()->count();
     }

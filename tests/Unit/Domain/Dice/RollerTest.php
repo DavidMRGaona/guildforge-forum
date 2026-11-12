@@ -6,8 +6,8 @@ namespace Modules\Forum\Tests\Unit\Domain\Dice;
 
 use Modules\Forum\Domain\Dice\Limits;
 use Modules\Forum\Domain\Dice\Parser;
-use Modules\Forum\Domain\Dice\RollResult;
 use Modules\Forum\Domain\Dice\Roller;
+use Modules\Forum\Domain\Dice\RollResult;
 use PHPUnit\Framework\TestCase;
 
 final class RollerTest extends TestCase

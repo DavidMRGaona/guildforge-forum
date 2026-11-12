@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/core';
 import {
     Bold,
     Code,
+    Dices,
     Heading2,
     Heading3,
     ImagePlus,
@@ -150,6 +151,14 @@ const buttons = computed<Button[]>(() => {
         });
     }
 
+    core.push({
+        id: 'roll',
+        label: t('forum.editor.toolbar.roll'),
+        icon: Dices,
+        run: () => chain().insertRoll().run(),
+        isActive: () => false,
+    });
+
     const extra = props.items.map((item) => ({
         id: item.id,
         label: item.label,
@@ -224,6 +233,7 @@ function move(event: KeyboardEvent): void {
                 button.id === 'undo' ||
                 button.id === 'redo' ||
                 button.id === 'image' ||
+                button.id === 'roll' ||
                 button.id === 'horizontalRule'
                     ? undefined
                     : button.isActive()

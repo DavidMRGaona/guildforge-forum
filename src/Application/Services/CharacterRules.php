@@ -42,7 +42,7 @@ final readonly class CharacterRules
     public function mayHaveCharacters(?Authenticatable $user): bool
     {
         return $this->decide(function () use ($user): bool {
-            if (! $user instanceof Authenticatable || $this->suspensions->isSuspended($user)) {
+            if (! $user instanceof Authenticatable || $this->suspensions->isBarred($user)) {
                 return false;
             }
 

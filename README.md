@@ -274,6 +274,20 @@ Cada cuenta escribe como sus personajes, para que las partidas se lean como una 
 - **Quién puede tenerlos**: ajuste «¿Quién puede tener personajes?»: nadie, cualquier cuenta con sesión (por defecto) o solo con `forum:characters.use`. Quien está suspendido en el foro no los crea ni escribe como ellos. Su dueño siempre puede verlos, retirarlos y borrarlos.
 - **Anonimización** (#15): `Character::stripPersonalDetails()` deja el nombre y quita la descripción y el retrato; falta llamarlo al anonimizar una cuenta.
 
+## Cuentas anonimizadas, desactivadas y restauradas
+
+El foro sigue los eventos de cuentas del core (`UserAnonymized`, `UserDeactivated`, `UserRestored`, `UserProfileUpdated`).
+
+- **Anonimizar** (`AccountErasure`, en una transacción, repetible y en cola con reintentos):
+  - Los mensajes y temas se quedan, con el nombre anónimo de la web: el foro lee los nombres de la cuenta al pintar, así que también las menciones. El texto plano que guardan los mensajes que mencionan a la persona se reescribe con ese nombre (búsqueda y avisos). Nunca se muestra el avatar de un autor.
+  - Se borran sus «me gusta», seguimientos, marcas de lectura, preferencias y las denuncias que hizo. Sus avisos de la campana, silencios y preferencias de correo ya los borra el core.
+  - Los personajes pierden la descripción y el retrato (que dejan de contar como uso en la biblioteca de medios) y se retiran con bloqueo de moderación, así que nadie los usa aunque se restaure la cuenta. El nombre se queda en los mensajes.
+  - Las denuncias que recibieron sus mensajes, sus suspensiones y el historial de moderación se quedan. Las imágenes de los mensajes también.
+  - La cuenta del sistema nunca se anonimiza desde el foro; si lo hace el core, el foro crea otra cuando la necesita.
+- **Desactivar y restaurar**: el foro no guarda nada del estado. Quien tiene la cuenta desactivada (o anonimizada) cuenta como «impedida» (`ForumSuspensions::isBarred()`): no escribe, no da «me gusta», no denuncia, no modera, no usa personajes y no recibe avisos. Sus mensajes siguen visibles. Al restaurarla vuelve todo, salvo los personajes que retiró la moderación.
+- **Cambio de nombre o avatar**: no hace falta nada. Los nombres se leen al pintar y no hay cachés. La única copia es el texto plano de los mensajes que mencionan a alguien, que dice lo que era verdad al escribirlo (como una cita).
+- `tests/Integration/Persistence/AccountDataCoverageTest.php` falla si hay una tabla o una columna de persona sin decidir en `tests/Support/ErasedTables.php`.
+
 ## Permisos
 
 Ninguno se concede solo: cada asociación los da a los roles que cree en el editor de roles. La administración los tiene todos.

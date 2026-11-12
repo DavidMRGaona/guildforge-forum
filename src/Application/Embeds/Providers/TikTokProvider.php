@@ -49,7 +49,7 @@ final class TikTokProvider extends AbstractEmbedProvider
     {
         [, $video] = explode('/', $id, 2);
 
-        return new EmbedPlayer("https://www.tiktok.com/embed/v2/{$video}", EmbedPlayer::PORTRAIT);
+        return new EmbedPlayer("https://www.tiktok.com/embed/v2/{$video}", EmbedPlayer::POST_SANDBOX, EmbedPlayer::PORTRAIT);
     }
 
     public function frameOrigins(): array

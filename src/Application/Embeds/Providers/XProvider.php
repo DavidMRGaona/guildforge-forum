@@ -41,7 +41,7 @@ final class XProvider extends AbstractEmbedProvider
 
     public function player(string $id, ?EmbedCard $card, string $siteHost): EmbedPlayer
     {
-        return new EmbedPlayer("https://platform.twitter.com/embed/Tweet.html?id={$id}&dnt=true", EmbedPlayer::POST);
+        return new EmbedPlayer("https://platform.twitter.com/embed/Tweet.html?id={$id}&dnt=true", EmbedPlayer::POST_SANDBOX, EmbedPlayer::POST);
     }
 
     public function frameOrigins(): array

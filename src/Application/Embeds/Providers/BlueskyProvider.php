@@ -63,7 +63,7 @@ final class BlueskyProvider extends AbstractEmbedProvider
         $did = preg_match(self::DID_PATTERN, $handle) === 1 ? $handle : $this->detail($card, self::DID);
 
         return $did !== null && preg_match(self::DID_PATTERN, $did) === 1
-            ? new EmbedPlayer("https://embed.bsky.app/embed/{$did}/app.bsky.feed.post/{$post}", EmbedPlayer::POST)
+            ? new EmbedPlayer("https://embed.bsky.app/embed/{$did}/app.bsky.feed.post/{$post}", EmbedPlayer::POST_SANDBOX, EmbedPlayer::POST)
             : null;
     }
 

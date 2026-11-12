@@ -36,7 +36,7 @@ final class InstagramProvider extends AbstractEmbedProvider
 
     public function player(string $id, ?EmbedCard $card, string $siteHost): EmbedPlayer
     {
-        return new EmbedPlayer("https://www.instagram.com/{$id}/embed/", EmbedPlayer::PORTRAIT);
+        return new EmbedPlayer("https://www.instagram.com/{$id}/embed/", EmbedPlayer::POST_SANDBOX, EmbedPlayer::PORTRAIT);
     }
 
     public function frameOrigins(): array

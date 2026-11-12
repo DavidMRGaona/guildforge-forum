@@ -76,6 +76,7 @@ final class EmbedNode extends AbstractNodeType
         if ($player instanceof EmbedPlayer) {
             $figure .= ' data-embed-src="'.Html::escape($player->src).'" data-embed-aspect="'.Html::escape($player->aspect).'"'
                 .' data-embed-referrer="'.Html::escape($player->referrerPolicy).'"'
+                .' data-embed-sandbox="'.Html::escape($player->sandboxAttribute()).'"'
                 .' data-embed-title="'.Html::escape(__('forum::messages.embeds.frame_title', ['service' => $provider->label()])).'"'
                 .($view->consentCategory !== null ? ' data-embed-consent="'.Html::escape($view->consentCategory).'"' : '');
         }

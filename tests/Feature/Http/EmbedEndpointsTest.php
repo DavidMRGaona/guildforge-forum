@@ -189,6 +189,7 @@ final class EmbedEndpointsTest extends ModuleTestCase
 
         $this->assertStringContainsString('data-forum-embed data-embed-service="youtube"', $html);
         $this->assertStringContainsString('data-embed-src="https://www.youtube-nocookie.com/embed/'.self::VIDEO.'?rel=0"', $html);
+        $this->assertStringContainsString('data-embed-sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"', $html);
         $this->assertStringContainsString('data-embed-consent="videos"', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;Vídeo', $html);
         $this->assertStringContainsString('Canal &amp; &quot;amigos&quot;', $html);

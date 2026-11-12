@@ -52,7 +52,7 @@ final class TwitchProvider extends AbstractEmbedProvider
             'v' => "https://player.twitch.tv/?video=v{$value}&parent={$parent}&autoplay=false",
             'c' => "https://clips.twitch.tv/embed?clip={$value}&parent={$parent}&autoplay=false",
             default => "https://player.twitch.tv/?channel={$value}&parent={$parent}&autoplay=false",
-        }, EmbedPlayer::VIDEO);
+        }, EmbedPlayer::POST_SANDBOX, EmbedPlayer::VIDEO);
     }
 
     public function frameOrigins(): array

@@ -6,13 +6,24 @@ import { nextTick, onMounted, watch, watchEffect, type Ref } from 'vue';
  * card (EmbedNode) and keeps the service's player in data attributes; nothing of the service
  * loads until the reader asks for it («Cargar contenido de X») or already consented to the
  * service's cookie category. Without a cookie consent module there is no consent, so it always
- * takes the click. The player goes in a sandboxed frame without referrer (or with the site's
+ * takes the click. The player goes in a frame sandboxed with only what its service needs
+ * (EmbedPlayer), without referrer (or with the site's
  * origin only, for players that refuse to load without one); no script of the service ever
  * runs on the forum's page.
  */
 
-const SANDBOX =
-    'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation';
+/**
+ * The only sandbox tokens a player may get (EmbedPlayer::ALLOWED_SANDBOX): each service's
+ * player says which of them it needs, and anything else in the attribute is dropped. Never
+ * top navigation, forms, modals or downloads.
+ */
+const ALLOWED_SANDBOX = new Set([
+    'allow-scripts',
+    'allow-same-origin',
+    'allow-popups',
+    'allow-popups-to-escape-sandbox',
+    'allow-presentation',
+]);
 
 const REFERRER_POLICIES = new Set(['no-referrer', 'strict-origin']);
 
@@ -33,7 +44,8 @@ export function loadEmbed(figure: HTMLElement): HTMLIFrameElement | null {
     const iframe = document.createElement('iframe');
     iframe.src = src;
     iframe.title = figure.dataset['embedTitle'] ?? '';
-    iframe.setAttribute('sandbox', SANDBOX);
+    // An empty sandbox (nothing valid asked for) is the strictest one: the player stays inert
+    iframe.setAttribute('sandbox', sandboxOf(figure.dataset['embedSandbox'] ?? ''));
     iframe.setAttribute(
         'referrerpolicy',
         REFERRER_POLICIES.has(referrer) ? referrer : 'no-referrer'
@@ -110,6 +122,13 @@ export function useEmbeds(root: Ref<HTMLElement | null>, html: () => string | nu
         },
         { flush: 'post' }
     );
+}
+
+/** The player's tokens that are allowed, each once, in the order given */
+export function sandboxOf(value: string): string {
+    const tokens = value.split(/\s+/).filter((token) => ALLOWED_SANDBOX.has(token));
+
+    return [...new Set(tokens)].join(' ');
 }
 
 function isHttps(value: string): boolean {

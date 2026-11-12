@@ -47,7 +47,7 @@ final class YouTubeProvider extends AbstractEmbedProvider
 
     public function player(string $id, ?EmbedCard $card, string $siteHost): EmbedPlayer
     {
-        return new EmbedPlayer("https://www.youtube-nocookie.com/embed/{$id}?rel=0", EmbedPlayer::VIDEO, EmbedPlayer::ORIGIN_ONLY);
+        return new EmbedPlayer("https://www.youtube-nocookie.com/embed/{$id}?rel=0", [...EmbedPlayer::POST_SANDBOX, EmbedPlayer::PRESENTATION], EmbedPlayer::VIDEO, EmbedPlayer::ORIGIN_ONLY);
     }
 
     public function frameOrigins(): array

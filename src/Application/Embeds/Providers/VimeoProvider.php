@@ -45,7 +45,7 @@ final class VimeoProvider extends AbstractEmbedProvider
 
     public function player(string $id, ?EmbedCard $card, string $siteHost): EmbedPlayer
     {
-        return new EmbedPlayer("https://player.vimeo.com/video/{$id}?dnt=1", EmbedPlayer::VIDEO);
+        return new EmbedPlayer("https://player.vimeo.com/video/{$id}?dnt=1", [...EmbedPlayer::POST_SANDBOX, EmbedPlayer::PRESENTATION], EmbedPlayer::VIDEO);
     }
 
     public function frameOrigins(): array

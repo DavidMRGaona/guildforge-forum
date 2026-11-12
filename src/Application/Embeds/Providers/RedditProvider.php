@@ -44,7 +44,7 @@ final class RedditProvider extends AbstractEmbedProvider
     {
         [$subreddit, $post] = explode('/', $id, 2);
 
-        return new EmbedPlayer("https://embed.reddit.com/r/{$subreddit}/comments/{$post}/?embed=true&showmedia=true", EmbedPlayer::POST);
+        return new EmbedPlayer("https://embed.reddit.com/r/{$subreddit}/comments/{$post}/?embed=true&showmedia=true", EmbedPlayer::POST_SANDBOX, EmbedPlayer::POST);
     }
 
     public function frameOrigins(): array

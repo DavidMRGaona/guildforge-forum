@@ -145,6 +145,64 @@ final class EmbedProvidersTest extends TestCase
         }
     }
 
+    /**
+     * The least each player needs. Every one runs its own script in its own origin and opens
+     * its links in a new tab; only the video players can send to a screen. None ever gets top
+     * navigation, forms or modals.
+     *
+     * @return iterable<string, array{string, string, list<string>}>
+     */
+    public static function sandboxes(): iterable
+    {
+        $post = ['allow-scripts', 'allow-same-origin', 'allow-popups', 'allow-popups-to-escape-sandbox'];
+        $video = [...$post, 'allow-presentation'];
+
+        yield 'reddit' => ['reddit', 'rpg/1abc2de', $post];
+        yield 'x' => ['x', '1790000000000000000', $post];
+        yield 'bluesky' => ['bluesky', self::DID.'/3kxyzabcdefgh', $post];
+        yield 'instagram' => ['instagram', 'p/C1a2B3c4D5e', $post];
+        yield 'tiktok' => ['tiktok', 'rolero.es/7310000000000000000', $post];
+        yield 'youtube' => ['youtube', 'dQw4w9WgXcQ', $video];
+        yield 'vimeo' => ['vimeo', '76979871', $video];
+        yield 'twitch' => ['twitch', 'v:2245123456', $post];
+    }
+
+    /**
+     * @param  list<string>  $expected
+     */
+    #[DataProvider('sandboxes')]
+    public function test_each_player_gets_only_the_sandbox_it_needs(string $service, string $id, array $expected): void
+    {
+        $player = EmbedProviders::builtIn()->get($service)?->player($id, null, 'foro.example.org');
+
+        $this->assertInstanceOf(EmbedPlayer::class, $player);
+        $this->assertSame($expected, $player->sandbox);
+        $this->assertSame(implode(' ', $expected), $player->sandboxAttribute());
+    }
+
+    public function test_every_service_has_its_sandbox_case(): void
+    {
+        $this->assertSame(EmbedProviders::builtIn()->keys(), array_keys(iterator_to_array(self::sandboxes())));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function forbiddenSandboxTokens(): iterable
+    {
+        foreach (['allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-forms', 'allow-modals', 'allow-downloads', 'allow-pointer-lock', 'allow-storage-access-by-user-activation', 'allow-scripts allow-forms', ''] as $token) {
+            yield $token === '' ? 'empty' : $token => [$token];
+        }
+    }
+
+    #[DataProvider('forbiddenSandboxTokens')]
+    public function test_a_player_never_gets_any_other_token(string $token): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new EmbedPlayer('https://player.example.com/1', [EmbedPlayer::SCRIPTS, $token]);
+    }
+
     public function test_youtube_plays_without_cookies_and_twitch_knows_the_site(): void
     {
         $providers = EmbedProviders::builtIn();

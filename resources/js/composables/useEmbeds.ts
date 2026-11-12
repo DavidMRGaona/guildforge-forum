@@ -27,6 +27,13 @@ const ALLOWED_SANDBOX = new Set([
 
 const REFERRER_POLICIES = new Set(['no-referrer', 'strict-origin']);
 
+/** Heights a player may ask for, in pixels: never a frame that vanishes or takes the page */
+const MIN_HEIGHT = 80;
+
+const MAX_HEIGHT = 2400;
+
+let listening = false;
+
 const ASPECTS = new Set(['video', 'portrait', 'post']);
 
 /** Loads the player of an embed card; false when it has none or it is already loaded */
@@ -62,8 +69,98 @@ export function loadEmbed(figure: HTMLElement): HTMLIFrameElement | null {
         figure.appendChild(frame);
     }
     figure.dataset['embedLoaded'] = 'true';
+    listenToHeights();
 
     return iframe;
+}
+
+/**
+ * The height a service's frame posts about its content, in its own format; null for anything
+ * else. Posts of social networks have no fixed shape, so the frame follows what they say.
+ */
+export function heightFrom(service: string, data: unknown): number | null {
+    const message = parsed(data);
+    let height: unknown = null;
+
+    if (service === 'reddit' && message['type'] === 'resize.embed') {
+        height = message['data'];
+    } else if (service === 'instagram' && message['type'] === 'MEASURE') {
+        height = record(message['details'])['height'];
+    } else if (service === 'bluesky') {
+        height = message['height'];
+    } else if (service === 'x') {
+        const call = record(message['twttr.embed']);
+        const params = call['params'];
+        if (call['method'] === 'twttr.private.resize' && Array.isArray(params)) {
+            height = record(params[0])['height'];
+        }
+    }
+
+    if (typeof height !== 'number' || !Number.isFinite(height)) {
+        return null;
+    }
+
+    return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.ceil(height)));
+}
+
+/**
+ * Follows the heights the loaded players post, once a player is loaded. A message counts only
+ * from the window of one of the forum's embed frames and from that frame's origin.
+ */
+function listenToHeights(): void {
+    if (listening) {
+        return;
+    }
+    listening = true;
+
+    window.addEventListener('message', (event: MessageEvent) => {
+        if (event.source === null) {
+            return;
+        }
+
+        for (const iframe of document.querySelectorAll<HTMLIFrameElement>(
+            '[data-forum-embed] .forum-embed__frame iframe'
+        )) {
+            if (iframe.contentWindow !== event.source) {
+                continue;
+            }
+            const figure = iframe.closest<HTMLElement>('[data-forum-embed]');
+            const height =
+                originOf(iframe.src) === event.origin
+                    ? heightFrom(figure?.dataset['embedService'] ?? '', event.data)
+                    : null;
+            if (height !== null && iframe.parentElement !== null) {
+                iframe.parentElement.style.height = `${height}px`;
+            }
+
+            return;
+        }
+    });
+}
+
+function parsed(data: unknown): Record<string, unknown> {
+    if (typeof data !== 'string') {
+        return record(data);
+    }
+    try {
+        return record(JSON.parse(data));
+    } catch {
+        return {};
+    }
+}
+
+function record(value: unknown): Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+}
+
+function originOf(value: string): string | null {
+    try {
+        return new URL(value).origin;
+    } catch {
+        return null;
+    }
 }
 
 /** Loads every embed in the root whose service's cookie category the reader consented to */

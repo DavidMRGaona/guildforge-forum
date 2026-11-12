@@ -6,6 +6,7 @@ import {
 import {
     bindEmbedButtons,
     loadConsentedEmbeds,
+    heightFrom,
     loadEmbed,
     sandboxOf,
 } from '../../../resources/js/composables/useEmbeds';
@@ -144,6 +145,71 @@ describe('embedded posts', () => {
 
         expect(iframe?.hasAttribute('sandbox')).toBe(true);
         expect(iframe?.getAttribute('sandbox')).toBe('');
+    });
+
+    it.each([
+        ['reddit', { type: 'resize.embed', data: 240 }, 240],
+        ['reddit', '{"type":"resize.embed","data":240.4}', 241],
+        ['instagram', { type: 'MEASURE', details: { height: 782 } }, 782],
+        ['bluesky', { height: 671.625, id: null }, 672],
+        [
+            'x',
+            {
+                'twttr.embed': {
+                    method: 'twttr.private.resize',
+                    params: [{ height: 300, width: 550 }],
+                },
+            },
+            300,
+        ],
+    ])('read the height the %s frame posts', (service, data, height) => {
+        expect(heightFrom(service, data)).toBe(height);
+    });
+
+    it('read no height from anything else, and keep it within bounds', () => {
+        expect(heightFrom('reddit', { type: 'MEASURE', details: { height: 500 } })).toBeNull();
+        expect(heightFrom('youtube', { height: 500 })).toBeNull();
+        expect(
+            heightFrom('x', { 'twttr.embed': { method: 'twttr.private.initialized' } })
+        ).toBeNull();
+        expect(heightFrom('bluesky', { height: '500' })).toBeNull();
+        expect(heightFrom('bluesky', 'not json')).toBeNull();
+        expect(heightFrom('bluesky', { height: Number.POSITIVE_INFINITY })).toBeNull();
+        expect(heightFrom('bluesky', { height: 5 })).toBe(80);
+        expect(heightFrom('bluesky', { height: 999999 })).toBe(2400);
+    });
+
+    it('size a frame only from its own window and origin', () => {
+        const element = root(
+            CARD.replace('data-embed-service="youtube"', 'data-embed-service="bluesky"').replace(
+                'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0',
+                'https://embed.bsky.app/embed/did:plc:abc/app.bsky.feed.post/3kxyz'
+            )
+        );
+        const iframe = loadEmbed(
+            element.querySelector<HTMLElement>('[data-forum-embed]') as HTMLElement
+        ) as HTMLIFrameElement;
+        const frame = iframe.parentElement as HTMLElement;
+        const post = (origin: string, from: MessageEventSource | null): void => {
+            window.dispatchEvent(
+                new MessageEvent('message', { data: { height: 400 }, origin, source: from })
+            );
+        };
+
+        // A frame without a window yet must not match a message without a source
+        expect(iframe.contentWindow).toBeNull();
+        post('https://embed.bsky.app', null);
+        expect(frame.style.height).toBe('');
+
+        const source = { postMessage: () => undefined } as unknown as Window;
+        Object.defineProperty(iframe, 'contentWindow', { value: source });
+
+        post('https://evil.example', source);
+        post('https://embed.bsky.app', window);
+        expect(frame.style.height).toBe('');
+
+        post('https://embed.bsky.app', source);
+        expect(frame.style.height).toBe('400px');
     });
 
     it('load each player once', () => {

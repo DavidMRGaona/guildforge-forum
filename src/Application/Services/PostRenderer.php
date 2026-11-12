@@ -48,13 +48,18 @@ final readonly class PostRenderer
 
     /**
      * @param  list<PostBody>  $bodies
+     * @param  array<int, string|null>  $speakers  by the index of each body: the name of the character it speaks as (rolls say who throws them); missing or null out of character
      * @return list<string> the HTML of each, in the same order
      */
-    public function toHtml(array $bodies, ?Authenticatable $reader): array
+    public function toHtml(array $bodies, ?Authenticatable $reader, array $speakers = []): array
     {
         $context = $this->contextFor($bodies, $reader);
 
-        return array_map(fn (PostBody $body): string => $this->renderer->toHtml($body->document, $context), $bodies);
+        return array_map(
+            fn (PostBody $body, int $index): string => $this->renderer->toHtml($body->document, $context->withSpeaker($speakers[$index] ?? null)),
+            $bodies,
+            array_keys($bodies),
+        );
     }
 
     /**

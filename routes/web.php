@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Http\Controllers\CategoryController;
+use Modules\Forum\Http\Controllers\CharacterController;
 use Modules\Forum\Http\Controllers\DiscussionController;
 use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
@@ -137,7 +138,7 @@ Route::prefix('foro')
                 ->name('images.store');
         });
 
-        // Likes, follows and the forum's preferences, all JSON
+        // Likes, follows, characters and the forum's preferences, all JSON
         Route::middleware('auth')->group(function (): void {
             Route::post('mensajes/{post}/me-gusta', [PostLikesController::class, 'store'])
                 ->whereUuid('post')
@@ -155,6 +156,26 @@ Route::prefix('foro')
                 ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
                 ->middleware('throttle:30,1,forum-follows')
                 ->name('categories.follow');
+            // Characters: the profile tab lists one's own; their owner and moderators change them
+            Route::get('personajes', [CharacterController::class, 'index'])
+                ->middleware('throttle:60,1,forum-characters')
+                ->name('characters.index');
+            Route::middleware('throttle:30,1,forum-characters-write')->group(function (): void {
+                Route::post('personajes', [CharacterController::class, 'store'])->name('characters.store');
+                // Multipart (a portrait may come with it), hence POST
+                Route::post('personajes/{character}', [CharacterController::class, 'update'])
+                    ->whereUuid('character')
+                    ->name('characters.update');
+                Route::post('personajes/{character}/retirar', [CharacterController::class, 'retire'])
+                    ->whereUuid('character')
+                    ->name('characters.retire');
+                Route::post('personajes/{character}/recuperar', [CharacterController::class, 'restore'])
+                    ->whereUuid('character')
+                    ->name('characters.restore');
+                Route::delete('personajes/{character}', [CharacterController::class, 'destroy'])
+                    ->whereUuid('character')
+                    ->name('characters.destroy');
+            });
             Route::get('preferencias', [ForumPreferencesController::class, 'show'])
                 ->middleware('throttle:60,1,forum-preferences')
                 ->name('preferences.show');

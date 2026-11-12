@@ -18,6 +18,7 @@ use Modules\Forum\Application\Content\Nodes\HorizontalRuleNode;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Content\Nodes\ListItemNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
+use Modules\Forum\Application\Content\Nodes\OocNode;
 use Modules\Forum\Application\Content\Nodes\OrderedListNode;
 use Modules\Forum\Application\Content\Nodes\ParagraphNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
@@ -113,6 +114,7 @@ final class DocumentSchema
             new HardBreakNode,
             new MentionNode,
             new RollNode,
+            new OocNode,
         ];
     }
 

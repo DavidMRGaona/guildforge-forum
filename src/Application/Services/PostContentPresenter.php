@@ -7,9 +7,12 @@ namespace Modules\Forum\Application\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\DTOs\PostContentDTO;
+use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\PostStatus;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 
 /**
  * What each post of a discussion shows to a reader. A post its author deleted keeps its place
@@ -24,6 +27,8 @@ final readonly class PostContentPresenter
         private ForumAccessInterface $access,
         private PostingService $posting,
         private PostRenderer $renderer,
+        private CharacterRepositoryInterface $characters,
+        private CharacterRules $characterRules,
     ) {}
 
     /**
@@ -36,13 +41,23 @@ final readonly class PostContentPresenter
         $moderates = $this->access->canModerate($reader, $discussion);
         $canPost = $this->posting->canPost($reader, $discussion);
 
-        $shown = array_filter($posts, fn (Post $post): bool => $this->showsContent($post, $readerId, $moderates));
+        $shown = array_values(array_filter($posts, fn (Post $post): bool => $this->showsContent($post, $readerId, $moderates)));
+        $characters = $this->charactersOf($posts, $reader);
         $html = array_combine(
             array_map(static fn (Post $post): string => $post->id()->value, $shown),
-            $this->renderer->toHtml(array_values(array_map(static fn (Post $post) => $post->body(), $shown)), $reader),
+            $this->renderer->toHtml(
+                array_map(static fn (Post $post) => $post->body(), $shown),
+                $reader,
+                array_map(static fn (Post $post): ?string => ($characters[$post->characterId()->value ?? ''] ?? null)?->name(), $shown),
+            ),
         );
+        /** @var array<string, bool> $moderated */
+        $moderated = [];
+        foreach ($characters as $id => $character) {
+            $moderated[$id] = $this->characterRules->moderates($reader, $character);
+        }
 
-        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates): PostContentDTO {
+        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates, $characters, $moderated): PostContentDTO {
             $own = $readerId !== null && $post->authorId() === $readerId;
             $ownEditable = $own && $canPost && $post->status() !== PostStatus::Deleted;
             // Moderators edit anyone's post; the version it replaces stays in its history
@@ -59,8 +74,27 @@ final readonly class PostContentPresenter
                 canEdit: $editable,
                 canDelete: $ownEditable && $post->status() !== PostStatus::Pending,
                 hiddenReason: $own || $moderates ? $post->hiddenReason() : null,
+                character: $characters[$post->characterId()->value ?? ''] ?? null,
+                moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
             );
         }, $posts);
+    }
+
+    /**
+     * The characters the posts speak as that the reader may see, by id. A post whose character
+     * the reader may not see shows its account, as one out of character.
+     *
+     * @param  list<Post>  $posts
+     * @return array<string, Character>
+     */
+    private function charactersOf(array $posts, ?Authenticatable $reader): array
+    {
+        $ids = array_values(array_filter(array_map(static fn (Post $post): ?CharacterId => $post->characterId(), $posts)));
+
+        return array_filter(
+            $this->characters->findMany($ids),
+            fn (Character $character): bool => $this->characterRules->maySee($reader, $character),
+        );
     }
 
     private function showsContent(Post $post, ?string $readerId, bool $moderates): bool

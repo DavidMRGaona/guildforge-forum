@@ -7,6 +7,7 @@ namespace Modules\Forum\Domain\Entities;
 use DateTimeImmutable;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\ValueObjects\AccountId;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 
@@ -24,6 +25,7 @@ final readonly class PostRevision
      * @param  int  $number  from 1, in the order the edits happened
      * @param  string|null  $editorId  who made the edit that replaced this version; null once that account is gone
      * @param  DateTimeImmutable  $replacedAt  when that edit happened
+     * @param  CharacterId|null  $characterId  the character this version spoke as
      *
      * @throws InvalidPostException
      */
@@ -33,6 +35,7 @@ final readonly class PostRevision
         public PostBody $body,
         ?string $editorId,
         public DateTimeImmutable $replacedAt,
+        public ?CharacterId $characterId = null,
     ) {
         if ($number < 1) {
             throw InvalidPostException::numberNotPositive($number);

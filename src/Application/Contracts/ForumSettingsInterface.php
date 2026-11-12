@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Contracts;
 
+use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 
 interface ForumSettingsInterface
@@ -53,4 +54,7 @@ interface ForumSettingsInterface
      * @return list<string> category ids
      */
     public function announcedCategoryIds(): array;
+
+    /** Who may have characters and write as them */
+    public function characterAccess(): CharacterAccessMode;
 }

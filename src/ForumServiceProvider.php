@@ -29,6 +29,7 @@ use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
 use Modules\Forum\Application\Content\DocumentSchema;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\CharacterPortraitStorageInterface;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
@@ -58,6 +59,7 @@ use Modules\Forum\Domain\Events\ForumPostReported;
 use Modules\Forum\Domain\Events\ForumUserSuspended;
 use Modules\Forum\Domain\Events\ForumUserSuspensionLifted;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
@@ -76,10 +78,13 @@ use Modules\Forum\Infrastructure\Listeners\NotifyUserOfLiftedSuspension;
 use Modules\Forum\Infrastructure\Listeners\NotifyUserOfSuspension;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
+use Modules\Forum\Infrastructure\Media\CharacterPortraitMediaSource;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CharacterModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCharacterRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiceRollRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
@@ -97,6 +102,7 @@ use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
 use Modules\Forum\Infrastructure\Search\ForumSearchObserver;
 use Modules\Forum\Infrastructure\Search\PostSearchSource;
 use Modules\Forum\Infrastructure\Services\CategoryForumAccess;
+use Modules\Forum\Infrastructure\Services\CloudinaryCharacterPortraitStorage;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
@@ -119,7 +125,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * Permission names, stored by the loader as "forum:<name>".
      */
-    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images'];
+    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'characters.use'];
 
     /**
      * Container tags for the post document's extra node and mark types: a feature that adds a
@@ -145,6 +151,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
         $this->app->bind(PostRevisionRepositoryInterface::class, EloquentPostRevisionRepository::class);
         $this->app->bind(DiceRollRepositoryInterface::class, EloquentDiceRollRepository::class);
+        $this->app->bind(CharacterRepositoryInterface::class, EloquentCharacterRepository::class);
+        $this->app->bind(CharacterPortraitStorageInterface::class, CloudinaryCharacterPortraitStorage::class);
         $this->app->bind(NumberGenerator::class, RandomIntNumbers::class);
         $this->app->bind(ForumCountersInterface::class, EloquentForumCounters::class);
         $this->app->bind(SubjectDiscussionRepositoryInterface::class, EloquentSubjectDiscussionRepository::class);
@@ -228,6 +236,16 @@ final class ForumServiceProvider extends ModuleServiceProvider
         );
         PostModel::saved($observer->saved(...));
         PostModel::deleted($observer->deleted(...));
+        // And which portrait a character took, dropped or left with it
+        $portraits = new RefreshMediaUsagesObserver(
+            CharacterPortraitMediaSource::TYPE,
+            static fn (Model $character): array => $character instanceof CharacterModel
+                && ($character->getOriginal('portrait_path') !== null || $character->getAttribute('portrait_path') !== null)
+                ? [$character->id]
+                : [],
+        );
+        CharacterModel::saved($portraits->saved(...));
+        CharacterModel::deleted($portraits->deleted(...));
 
         // The site search learns at once what was written, moved, hidden, approved or deleted
         ForumSearchObserver::register();
@@ -248,7 +266,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
      */
     public function registerMediaSources(): array
     {
-        return [PostImageMediaSource::class];
+        return [PostImageMediaSource::class, CharacterPortraitMediaSource::class];
     }
 
     /**
@@ -264,6 +282,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * - The «Foro» tab of the profile: following after posting, and what the person follows.
      *   The section loads GET /foro/preferencias itself.
+     * - The «Personajes» tab of the profile: the person's characters (GET /foro/personajes).
      * - The conversation of a record (game table, campaign, event) in its page: the page hands
      *   `subjectType` and `subjectId` to the slot, and the component asks for the rest.
      *
@@ -283,6 +302,19 @@ final class ForumServiceProvider extends ModuleServiceProvider
                     'tabId' => 'forum',
                     'icon' => 'cog',
                     'labelKey' => 'forum.preferences.tabLabel',
+                ],
+            ),
+            new SlotRegistrationDTO(
+                slot: 'profile-sections',
+                component: 'components/profile/ForumCharacters.vue',
+                module: $this->moduleName(),
+                order: 41,
+                props: [],
+                dataKeys: [],
+                profileTab: [
+                    'tabId' => 'forum-characters',
+                    'icon' => 'user',
+                    'labelKey' => 'forum.characters.tabLabel',
                 ],
             ),
             new SlotRegistrationDTO(

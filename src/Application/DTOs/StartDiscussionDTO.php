@@ -19,5 +19,7 @@ final readonly class StartDiscussionDTO
         public array $topicKeys = [],
         public bool $pinned = false,
         public bool $closed = false,
+        /** The character the first post speaks as; null out of character */
+        public ?string $characterId = null,
     ) {}
 }

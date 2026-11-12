@@ -22,6 +22,10 @@ return [
             'upload_images' => 'Subir imágenes al foro',
             'upload_images_description' => 'Añadir imágenes a los mensajes, con los formatos y límites de los ajustes del foro.',
         ],
+        'characters' => [
+            'use' => 'Tener personajes en el foro',
+            'use_description' => 'Crear personajes y escribir como ellos, cuando los ajustes del foro piden este permiso.',
+        ],
     ],
 
     'settings' => [
@@ -51,6 +55,15 @@ return [
         'announcements' => 'Avisos de temas nuevos',
         'announcements_help' => 'Los temas que se abran en estas categorías se anuncian en los canales del sitio (Telegram y los demás que estén configurados).',
         'announced_categories' => 'Categorías que se anuncian',
+        'characters' => 'Personajes',
+        'characters_help' => 'Las cuentas escriben como sus personajes. Quien modera el foro, o la categoría de un personaje, puede editarlo, retirarlo o borrarlo.',
+        'characters_access' => '¿Quién puede tener personajes?',
+        'characters_access_help' => 'Al apagarlos, los mensajes ya escritos siguen mostrando su personaje.',
+        'characters_access_options' => [
+            'nobody' => 'Nadie',
+            'everyone' => 'Cualquier cuenta con sesión',
+            'permission' => 'Solo con el permiso «Tener personajes en el foro»',
+        ],
         'announced_categories_help' => 'Solo aparecen las categorías que se leen sin sesión. Las de mesas, campañas y eventos se anuncian con su publicación. Sin ninguna marcada, no se anuncia nada.',
     ],
 
@@ -342,16 +355,44 @@ return [
         'role' => 'Imagen del mensaje',
         'post_title' => ':discussion, mensaje :number',
         'pending_post_title' => ':discussion, mensaje pendiente',
+        'characters_source' => 'Personajes del foro',
+        'portrait_role' => 'Retrato',
+        'character_title' => 'Personaje :name',
     ],
 
     'content' => [
         'quote' => 'Cita',
         'quote_by' => ':name escribió:',
         'unknown_account' => 'cuenta eliminada',
+        'ooc' => 'Fuera de personaje',
+    ],
+
+    'characters' => [
+        'fields' => [
+            'name' => 'nombre',
+            'description' => 'descripción',
+            'category' => 'categoría',
+            'portrait' => 'retrato',
+        ],
+        'errors' => [
+            'name' => 'El nombre tiene entre 1 y :name caracteres.',
+            'description' => 'La descripción tiene como mucho :description caracteres.',
+            'category' => 'No puedes atar un personaje a esa categoría.',
+            'portrait' => 'El retrato debe ser una imagen en uno de los formatos admitidos.',
+            'owner' => 'El personaje no tiene una cuenta válida.',
+            'too_many' => 'Ya tienes :max personajes. Borra alguno sin mensajes para crear otro.',
+            'has_posts' => 'Este personaje tiene mensajes: retíralo en lugar de borrarlo.',
+            'locked' => 'La moderación retiró este personaje y solo ella puede recuperarlo.',
+            'not_retired' => 'Este personaje no está retirado.',
+            'already_retired' => 'Este personaje ya está retirado.',
+            'forbidden' => 'No puedes tener personajes en este foro.',
+            'unavailable' => 'No puedes escribir aquí como ese personaje: es de otra cuenta, está retirado o pertenece a otra categoría.',
+        ],
     ],
 
     'dice' => [
         'label' => 'Tirada',
+        'speaker_rolls' => ':name tira',
         'added_on_edit' => 'Añadida al editar',
         'dropped' => 'descartado',
         'exploded' => 'explosión',

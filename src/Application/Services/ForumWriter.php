@@ -10,6 +10,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
+use Modules\Forum\Application\DTOs\SpeakerChoice;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Entities\PostRevision;
@@ -22,6 +23,7 @@ use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -61,13 +63,13 @@ final readonly class ForumWriter
      * discussion waits with it: only its author and moderators see it). The post is dated when
      * the discussion started. The discussion gets the next public number; should
      * another discussion take it at the same moment, the whole write is tried again with the
-     * following one.
+     * following one. The character it speaks as (if any) was checked before.
      */
-    public function startDiscussion(Discussion $discussion, PostId $firstPostId, PostBody $body, bool $needsApproval): Post
+    public function startDiscussion(Discussion $discussion, PostId $firstPostId, PostBody $body, bool $needsApproval, ?CharacterId $characterId = null): Post
     {
         for ($attempt = 1; ; $attempt++) {
             try {
-                $post = DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval): Post {
+                $post = DB::transaction(function () use ($discussion, $firstPostId, $body, $needsApproval, $characterId): Post {
                     $this->categories->lockForWrite($discussion->categoryId());
 
                     // Numbered on a copy: a failed attempt leaves the caller's discussion as it was
@@ -86,8 +88,8 @@ final readonly class ForumWriter
 
                     $rolled = $this->rolls->settle($firstPostId, $body, editing: false, at: $discussion->createdAt());
                     $post = $needsApproval
-                        ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $rolled->body, $discussion->createdAt())
-                        : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $rolled->body, $discussion->createdAt());
+                        ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId)
+                        : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId);
                     $this->posts->save($post);
                     $this->rolls->store($rolled);
 
@@ -107,19 +109,19 @@ final readonly class ForumWriter
 
     /**
      * Adds a post to the discussion with the next number, or without one while it awaits
-     * approval.
+     * approval. The character it speaks as (if any) was checked before.
      *
      * @throws DiscussionNotFoundException
      */
-    public function reply(DiscussionId $discussionId, PostId $postId, ?string $authorId, PostBody $body, DateTimeImmutable $at, bool $needsApproval): Post
+    public function reply(DiscussionId $discussionId, PostId $postId, ?string $authorId, PostBody $body, DateTimeImmutable $at, bool $needsApproval, ?CharacterId $characterId = null): Post
     {
-        return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval): Post {
+        return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval, $characterId): Post {
             $discussion = $this->lockDiscussion($discussionId);
 
             $rolled = $this->rolls->settle($postId, $body, editing: false, at: $at);
             $post = $needsApproval
-                ? Post::submitForApproval($postId, $discussionId, $authorId, $rolled->body, $at)
-                : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $rolled->body, $at);
+                ? Post::submitForApproval($postId, $discussionId, $authorId, $rolled->body, $at, $characterId)
+                : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $rolled->body, $at, $characterId);
             $this->posts->save($post);
             $this->rolls->store($rolled);
 
@@ -200,30 +202,33 @@ final readonly class ForumWriter
     /**
      * Replaces what a post says, first keeping what it said as its next revision. The post is
      * read again under the lock, so two edits at once keep both versions. A body that holds the
-     * same document changes nothing.
+     * same document, said as the same character, changes nothing.
      *
      * @param  string|null  $editorId  who edits it: its author, or a moderator
+     * @param  SpeakerChoice|null  $speaker  who it speaks as from now on (checked before); null keeps it
      *
      * @throws PostNotFoundException
      * @throws InvalidPostException once its author deleted it
      */
-    public function editPost(PostId $postId, PostBody $body, ?string $editorId, DateTimeImmutable $at): Post
+    public function editPost(PostId $postId, PostBody $body, ?string $editorId, DateTimeImmutable $at, ?SpeakerChoice $speaker = null): Post
     {
         $replaced = null;
-        $post = DB::transaction(function () use ($postId, $body, $editorId, $at, &$replaced): Post {
+        $post = DB::transaction(function () use ($postId, $body, $editorId, $at, $speaker, &$replaced): Post {
             $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
+            $characterId = $speaker instanceof SpeakerChoice && ! $speaker->keep ? $speaker->characterId : $post->characterId();
             // Its rolls first: the ones it already has are kept, new ones are thrown once
             $rolled = $this->rolls->settle($postId, $body, editing: true, at: $at);
-            if ($post->body()->sameDocumentAs($rolled->body)) {
+            if ($post->body()->sameDocumentAs($rolled->body) && $post->speaksAs($characterId)) {
                 return $post;
             }
 
             $replaced = $post->body();
-            $post->edit($rolled->body, $at);
+            $replacedCharacter = $post->characterId();
+            $post->edit($rolled->body, $at, $characterId);
 
-            $this->revisions->save(new PostRevision($postId, $this->revisions->nextNumber($postId), $replaced, $editorId, $at));
+            $this->revisions->save(new PostRevision($postId, $this->revisions->nextNumber($postId), $replaced, $editorId, $at, $replacedCharacter));
             $this->posts->save($post);
             $this->rolls->store($rolled);
 

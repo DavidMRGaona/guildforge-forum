@@ -11,6 +11,7 @@ use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -37,6 +38,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             'deleted_at' => $post->deletedAt(),
             'content_purged_at' => $post->contentPurgedAt(),
             'hidden_reason' => $post->hiddenReason(),
+            'character_id' => $post->characterId()?->value,
             'created_at' => $post->createdAt(),
         ]);
     }
@@ -181,6 +183,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             deletedAt: $model->deleted_at?->toDateTimeImmutable(),
             contentPurgedAt: $model->content_purged_at?->toDateTimeImmutable(),
             hiddenReason: $model->status === PostStatus::Hidden->value ? $model->hidden_reason : null,
+            characterId: $model->character_id === null ? null : CharacterId::fromString($model->character_id),
         );
     }
 }

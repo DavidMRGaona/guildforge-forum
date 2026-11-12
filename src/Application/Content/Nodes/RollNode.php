@@ -57,7 +57,10 @@ final class RollNode extends AbstractNodeType
         $rollId = Attributes::string($attributes, 'rollId');
         $roll = $rollId === null ? null : $context->roll($rollId);
 
-        $head = '<p class="forum-roll__head"><span class="forum-roll__label">'.Html::escape(__('forum::messages.dice.label')).'</span> '
+        $speaker = $context->speaker();
+        $label = $speaker === null ? __('forum::messages.dice.label') : __('forum::messages.dice.speaker_rolls', ['name' => $speaker]);
+
+        $head = '<p class="forum-roll__head"><span class="forum-roll__label">'.Html::escape($label).'</span> '
             .'<code class="forum-roll__expression">'.Html::escape($expression).'</code>'
             .($reason === '' ? '' : ' <span class="forum-roll__reason">'.Html::escape($reason).'</span>')
             .($roll?->addedOnEdit === true ? ' <span class="forum-roll__badge">'.Html::escape(__('forum::messages.dice.added_on_edit')).'</span>' : '')

@@ -1,0 +1,130 @@
+import { mount } from '@vue/test-utils';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { nextTick } from 'vue';
+import SpeakAsSelect from '../../../resources/js/components/characters/SpeakAsSelect.vue';
+import type { ForumCharacterPicker } from '../../../resources/js/types/forum';
+
+beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
+        this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
+        this.open = false;
+    };
+});
+
+function aPicker(overrides: Partial<ForumCharacterPicker> = {}): ForumCharacterPicker {
+    return {
+        items: [
+            { id: 'arwen', name: 'Arwen', initials: 'A', portraitUrl: null },
+            {
+                id: 'boromir',
+                name: 'Boromir',
+                initials: 'B',
+                portraitUrl: 'https://cdn.example.com/b.png',
+            },
+        ],
+        suggestedId: 'arwen',
+        categoryId: 'general',
+        createUrl: '/foro/personajes',
+        categories: [
+            { id: 'general', name: 'General', parentId: null, parentName: null },
+            { id: 'espacio', name: 'Espacio', parentId: 'general', parentName: 'General' },
+            { id: 'otra', name: 'Otra', parentId: null, parentName: null },
+        ],
+        limits: {
+            nameMax: 60,
+            descriptionMax: 300,
+            portraitKilobytes: 2048,
+            portraitTypes: ['image/png', 'image/jpeg'],
+            perAccount: 30,
+        },
+        ...overrides,
+    };
+}
+
+function options(wrapper: ReturnType<typeof mount>): string[] {
+    return wrapper.findAll('option').map((option) => option.text());
+}
+
+describe('SpeakAsSelect', () => {
+    it('offers out of character, the characters and a new one', () => {
+        const wrapper = mount(SpeakAsSelect, { props: { modelValue: 'arwen', picker: aPicker() } });
+
+        expect(options(wrapper)).toEqual([
+            'Fuera de personaje',
+            'Arwen',
+            'Boromir',
+            'Nuevo personaje…',
+        ]);
+        expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('arwen');
+        expect(wrapper.find('label').text()).toBe('Hablar como');
+    });
+
+    it('says null when the post goes out of character', async () => {
+        const wrapper = mount(SpeakAsSelect, { props: { modelValue: 'arwen', picker: aPicker() } });
+
+        await wrapper.find('select').setValue('');
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
+    });
+
+    it('opens the form instead of choosing «Nuevo personaje…»', async () => {
+        const wrapper = mount(SpeakAsSelect, {
+            props: { modelValue: null, picker: aPicker() },
+            attachTo: document.body,
+        });
+
+        await wrapper.find('select').setValue('__new__');
+        await nextTick();
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(
+            document.body.querySelector<HTMLDialogElement>('[data-testid="character-dialog"]')?.open
+        ).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('keeps the character a post being edited speaks as, even if retired', () => {
+        const wrapper = mount(SpeakAsSelect, {
+            props: {
+                modelValue: 'retired',
+                picker: aPicker({ createUrl: null }),
+                current: { id: 'retired', name: 'Viejo', initials: 'V', portraitUrl: null },
+            },
+        });
+
+        expect(options(wrapper)).toEqual(['Fuera de personaje', 'Viejo', 'Arwen', 'Boromir']);
+    });
+
+    it('offers on the new discussion page only what the chosen category takes', async () => {
+        const picker = aPicker({
+            items: [
+                {
+                    id: 'arwen',
+                    name: 'Arwen',
+                    initials: 'A',
+                    portraitUrl: null,
+                    categoryIds: ['general', 'espacio'],
+                },
+                {
+                    id: 'boromir',
+                    name: 'Boromir',
+                    initials: 'B',
+                    portraitUrl: null,
+                    categoryIds: ['otra'],
+                },
+            ],
+            categoryId: null,
+            createUrl: null,
+        });
+        const wrapper = mount(SpeakAsSelect, {
+            props: { modelValue: 'boromir', picker, categoryId: 'espacio' },
+        });
+        await nextTick();
+
+        expect(options(wrapper)).toEqual(['Fuera de personaje', 'Arwen']);
+        // The character chosen before no longer fits
+        expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
+    });
+});

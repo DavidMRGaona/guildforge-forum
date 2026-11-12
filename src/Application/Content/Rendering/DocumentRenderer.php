@@ -6,6 +6,7 @@ namespace Modules\Forum\Application\Content\Rendering;
 
 use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
 use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
+use Modules\Forum\Application\Content\Contracts\OutOfCharacterInterface;
 use Modules\Forum\Application\Content\DocumentLimits;
 use Modules\Forum\Application\Content\DocumentSchema;
 
@@ -157,7 +158,9 @@ final readonly class DocumentRenderer
 
         $attributes = is_array($node['attrs'] ?? null) ? $node['attrs'] : [];
         /** @var array<string, mixed> $attributes */
-        $children = $nodeType->content() === null ? [] : $this->children($node, $context, $html, $depth);
+        // What is said out of character never speaks as the post's character
+        $inner = $nodeType instanceof OutOfCharacterInterface ? $context->withSpeaker(null) : $context;
+        $children = $nodeType->content() === null ? [] : $this->children($node, $inner, $html, $depth);
         $rendered = $html
             ? $nodeType->toHtml($attributes, $children, $context)
             : $nodeType->toText($attributes, $children, $context);

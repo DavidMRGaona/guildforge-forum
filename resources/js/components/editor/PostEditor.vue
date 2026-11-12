@@ -107,6 +107,7 @@ const editor = useEditor({
     editable: !props.disabled,
     extensions: createForumExtensions({
         placeholder: props.placeholder,
+        oocLabel: t('forum.editor.oocLabel'),
         imageUrl: (path) => storedImageUrl(path, (publicId) => buildImageUrl(publicId)),
         mentionNames: { nameOf: (id) => names.get(id) ?? null },
         mentionSuggestion:

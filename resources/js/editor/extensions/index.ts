@@ -8,6 +8,7 @@ import { ForumImage } from './ForumImage';
 import { ForumLink } from './ForumLink';
 import { ForumCodeBlock, ForumOrderedList } from './ForumLists';
 import { forumMention, type MentionNames } from './ForumMention';
+import { ForumOoc } from './ForumOoc';
 import { HeadingShortcut } from './HeadingShortcut';
 import { ForumRoll } from './ForumRoll';
 import { MarkdownPaste } from './MarkdownPaste';
@@ -21,6 +22,8 @@ export interface ForumExtensionOptions {
     mentionNames: MentionNames;
     /** How «@» finds people, or null where mentions are not offered */
     mentionSuggestion: Omit<SuggestionOptions, 'editor'> | null;
+    /** The label shown above an aside out of character while writing */
+    oocLabel?: string;
     /**
      * Nodes and marks other features add (dice rolls, out-of-character asides). Each must have
      * its node type registered with the server's document schema, or the post is refused.
@@ -50,6 +53,7 @@ export function createForumExtensions(options: ForumExtensionOptions): AnyExtens
         ForumImage.configure({ urlFor: options.imageUrl }),
         PostQuote,
         ForumRoll,
+        ForumOoc.configure({ label: options.oocLabel ?? '' }),
         forumMention(options.mentionNames, options.mentionSuggestion),
         Placeholder.configure({ placeholder: options.placeholder ?? '' }),
         HeadingShortcut,

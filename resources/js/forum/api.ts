@@ -35,6 +35,34 @@ export async function sendJson<T>(
         return { ok: false, status: 0, data: null, message: null, errors: {} };
     }
 
+    return readAnswer<T>(response);
+}
+
+/**
+ * A multipart request (a form with a file) to the forum's endpoints, answered in JSON. It
+ * never throws: a network failure answers status 0.
+ */
+export async function sendForm<T>(url: string, form: FormData): Promise<JsonAnswer<T>> {
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                ...csrfHeaders(),
+            },
+            body: form,
+        });
+    } catch {
+        return { ok: false, status: 0, data: null, message: null, errors: {} };
+    }
+
+    return readAnswer<T>(response);
+}
+
+async function readAnswer<T>(response: Response): Promise<JsonAnswer<T>> {
     let payload: unknown;
     try {
         payload = await response.json();

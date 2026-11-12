@@ -17,6 +17,7 @@ use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
@@ -35,6 +36,7 @@ final readonly class ForumPresenter
         private AccountDirectoryInterface $accounts,
         private TimezoneServiceInterface $timezone,
         private CategoryStatsQueryInterface $stats,
+        private CharacterPresenter $characters,
     ) {}
 
     /**
@@ -284,6 +286,9 @@ final readonly class ForumPresenter
                 'updateUrl' => $content->canEdit ? route('forum.posts.update', ['post' => $post->id()->value]) : null,
                 'deleteUrl' => $content->canDelete ? route('forum.posts.destroy', ['post' => $post->id()->value]) : null,
                 'hiddenReason' => $content->hiddenReason,
+                // Who it speaks as, when the reader may see that character; its editor starts from it
+                'character' => $content->character instanceof Character ? $this->characters->card($content->character, $content->moderatesCharacter) : null,
+                'characterId' => $content->canEdit ? $post->characterId()?->value : null,
                 // Its moderation menu, for whoever moderates the discussion
                 'moderationUrl' => $moderates ? route('forum.moderation.posts', ['post' => $post->id()->value]) : null,
             ];

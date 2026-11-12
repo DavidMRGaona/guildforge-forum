@@ -33,6 +33,7 @@ use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
+use Modules\Forum\Http\Presenters\CharacterPresenter;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
@@ -62,6 +63,7 @@ final class DiscussionController extends Controller
         private readonly CategoryRepositoryInterface $categories,
         private readonly SuspensionService $suspensionService,
         private readonly ModerationProps $moderationProps,
+        private readonly CharacterPresenter $characters,
     ) {}
 
     public function show(Request $request, string $discussion, ?string $post = null): Response|RedirectResponse
@@ -104,6 +106,8 @@ final class DiscussionController extends Controller
                 'mentionsUrl' => $user === null ? null : route('forum.mentions.index', ['discussion' => $found->id()->value]),
                 ...$this->editor->for($user),
                 'suspension' => $this->moderationProps->suspensionNotice($user),
+                // «Hablar como»: the characters the reader may write as here
+                'characters' => $page->canPost ? $this->characters->picker($user, $page->category, $found->id()) : null,
             ],
             'readUrl' => $user === null ? null : route('forum.discussions.read', ['discussion' => $found->id()->value]),
             'moderation' => $page->canModerate && $user !== null ? $this->moderationMenu($user, $page->discussion) : null,
@@ -171,6 +175,7 @@ final class DiscussionController extends Controller
             'storeUrl' => route('forum.discussions.store'),
             'cancelUrl' => $this->urls->index(),
             'editor' => $this->editor->for($user),
+            'characters' => $this->characters->pickerForCategories($user, array_map(static fn (CategoryAccessDTO $access): Category => $access->category, $categories)),
             'suspension' => $this->moderationProps->suspensionNotice($user),
             'limits' => ['titleMin' => DiscussionStarter::MIN_TITLE_LENGTH, 'titleMax' => DiscussionStarter::MAX_TITLE_LENGTH, 'topicsMax' => DiscussionStarter::MAX_TOPICS],
             'seo' => $this->seo->forPage(new SeoPageDTO(title: __('forum::messages.pages.create_title'), noindex: true))->toArray(),
@@ -191,6 +196,7 @@ final class DiscussionController extends Controller
                     topicKeys: $request->topicKeys(),
                     pinned: $request->boolean('pinned'),
                     closed: $request->boolean('closed'),
+                    characterId: $this->speakerFrom($request)[1],
                 ));
             } catch (DiscussionNotStartedException $exception) {
                 $message = __("forum::messages.discussions.errors.{$exception->reason}");

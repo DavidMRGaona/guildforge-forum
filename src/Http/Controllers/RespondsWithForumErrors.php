@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Forum\Application\Content\DocumentLimits;
+use Modules\Forum\Domain\Exceptions\CharacterUnavailableException;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
@@ -53,6 +54,10 @@ trait RespondsWithForumErrors
                 429,
                 ['Retry-After' => (string) $exception->retryAfterSeconds],
             );
+        } catch (CharacterUnavailableException) {
+            $message = __('forum::messages.characters.errors.unavailable');
+
+            return response()->json(['message' => $message, 'reason' => 'character_unavailable', 'errors' => ['character' => [$message]]], 422);
         } catch (InvalidPostException) {
             return response()->json(['message' => __('forum::messages.errors.post_state')], 409);
         } catch (InvalidDiscussionException) {
@@ -77,5 +82,23 @@ trait RespondsWithForumErrors
         $decoded = json_decode($content, true, 2 * DocumentLimits::MAX_DEPTH + 8);
 
         return is_array($decoded) && array_key_exists('document', $decoded) ? $decoded['document'] : null;
+    }
+
+    /**
+     * Who the post speaks as: [whether the request says, the character id or null out of
+     * character]. Anything that is not a string or null counts as an id nobody has.
+     *
+     * @return array{bool, string|null}
+     */
+    private function speakerFrom(Request $request): array
+    {
+        $decoded = json_decode($request->getContent(), true, 2 * DocumentLimits::MAX_DEPTH + 8);
+        if (! is_array($decoded) || ! array_key_exists('character', $decoded)) {
+            return [false, null];
+        }
+
+        $character = $decoded['character'];
+
+        return [true, $character === null || is_string($character) ? $character : 'invalid'];
     }
 }

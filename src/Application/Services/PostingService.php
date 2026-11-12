@@ -16,6 +16,7 @@ use Modules\Forum\Application\DTOs\PostVersionDTO;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Exceptions\CharacterUnavailableException;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
@@ -23,9 +24,11 @@ use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostingTooFastException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -54,6 +57,8 @@ final readonly class PostingService
         private FollowService $follows,
         private CategoryRepositoryInterface $categories,
         private ApprovalRule $approval,
+        private PostSpeakers $speakers,
+        private CharacterRepositoryInterface $characters,
     ) {}
 
     /**
@@ -61,8 +66,9 @@ final readonly class PostingService
      * @throws ForumActionDeniedException when the author may not write in it, or it is closed
      * @throws InvalidDocumentException
      * @throws PostingTooFastException
+     * @throws CharacterUnavailableException when it would speak as a character the author may not use there
      */
-    public function reply(Authenticatable $author, DiscussionId $discussionId, mixed $document): Post
+    public function reply(Authenticatable $author, DiscussionId $discussionId, mixed $document, ?string $characterId = null): Post
     {
         $discussion = $this->readableDiscussion($author, $discussionId);
         $this->assertCanPost($author, $discussion);
@@ -72,10 +78,11 @@ final readonly class PostingService
         if (! $category instanceof Category) {
             throw DiscussionNotFoundException::withId($discussionId->value);
         }
+        $speaker = $this->speakers->forNewPost($author, $characterId, $category);
         $this->countPost($author);
 
         $now = CarbonImmutable::now();
-        $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: $this->approval->needsApproval($author, $category));
+        $post = $this->writer->reply($discussionId, PostId::generate(), $this->accountId($author), $body, $now, needsApproval: $this->approval->needsApproval($author, $category), characterId: $speaker);
 
         // Whoever replies has read the discussion up to their reply, and follows it from now on
         $number = $post->number()?->value;
@@ -90,17 +97,28 @@ final readonly class PostingService
     /**
      * Replaces the body of one of the author's posts, keeping what it said in its history.
      *
+     * @param  bool  $speakerGiven  whether the editor said who it speaks as ($characterId, null out of character); otherwise it keeps its own
+     *
      * @throws PostNotFoundException when the author may not read it
      * @throws ForumActionDeniedException when it is someone else's, or the author may no longer post there
      * @throws InvalidDocumentException
      * @throws InvalidPostException once it was deleted
+     * @throws CharacterUnavailableException when it would switch to a character the author may not use there
      */
-    public function edit(Authenticatable $author, PostId $postId, mixed $document): Post
+    public function edit(Authenticatable $author, PostId $postId, mixed $document, bool $speakerGiven = false, ?string $characterId = null): Post
     {
         $discussion = $this->ownPostDiscussion($author, $postId);
         $this->assertCanPost($author, $discussion);
 
-        return $this->writer->editPost($postId, $this->bodies->fromInput($document, $author), $this->accountId($author), CarbonImmutable::now());
+        $body = $this->bodies->fromInput($document, $author);
+        $post = $this->posts->findOrFail($postId);
+        $category = $this->categories->find($discussion->categoryId());
+        if (! $category instanceof Category) {
+            throw PostNotFoundException::withId($postId->value);
+        }
+        $speaker = $this->speakers->forEdit($author, $post, $category, $speakerGiven, $characterId);
+
+        return $this->writer->editPost($postId, $body, $this->accountId($author), CarbonImmutable::now(), $speaker);
     }
 
     /**
@@ -145,7 +163,10 @@ final readonly class PostingService
 
         $revisions = $this->revisions->ofPost($postId);
         $bodies = [...array_map(static fn ($revision): PostBody => $revision->body, $revisions), $post->body()];
-        $html = $this->renderer->toHtml($bodies, $moderator);
+        $characterIds = [...array_map(static fn ($revision): ?CharacterId => $revision->characterId, $revisions), $post->characterId()];
+        $characters = $this->characters->findMany(array_values(array_filter($characterIds)));
+        $speakers = array_map(static fn (?CharacterId $id): ?string => $id instanceof CharacterId ? ($characters[$id->value] ?? null)?->name() : null, $characterIds);
+        $html = $this->renderer->toHtml($bodies, $moderator, $speakers);
 
         // Version 1 is the author's; each later one is by whoever made the edit before it
         $writers = [[$post->authorId(), $post->publishedAt() ?? $post->createdAt()]];
@@ -163,6 +184,7 @@ final readonly class PostingService
                 authorName: $writerId === null ? null : ($names[$writerId] ?? null),
                 writtenAt: $writtenAt,
                 isCurrent: $index === count($writers) - 1,
+                characterName: $speakers[$index],
             );
         }
 

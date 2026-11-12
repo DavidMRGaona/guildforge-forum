@@ -15,6 +15,7 @@ use BackedEnum;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -23,6 +24,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
@@ -115,6 +117,19 @@ final class ForumSettingsPage extends Page implements HasForms
                             ->columns(2)
                             ->default([]),
                     ]),
+                Section::make(__('forum::messages.settings.characters'))
+                    ->description(__('forum::messages.settings.characters_help'))
+                    ->schema([
+                        Select::make('characters_access')
+                            ->label(__('forum::messages.settings.characters_access'))
+                            ->helperText(__('forum::messages.settings.characters_access_help'))
+                            ->options($this->characterAccessOptions())
+                            ->native(false)
+                            ->selectablePlaceholder(false)
+                            ->required()
+                            ->in(array_keys($this->characterAccessOptions()))
+                            ->default(CharacterAccessMode::Everyone->value),
+                    ]),
                 Section::make(__('forum::messages.settings.images'))
                     ->description(__('forum::messages.settings.images_help'))
                     ->schema([
@@ -164,6 +179,19 @@ final class ForumSettingsPage extends Page implements HasForms
                 ->label(__('common.save'))
                 ->submit('save'),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function characterAccessOptions(): array
+    {
+        $options = [];
+        foreach (CharacterAccessMode::cases() as $mode) {
+            $options[$mode->value] = $mode->label();
+        }
+
+        return $options;
     }
 
     /**

@@ -2,7 +2,7 @@
 
 Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes, con las mismas cuentas, roles y aspecto que la web.
 
-> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña, las páginas públicas, los «me gusta», el seguimiento, los avisos y la moderación.
+> En construcción. El plan está en la épica #1. Esta versión trae el modelo de datos, los temas automáticos de las publicaciones, los espacios de campaña, las páginas públicas, los «me gusta», el seguimiento, los avisos, la moderación, las tiradas de dados, la búsqueda y los personajes.
 
 ## Qué hay
 
@@ -180,6 +180,7 @@ El editor es TipTap en el navegador. Lo que se envía y se guarda es su document
 | `horizontalRule`, `image` | — | `image`: `origin` (`upload`; otros orígenes podrán añadirse sin migrar datos), `src` (ruta en `forum/posts/`) y `alt` opcional (300 caracteres) |
 | `hardBreak`, `mention` (inline) | — | `mention`: `id` de la cuenta |
 | `roll` | — | `expression` y `reason` (hasta 200 y 100 caracteres) y `rollId` (id de la tirada, solo lo pone el servidor); nunca un resultado |
+| `ooc` | bloques | ninguno: aparte fuera de personaje |
 
 Marcas: `bold`, `italic`, `strike`, `code` y `link` (solo `href`, a `http`, `https` o `mailto`, sin credenciales).
 
@@ -193,6 +194,7 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
   - **Nadie fabrica un resultado**: el esquema rechaza cualquier atributo que no sea `expression`, `reason` y `rollId`. Al guardar, `Application\Services\PostRolls` (dentro de la transacción de `ForumWriter`, también al editar como moderación) comprueba cada `rollId`: en un mensaje nuevo no puede haber ninguno, y al editar solo valen los de las tiradas vigentes de ese mismo mensaje, una vez cada uno y con la expresión con la que se tiraron (`unknown_roll`, 422).
   - **Al editar** no se repite ninguna tirada: las que siguen, con su id, conservan lo que salió; una expresión nueva se tira una vez y queda «Añadida al editar» (`added_on_edit`); las que ya no están se marcan `removed_at` y siguen en el historial, y las versiones anteriores del mensaje las pintan como salieron. Al vaciar un mensaje borrado (`forum:purge-deleted-posts`) sus tiradas se borran con él.
   - **Se ve** la expresión, cada dado (descartados tachados y dichos «(descartado)»; explosiones marcadas y dichas «(explosión)»), el total y el motivo; en texto plano, `2d6+3 Ataque = 11`. Los colores salen de las variables del tema, así que valen en claro y oscuro.
+- **Apartes fuera de personaje** (`ooc`): botón «Aparte fuera de personaje» del editor. Se ven con borde discontinuo, fondo apagado y el rótulo «Fuera de personaje» escrito, así que no dependen del color; en texto plano, «(Fuera de personaje) …». Las tiradas de dentro no dicen quién tira.
 - **Texto plano**: sale del mismo documento (bloques por línea, listas con su marca, citas tras «> », menciones con el nombre del momento).
 - **Borrar**: el autor borra su mensaje y en su sitio queda «Mensaje borrado». Quien modera sigue viendo el cuerpo y las versiones durante 30 días; después `forum:purge-deleted-posts` (cada día) los vacía y sus imágenes dejan de contar como uso.
 - **Límite de envío**: *Mensajes por minuto y persona* en los ajustes (6 por defecto). Al pasarse responde 429 con `Retry-After`.
@@ -201,8 +203,8 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 
 | Método y ruta | Qué hace |
 |---|---|
-| `POST /foro/temas/{tema}/mensajes` | Responder (`{"document": …}`) |
-| `PATCH /foro/mensajes/{mensaje}` | Editar el mensaje propio |
+| `POST /foro/temas/{tema}/mensajes` | Responder (`{"document": …, "character": id \| null}`) |
+| `PATCH /foro/mensajes/{mensaje}` | Editar el mensaje propio (sin `character`, conserva el personaje) |
 | `DELETE /foro/mensajes/{mensaje}` | Borrar el mensaje propio |
 | `GET /foro/mensajes/{mensaje}/versiones` | Versiones, para quien modera |
 | `GET /foro/temas/{tema}/menciones?q=` | Personas que pueden leer el tema |
@@ -211,6 +213,11 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 | `PUT /foro/temas/{tema}/seguimiento` | Nivel de seguimiento (`{"level": "following" \| "normal" \| "muted"}`) |
 | `PUT /foro/c/{categoría}/seguimiento` | Seguir una categoría (`{"follow": true}`) |
 | `GET` / `PUT /foro/preferencias` | Pestaña «Foro» del perfil: seguimiento automático y lo que se sigue |
+| `GET /foro/personajes` | Pestaña «Personajes» del perfil: los personajes propios, las categorías a las que se pueden atar y los límites |
+| `POST /foro/personajes` | Crear un personaje (multipart: `name`, `description`, `category`, `portrait`) |
+| `POST /foro/personajes/{personaje}` | Cambiarlo (multipart; `remove_portrait` quita el retrato) |
+| `POST /foro/personajes/{personaje}/retirar` y `/recuperar` | Retirarlo y recuperarlo |
+| `DELETE /foro/personajes/{personaje}` | Borrarlo |
 
 Lo que la persona no puede leer responde 404; lo que no puede hacer, 403.
 
@@ -253,6 +260,20 @@ En `/buscar` salen como las pestañas «Temas del foro» y «Mensajes del foro»
 
 **Buscar dentro del foro.** `/foro/buscar?q=<texto>[&categoria=<slug>][&pagina=<n>]` usa el mismo motor (Meilisearch o la base de datos de reserva) limitado a los dos tipos y, además, comprueba cada resultado contra las tablas: un índice atrasado nunca enseña un mensaje que ya está oculto o borrado, ni una categoría que el lector ya no puede leer. Mira los 100 primeros resultados del motor (y avisa si hay más), en páginas de 10. Un fallo del motor da una página con el aviso, nunca un 500. Es una página con `noindex`, con un límite de 60 peticiones por minuto.
 
+## Personajes
+
+Cada cuenta escribe como sus personajes, para que las partidas se lean como una historia.
+
+- **Personaje** (`forum_characters`, `Domain\Entities\Character`): nombre (60 caracteres), descripción corta (300) y retrato opcional; sin retrato se muestran las iniciales. 30 por cuenta, retirados incluidos. Se gestionan en la pestaña «Personajes» del perfil (ranura `profile-sections`) y desde el editor, con «Nuevo personaje…».
+- **Retratos**: se suben con el formulario, en los formatos de imagen de los ajustes (nunca SVG), hasta 2048 KB (o menos, si los ajustes piden menos), y se reducen a 512 px. Se guardan en `forum/characters/<año>/<mes>/`, carpeta de la fuente de medios `forum.characters`: la biblioteca de medios sabe de dónde vienen y da por sin uso los que se cambian o quedan de un personaje borrado.
+- **Atado a una categoría**: solo se ofrece en ella y en sus subcategorías, y solo lo ve quien puede leerla (`CategoryAccessPolicy`). A quien no la lee, sus mensajes le muestran la cuenta, como fuera de personaje. Si la categoría se borra, el personaje deja de estar atado.
+- **Hablar como**: encima del editor (responder, editar el mensaje propio y abrir tema) se elige el personaje o «Fuera de personaje». Al responder se propone el último personaje que la persona usó en ese tema, sin contar sus mensajes fuera de personaje, si aún puede usarlo. El mensaje muestra el retrato y el nombre del personaje y, debajo, «por» quien lo lleva. Las tiradas de un mensaje en personaje dicen quién tira («Arwen tira»), salvo las de un aparte `ooc`.
+- **Seguridad**: el servidor comprueba el personaje cada vez que se publica o se edita un mensaje (`Application\Services\PostSpeakers`, con las reglas de `CharacterRules`): nadie escribe como un personaje ajeno, retirado o atado a otra categoría, ni con los personajes apagados para él (422 `character_unavailable`). Al editar, el mensaje conserva su personaje aunque se haya retirado después; cambiarlo se comprueba como al publicar. La edición de la moderación nunca cambia el personaje. Las versiones del mensaje guardan con qué personaje habló cada una.
+- **Retirar en vez de borrar**: un personaje con mensajes (o con versiones de mensajes) no lo borra su dueño: se retira, nadie escribe ya como él y sus mensajes lo siguen mostrando, con «Retirado». Su dueño puede recuperarlo, salvo que lo retirara la moderación.
+- **Moderación**: quien modera el foro, o la categoría a la que está atado el personaje, puede editar su nombre, descripción y retrato (nunca su categoría), retirarlo (sin que su dueño pueda recuperarlo) y borrarlo aunque tenga mensajes, con una casilla de confirmación; entonces sus mensajes muestran la cuenta y su retrato deja de contar como uso. Lo hace desde el menú «Moderar» del mensaje. Cada edición, retirada, recuperación y borrado de la moderación queda en el historial de moderación con el nombre del personaje (`character_edited`, `character_retired`, `character_restored`, `character_deleted`); lo que hace el dueño con los suyos, no.
+- **Quién puede tenerlos**: ajuste «¿Quién puede tener personajes?»: nadie, cualquier cuenta con sesión (por defecto) o solo con `forum:characters.use`. Quien está suspendido en el foro no los crea ni escribe como ellos. Su dueño siempre puede verlos, retirarlos y borrarlos.
+- **Anonimización** (#15): `Character::stripPersonalDetails()` deja el nombre y quita la descripción y el retrato; falta llamarlo al anonimizar una cuenta.
+
 ## Permisos
 
 Ninguno se concede solo: cada asociación los da a los roles que cree en el editor de roles. La administración los tiene todos.
@@ -263,6 +284,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 | `forum:categories.manage` | Gestionar las categorías y quién ve y escribe en cada una |
 | `forum:settings.manage` | Cambiar los ajustes del foro |
 | `forum:posts.upload_images` | Subir imágenes a los mensajes |
+| `forum:characters.use` | Tener personajes y escribir como ellos, cuando el ajuste lo pide |
 
 ## Panel
 
@@ -274,7 +296,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
   - *Historial*: el historial de moderación, lo más nuevo primero, con filtro por acción. Solo se lee.
   - Las tablas caben en todos los anchos: las columnas secundarias aparecen desde el ancho en que caben y «Ver detalles» muestra las ocultas.
 - **Actividad del foro**: widget del escritorio con los temas y mensajes de los últimos 30 días, las denuncias pendientes y lo pendiente de aprobación (enlaza a la moderación). Solo con `forum:forum.moderate`.
-- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30).
+- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30). También quién puede tener personajes (nadie, cualquier cuenta con sesión o solo con permiso; cualquier cuenta por defecto).
 
 ## Desarrollo
 

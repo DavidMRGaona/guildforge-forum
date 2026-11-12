@@ -37,6 +37,7 @@ final class PostVersionsController extends Controller
                 'authorName' => $version->authorName,
                 'writtenAt' => $this->timezone->iso($version->writtenAt),
                 'isCurrent' => $version->isCurrent,
+                'characterName' => $version->characterName,
             ], $this->posting->versions($user, PostId::fromString($post)))]);
         });
     }

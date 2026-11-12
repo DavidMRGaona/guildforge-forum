@@ -145,7 +145,7 @@ final class ForumRepositoriesTest extends ModuleTestCase
     {
         [, $post] = $this->aDiscussion($this->aCategory());
 
-        $post->edit(self::aBody('Corregido'), new DateTimeImmutable('2026-11-10 19:00:00'));
+        $post->edit(self::aBody('Corregido'), new DateTimeImmutable('2026-11-10 19:00:00'), null);
         $post->hide();
         app(PostRepositoryInterface::class)->save($post);
 

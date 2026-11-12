@@ -10,16 +10,24 @@ import ModerationDialog, { type ModerationDialogFields } from '../moderation/Mod
 import ModerationMenu, { type ModerationMenuItem } from '../moderation/ModerationMenu.vue';
 import ReportDialog from '../moderation/ReportDialog.vue';
 import SuspendDialog from '../moderation/SuspendDialog.vue';
+import CharacterAvatar from '../characters/CharacterAvatar.vue';
+import CharacterDialog from '../characters/CharacterDialog.vue';
+import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import { sendJson } from '../../forum/api';
-import type { ForumEditorSettings, ForumPost } from '../../types/forum';
+import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
 
 type PostAction = 'hide' | 'show' | 'approve' | 'reject';
+type CharacterAction = 'retire' | 'delete';
 
 /**
  * One post of the conversation. Its author may edit or delete it while they may post in the
  * discussion; anyone who may reply can quote it (the selected text, or the whole post); anyone
  * signed in who reads it may like it, except its author. Its moderators also edit it, hide or
  * show it (with a reason its author reads) and approve or reject it while it awaits approval.
+ *
+ * A post written as a character shows the character's portrait and name, and below who plays
+ * it. Its author may switch character when editing; whoever moderates the character may
+ * change, retire or delete it from here.
  */
 const props = withDefaults(
     defineProps<{
@@ -34,8 +42,10 @@ const props = withDefaults(
         /** For whoever moderates the whole forum: suspending the author from this post */
         suspendUrl?: string | null;
         viewerId?: string | null;
+        /** «Hablar como» for the reader's own posts; null when characters are off for them */
+        characters?: ForumCharacterPicker | null;
     }>(),
-    { hiddenReasonMax: 300, reasonMax: 500, suspendUrl: null, viewerId: null }
+    { hiddenReasonMax: 300, reasonMax: 500, suspendUrl: null, viewerId: null, characters: null }
 );
 
 const emit = defineEmits<{
@@ -56,6 +66,28 @@ const moderationOpen = ref(false);
 const moderationBusy = ref(false);
 const moderationError = ref<string | null>(null);
 
+const speaker = ref<string | null>(props.post.characterId);
+const isOwn = computed(() => props.viewerId !== null && props.post.authorId === props.viewerId);
+
+/** The character form for a moderator whose own characters are off: the server's limits */
+const fallbackForm = computed(() => ({
+    createUrl: null,
+    categories: [],
+    limits: {
+        nameMax: 60,
+        descriptionMax: 300,
+        portraitKilobytes: 2048,
+        portraitTypes: props.editor.imageTypes,
+        perAccount: 30,
+    },
+}));
+
+const characterAction = ref<CharacterAction | null>(null);
+const characterDialogOpen = ref(false);
+const characterBusy = ref(false);
+const characterError = ref<string | null>(null);
+const editingCharacter = ref(false);
+
 const reporting = ref(false);
 const reported = ref(false);
 const suspending = ref(false);
@@ -71,7 +103,7 @@ const canSuspendAuthor = computed(
 
 const moderationItems = computed<ModerationMenuItem[]>(() => {
     if (props.post.moderationUrl === null) {
-        return [];
+        return characterItems.value;
     }
     const items: ModerationMenuItem[] = [];
     switch (props.post.status) {
@@ -94,10 +126,91 @@ const moderationItems = computed<ModerationMenuItem[]>(() => {
         items.push({ key: 'suspend', label: t('forum.moderation.post.suspend'), danger: true });
     }
 
+    return [...items, ...characterItems.value];
+});
+
+/** What whoever moderates the post's character may do with it */
+const characterItems = computed<ModerationMenuItem[]>(() => {
+    const actions = props.post.character?.actions ?? null;
+    if (actions === null) {
+        return [];
+    }
+    const items: ModerationMenuItem[] = [
+        { key: 'character-edit', label: t('forum.characters.moderation.edit') },
+    ];
+    if (actions.retireUrl) {
+        items.push({ key: 'character-retire', label: t('forum.characters.moderation.retire') });
+    }
+    if (actions.restoreUrl) {
+        items.push({ key: 'character-restore', label: t('forum.characters.moderation.restore') });
+    }
+    items.push({
+        key: 'character-delete',
+        label: t('forum.characters.moderation.delete'),
+        danger: true,
+    });
+
     return items;
 });
 
+async function restoreCharacter(): Promise<void> {
+    const url = props.post.character?.actions?.restoreUrl ?? null;
+    if (url === null) {
+        return;
+    }
+    characterBusy.value = true;
+    const answer = await sendJson(url, 'POST');
+    characterBusy.value = false;
+    if (answer.ok) {
+        emit('changed');
+
+        return;
+    }
+    error.value = answer.message ?? t('forum.characters.errors.save');
+}
+
+async function moderateCharacter(): Promise<void> {
+    const actions = props.post.character?.actions ?? null;
+    const action = characterAction.value;
+    if (actions === null || action === null) {
+        return;
+    }
+    const url = action === 'retire' ? actions.retireUrl : actions.deleteUrl;
+    if (url === null) {
+        return;
+    }
+    characterBusy.value = true;
+    characterError.value = null;
+    const answer = await sendJson(url, action === 'retire' ? 'POST' : 'DELETE');
+    characterBusy.value = false;
+    if (answer.ok) {
+        characterDialogOpen.value = false;
+        characterAction.value = null;
+        emit('changed');
+
+        return;
+    }
+    characterError.value = answer.message ?? t('forum.characters.errors.save');
+}
+
 function selectModeration(key: string): void {
+    if (key === 'character-edit') {
+        editingCharacter.value = true;
+
+        return;
+    }
+    if (key === 'character-restore') {
+        void restoreCharacter();
+
+        return;
+    }
+    if (key === 'character-retire' || key === 'character-delete') {
+        characterAction.value = key === 'character-retire' ? 'retire' : 'delete';
+        characterError.value = null;
+        characterDialogOpen.value = true;
+
+        return;
+    }
     if (key === 'suspend') {
         suspending.value = true;
 
@@ -168,7 +281,12 @@ async function save(document: JSONContent): Promise<void> {
     }
     saving.value = true;
     error.value = null;
-    const answer = await sendJson(props.post.updateUrl, 'PATCH', { document });
+    // Only its author says who it speaks as; a moderator's edit keeps it
+    const answer = await sendJson(
+        props.post.updateUrl,
+        'PATCH',
+        isOwn.value && props.characters ? { document, character: speaker.value } : { document }
+    );
     saving.value = false;
 
     if (answer.ok) {
@@ -209,14 +327,51 @@ async function remove(): Promise<void> {
         <header
             class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-default px-4 py-3"
         >
+            <CharacterAvatar
+                v-if="post.character"
+                :initials="post.character.initials"
+                :portrait-url="post.character.portraitUrl"
+            />
             <span
+                v-else
                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary"
                 aria-hidden="true"
             >
                 {{ (post.authorName ?? '?').charAt(0).toUpperCase() }}
             </span>
             <div class="min-w-0 flex-1">
-                <p :id="`${anchor}-author`" class="truncate font-semibold text-base-primary">
+                <template v-if="post.character">
+                    <p
+                        :id="`${anchor}-author`"
+                        class="truncate font-semibold text-base-primary"
+                        data-testid="post-character"
+                    >
+                        {{ post.character.name }}
+                        <span
+                            v-if="post.character.isRetired"
+                            class="ml-1 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-medium text-base-secondary"
+                        >
+                            {{ t('forum.characters.retiredBadge') }}
+                        </span>
+                    </p>
+                    <p
+                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
+                        data-testid="post-character-player"
+                    >
+                        <span class="min-w-0 truncate">{{
+                            t('forum.characters.playedBy', {
+                                name: post.authorName ?? t('forum.posts.deletedAccount'),
+                            })
+                        }}</span>
+                        <span
+                            v-if="post.isStarter"
+                            class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                        >
+                            {{ t('forum.posts.starter') }}
+                        </span>
+                    </p>
+                </template>
+                <p v-else :id="`${anchor}-author`" class="truncate font-semibold text-base-primary">
                     {{ post.authorName ?? t('forum.posts.deletedAccount') }}
                     <span
                         v-if="post.isStarter"
@@ -248,6 +403,14 @@ async function remove(): Promise<void> {
 
         <div class="px-4 py-3">
             <template v-if="editing">
+                <SpeakAsSelect
+                    v-if="isOwn && characters"
+                    v-model="speaker"
+                    class="mb-2"
+                    :picker="characters"
+                    :current="post.character"
+                    :disabled="saving"
+                />
                 <PostEditor
                     :label="t('forum.posts.editLabel', { number: post.number ?? '' })"
                     :model-value="post.document"
@@ -391,6 +554,54 @@ async function remove(): Promise<void> {
             :busy="moderationBusy"
             :error="moderationError"
             @confirm="(fields) => moderating && moderate(moderating, fields)"
+        />
+
+        <ModerationDialog
+            v-model="characterDialogOpen"
+            :title="
+                characterAction === 'delete'
+                    ? t('forum.characters.moderation.deleteTitle', {
+                          name: post.character?.name ?? '',
+                      })
+                    : t('forum.characters.moderation.retireTitle', {
+                          name: post.character?.name ?? '',
+                      })
+            "
+            :message="
+                characterAction === 'delete'
+                    ? t('forum.characters.moderation.deleteMessage')
+                    : t('forum.characters.moderation.retireMessage')
+            "
+            :confirm-label="
+                characterAction === 'delete'
+                    ? t('forum.characters.moderation.delete')
+                    : t('forum.characters.moderation.retire')
+            "
+            :danger="characterAction === 'delete'"
+            :confirmation="
+                characterAction === 'delete'
+                    ? t('forum.characters.moderation.deleteConfirmation')
+                    : null
+            "
+            :busy="characterBusy"
+            :error="characterError"
+            @confirm="moderateCharacter"
+        />
+
+        <CharacterDialog
+            v-if="post.character?.actions"
+            v-model="editingCharacter"
+            :form="characters ?? fallbackForm"
+            :start="{
+                name: post.character.name,
+                description: post.character.description,
+                categoryId: null,
+                initials: post.character.initials,
+                portraitUrl: post.character.portraitUrl,
+                updateUrl: post.character.actions.updateUrl,
+            }"
+            :chooses-category="false"
+            @saved="emit('changed')"
         />
 
         <ReportDialog

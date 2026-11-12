@@ -11,6 +11,7 @@ use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\StartDiscussionDTO;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Exceptions\CharacterUnavailableException;
 use Modules\Forum\Domain\Exceptions\DiscussionNotStartedException;
 use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
@@ -47,6 +48,7 @@ final readonly class DiscussionStarter
         private DiscussionReadsInterface $reads,
         private FollowService $follows,
         private ApprovalRule $approval,
+        private PostSpeakers $speakers,
     ) {}
 
     /**
@@ -78,6 +80,7 @@ final readonly class DiscussionStarter
      * @throws InvalidDiscussionException for a title out of bounds
      * @throws InvalidDocumentException
      * @throws PostingTooFastException
+     * @throws CharacterUnavailableException when the first post would speak as a character the author may not use there
      */
     public function start(Authenticatable $author, StartDiscussionDTO $input): Discussion
     {
@@ -99,6 +102,7 @@ final readonly class DiscussionStarter
         $title = new DiscussionTitle($this->checkedTitle($input->title));
         $topics = $this->checkedTopics($author, $input->topicKeys);
         $body = $this->bodies->fromInput($input->document, $author);
+        $speaker = $this->speakers->forNewPost($author, $input->characterId, $access->category);
         $this->posting->countDiscussion($author);
         $this->posting->countPost($author);
         $needsApproval = $this->approval->needsApproval($author, $access->category);
@@ -113,8 +117,8 @@ final readonly class DiscussionStarter
         }
 
         $firstPost = null;
-        DB::transaction(function () use ($discussion, $body, $topics, $needsApproval, &$firstPost): void {
-            $firstPost = $this->writer->startDiscussion($discussion, PostId::generate(), $body, $needsApproval);
+        DB::transaction(function () use ($discussion, $body, $topics, $needsApproval, $speaker, &$firstPost): void {
+            $firstPost = $this->writer->startDiscussion($discussion, PostId::generate(), $body, $needsApproval, $speaker);
             if ($topics !== []) {
                 $this->discussions->replaceTopics($discussion->id(), $topics);
             }

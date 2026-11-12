@@ -11,6 +11,7 @@ import {
     Link,
     List,
     ListOrdered,
+    MessageSquareDashed,
     Minus,
     Quote,
     Redo2,
@@ -150,6 +151,14 @@ const buttons = computed<Button[]>(() => {
             isActive: () => false,
         });
     }
+
+    core.push({
+        id: 'ooc',
+        label: t('forum.editor.toolbar.ooc'),
+        icon: MessageSquareDashed,
+        run: () => chain().toggleOoc().run(),
+        isActive: () => props.editor.isActive('ooc'),
+    });
 
     core.push({
         id: 'roll',

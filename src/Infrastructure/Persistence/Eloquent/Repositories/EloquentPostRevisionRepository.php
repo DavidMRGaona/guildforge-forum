@@ -6,6 +6,7 @@ namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Modules\Forum\Domain\Entities\PostRevision;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
@@ -20,6 +21,7 @@ final class EloquentPostRevisionRepository implements PostRevisionRepositoryInte
             'body' => $revision->body->document,
             'plain_text' => $revision->body->plainText,
             'editor_id' => $revision->editorId(),
+            'character_id' => $revision->characterId?->value,
             'created_at' => $revision->replacedAt,
         ]);
     }
@@ -36,6 +38,7 @@ final class EloquentPostRevisionRepository implements PostRevisionRepositoryInte
                 body: new PostBody($model->body, $model->plain_text),
                 editorId: $model->editor_id,
                 replacedAt: $model->created_at->toDateTimeImmutable(),
+                characterId: $model->character_id === null ? null : CharacterId::fromString($model->character_id),
             ))
             ->all());
     }

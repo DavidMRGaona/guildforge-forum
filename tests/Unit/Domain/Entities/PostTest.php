@@ -168,7 +168,7 @@ final class PostTest extends TestCase
         $body = new PostBody(['type' => 'doc', 'content' => []], 'Corregido');
         $at = new DateTimeImmutable('2026-11-10 21:00:00');
 
-        $post->edit($body, $at);
+        $post->edit($body, $at, null);
 
         $this->assertSame('Corregido', $post->body()->plainText);
         $this->assertEquals($at, $post->editedAt());
@@ -181,7 +181,7 @@ final class PostTest extends TestCase
 
         $this->expectException(InvalidPostException::class);
 
-        $post->edit(new PostBody(['type' => 'doc', 'content' => []], 'Otra vez'), new DateTimeImmutable);
+        $post->edit(new PostBody(['type' => 'doc', 'content' => []], 'Otra vez'), new DateTimeImmutable, null);
     }
 
     public function test_a_visible_post_always_has_a_number(): void

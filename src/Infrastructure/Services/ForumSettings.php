@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Services;
 
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 
 /**
@@ -122,6 +123,14 @@ final readonly class ForumSettings implements ForumSettingsInterface
             strtolower(...),
             array_filter($stored, static fn (mixed $id): bool => is_string($id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1),
         )));
+    }
+
+    public function characterAccess(): CharacterAccessMode
+    {
+        $stored = config('modules.settings.forum.characters_access');
+
+        // An unknown value turns characters off rather than opening them to everyone
+        return is_string($stored) ? (CharacterAccessMode::tryFrom($stored) ?? CharacterAccessMode::Nobody) : CharacterAccessMode::Everyone;
     }
 
     private function pageSize(string $key): int

@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\ValueObjects\AccountId;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -29,6 +30,7 @@ final class Post
      * @param  string|null  $authorId  the account that wrote it; null once that account is gone
      * @param  DateTimeImmutable|null  $publishedAt  when it became readable: when it was written, or approved
      * @param  string|null  $hiddenReason  why moderation hid it, shown to its author and its moderators
+     * @param  CharacterId|null  $characterId  the character it speaks as; null out of character
      *
      * @throws InvalidPostException when the number or publication time does not match the status, for an author id that is not a UUID, or for a reason on a post that is not hidden
      */
@@ -45,6 +47,7 @@ final class Post
         private ?DateTimeImmutable $deletedAt = null,
         private ?DateTimeImmutable $contentPurgedAt = null,
         private ?string $hiddenReason = null,
+        private ?CharacterId $characterId = null,
     ) {
         if ($hiddenReason !== null && $status !== PostStatus::Hidden) {
             throw InvalidPostException::reasonWithoutHiding($status);
@@ -64,9 +67,9 @@ final class Post
      *
      * @throws InvalidPostException
      */
-    public static function publish(PostId $id, DiscussionId $discussionId, PostNumber $number, ?string $authorId, PostBody $body, DateTimeImmutable $createdAt): self
+    public static function publish(PostId $id, DiscussionId $discussionId, PostNumber $number, ?string $authorId, PostBody $body, DateTimeImmutable $createdAt, ?CharacterId $characterId = null): self
     {
-        return new self($id, $discussionId, $number, $authorId, $body, PostStatus::Visible, $createdAt, $createdAt);
+        return new self($id, $discussionId, $number, $authorId, $body, PostStatus::Visible, $createdAt, $createdAt, characterId: $characterId);
     }
 
     /**
@@ -74,9 +77,9 @@ final class Post
      *
      * @throws InvalidPostException
      */
-    public static function submitForApproval(PostId $id, DiscussionId $discussionId, ?string $authorId, PostBody $body, DateTimeImmutable $createdAt): self
+    public static function submitForApproval(PostId $id, DiscussionId $discussionId, ?string $authorId, PostBody $body, DateTimeImmutable $createdAt, ?CharacterId $characterId = null): self
     {
-        return new self($id, $discussionId, null, $authorId, $body, PostStatus::Pending, $createdAt, null);
+        return new self($id, $discussionId, null, $authorId, $body, PostStatus::Pending, $createdAt, null, characterId: $characterId);
     }
 
     /**
@@ -160,14 +163,30 @@ final class Post
     }
 
     /**
+     * New words, and the character they are said as (null out of character).
+     *
      * @throws InvalidPostException once its author deleted it
      */
-    public function edit(PostBody $body, DateTimeImmutable $at): void
+    public function edit(PostBody $body, DateTimeImmutable $at, ?CharacterId $characterId): void
     {
         $this->assertStatus([PostStatus::Visible, PostStatus::Hidden, PostStatus::Pending], 'be edited');
 
         $this->body = $body;
+        $this->characterId = $characterId;
         $this->editedAt = $at;
+    }
+
+    /** The character it speaks as; null out of character (or once that character was deleted) */
+    public function characterId(): ?CharacterId
+    {
+        return $this->characterId;
+    }
+
+    public function speaksAs(?CharacterId $characterId): bool
+    {
+        return $characterId instanceof CharacterId
+            ? $this->characterId?->equals($characterId) === true
+            : ! $this->characterId instanceof CharacterId;
     }
 
     public function isVisible(): bool

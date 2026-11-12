@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property array<string, mixed> $body
  * @property string $plain_text
  * @property string|null $editor_id
+ * @property string|null $character_id
  * @property CarbonImmutable $created_at
  */
 final class PostRevisionModel extends Model
@@ -34,7 +35,7 @@ final class PostRevisionModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['post_id', 'number', 'body', 'plain_text', 'editor_id', 'created_at'];
+    protected $fillable = ['post_id', 'number', 'body', 'plain_text', 'editor_id', 'character_id', 'created_at'];
 
     /**
      * @return array<string, string>

@@ -21,8 +21,9 @@ use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostId;
 
 /**
- * Replying, editing and deleting from the editor (moderators edit other people's posts too). The body is `{"document": <editor JSON>}`;
- * the answer is the post as the author now sees it.
+ * Replying, editing and deleting from the editor (moderators edit other people's posts too). The body is
+ * `{"document": <editor JSON>, "character": <id> | null}` (no `character` on an edit keeps who it speaks
+ * as); the answer is the post as the author now sees it.
  */
 final class PostController extends Controller
 {
@@ -41,7 +42,8 @@ final class PostController extends Controller
     {
         return $this->respond(function () use ($request, $discussion): JsonResponse {
             $user = $this->user($request);
-            $post = $this->posting->reply($user, DiscussionId::fromString($discussion), $this->documentFrom($request));
+            [, $characterId] = $this->speakerFrom($request);
+            $post = $this->posting->reply($user, DiscussionId::fromString($discussion), $this->documentFrom($request), $characterId);
 
             return response()->json(['post' => $this->present($post, $user)], 201);
         });
@@ -53,16 +55,18 @@ final class PostController extends Controller
             $user = $this->user($request);
             $id = PostId::fromString($post);
             $document = $this->documentFrom($request);
+            [$speakerGiven, $characterId] = $this->speakerFrom($request);
 
             try {
                 if ($this->posting->owns($user, $id)) {
-                    return response()->json(['post' => $this->present($this->posting->edit($user, $id, $document), $user)]);
+                    return response()->json(['post' => $this->present($this->posting->edit($user, $id, $document, $speakerGiven, $characterId), $user)]);
                 }
             } catch (ForumActionDeniedException) {
                 // Their own post where they may no longer post: only as its moderator, below
             }
 
-            // Someone else's post is edited only by its moderators, and the edit is logged
+            // Someone else's post is edited only by its moderators, and the edit is logged; it
+            // keeps speaking as it did (nobody chooses someone else's character)
             $edited = $this->moderation->editPost($user, $id, $this->bodies->fromInput($document, $user));
 
             return response()->json(['post' => $this->present($edited, $user)]);

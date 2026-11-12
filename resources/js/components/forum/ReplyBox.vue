@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { useAuth } from '@/composables/useAuth';
 import { useRoutes } from '@/composables/useRoutes';
+import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import type { ForumReplySettings } from '../../types/forum';
 
@@ -32,13 +33,16 @@ const props = withDefaults(
     { closedNotice: null, isAwaitingApproval: false }
 );
 
-const emit = defineEmits<{ submit: [document: JSONContent] }>();
+/** The document, and the character it speaks as (null out of character) */
+const emit = defineEmits<{ submit: [document: JSONContent, characterId: string | null] }>();
 
 const { t } = useI18n();
 const { isAuthenticated, mustVerifyEmail } = useAuth();
 const routes = useRoutes();
 
 const editor = ref<InstanceType<typeof PostEditor> | null>(null);
+// The last character the reader used in this discussion, when they still may
+const speaker = ref<string | null>(props.reply.characters?.suggestedId ?? null);
 
 /** Why there is no editor, when there is none */
 const notice = computed<
@@ -73,6 +77,12 @@ defineExpose({
 <template>
     <div v-if="reply.canPost" class="space-y-3">
         <slot name="intro" />
+        <SpeakAsSelect
+            v-if="reply.characters"
+            v-model="speaker"
+            :picker="reply.characters"
+            :disabled="sending"
+        />
         <PostEditor
             ref="editor"
             :label="label"
@@ -84,7 +94,7 @@ defineExpose({
             :submit-label="submitLabel"
             :submitting="sending"
             :error="error"
-            @submit="(document: JSONContent) => emit('submit', document)"
+            @submit="(document: JSONContent) => emit('submit', document, speaker)"
         />
     </div>
 

@@ -10,6 +10,7 @@ use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
+use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Domain\Publications\Events\PublicationChanged;
 use App\Domain\Publications\Events\PublicationRemoved;
 use App\Domain\Publications\Events\PublicationRosterChanged;
@@ -96,6 +97,9 @@ use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
 use Modules\Forum\Infrastructure\Services\EloquentPostLikes;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
+use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
+use Modules\Forum\Infrastructure\Search\ForumSearchObserver;
+use Modules\Forum\Infrastructure\Search\PostSearchSource;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 use Modules\Forum\Infrastructure\Services\JobPublicationSyncQueue;
 use Modules\Forum\Infrastructure\Services\QueuedForumNotices;
@@ -215,6 +219,19 @@ final class ForumServiceProvider extends ModuleServiceProvider
         );
         PostModel::saved($observer->saved(...));
         PostModel::deleted($observer->deleted(...));
+
+        // The site search learns at once what was written, moved, hidden, approved or deleted
+        ForumSearchObserver::register();
+    }
+
+    /**
+     * Discussions (title and opening message) and replies, for the site search and the forum's own search.
+     *
+     * @return array<class-string<IndexedSearchSourceInterface>>
+     */
+    public function registerSearchSources(): array
+    {
+        return [DiscussionSearchSource::class, PostSearchSource::class];
     }
 
     /**

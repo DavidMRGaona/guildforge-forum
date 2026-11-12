@@ -68,7 +68,8 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
 
     public function delete(DiscussionId $id): void
     {
-        DiscussionModel::query()->whereKey($id->value)->delete();
+        // Through the model, so the site search is told
+        DiscussionModel::query()->find($id->value)?->delete();
     }
 
     public function countInCategory(CategoryId $categoryId): int
@@ -78,7 +79,10 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
 
     public function moveAllToCategory(CategoryId $from, CategoryId $to): void
     {
-        DiscussionModel::query()->where('category_id', $from->value)->update(['category_id' => $to->value]);
+        // One by one, so the site search is told which ones changed category
+        foreach (DiscussionModel::query()->where('category_id', $from->value)->get() as $discussion) {
+            $discussion->update(['category_id' => $to->value]);
+        }
     }
 
     public function replaceTopics(DiscussionId $id, array $topics): void

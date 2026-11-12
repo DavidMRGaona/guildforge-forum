@@ -512,4 +512,16 @@ return [
             'action' => 'Revisar el mensaje',
         ],
     ],
+
+    'search' => [
+        'discussions' => [
+            'label' => 'Temas del foro',
+            'item' => 'Tema del foro',
+        ],
+        'posts' => [
+            'label' => 'Mensajes del foro',
+            'item' => 'Mensaje del foro',
+        ],
+        'post_meta' => 'Mensaje n.º :number · :category',
+    ],
 ];

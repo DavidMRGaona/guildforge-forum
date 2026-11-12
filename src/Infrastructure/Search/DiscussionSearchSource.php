@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Forum\Infrastructure\Search;
+
+use App\Application\Search\Contracts\IndexedSearchSourceInterface;
+use App\Application\Search\DTOs\SearchDocumentDTO;
+use Illuminate\Support\Str;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
+
+/**
+ * The discussions readers can find: the title and the opening message.
+ */
+final readonly class DiscussionSearchSource implements IndexedSearchSourceInterface
+{
+    public const string TYPE = 'forum-discussion';
+
+    public function __construct(
+        private ForumSearchDocuments $documents,
+    ) {}
+
+    public function type(): string
+    {
+        return self::TYPE;
+    }
+
+    public function label(): string
+    {
+        return __('forum::messages.search.discussions.label');
+    }
+
+    public function itemLabel(): string
+    {
+        return __('forum::messages.search.discussions.item');
+    }
+
+    public function pastLabel(): ?string
+    {
+        return null;
+    }
+
+    public function document(string $id): ?SearchDocumentDTO
+    {
+        // Keys are uuids: anything else matches no row, and PostgreSQL rejects it in the query
+        if (! Str::isUuid($id)) {
+            return null;
+        }
+
+        $discussion = ForumSearchDocuments::discussions()->whereKey(strtolower($id))->first();
+
+        return $discussion instanceof DiscussionModel ? ($this->documents->discussionDocuments([$discussion])[0] ?? null) : null;
+    }
+
+    /**
+     * @return iterable<SearchDocumentDTO>
+     */
+    public function documents(): iterable
+    {
+        $after = '';
+
+        // By key in chunks, the openings of each chunk read in one query
+        while (true) {
+            $chunk = ForumSearchDocuments::discussions()->where('id', '>', $after)->orderBy('id')->limit(200)->get();
+            $last = $chunk->last();
+            if (! $last instanceof DiscussionModel) {
+                return;
+            }
+
+            yield from $this->documents->discussionDocuments($chunk);
+            $after = $last->id;
+        }
+    }
+}

@@ -162,7 +162,8 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
 
     public function delete(PostId $id): void
     {
-        PostModel::query()->whereKey($id->value)->delete();
+        // Through the model, so the site search is told
+        PostModel::query()->find($id->value)?->delete();
     }
 
     private function toEntity(PostModel $model): Post

@@ -15,6 +15,7 @@ use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Domain\Entities\Suspension;
 use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Events\ForumUserSuspended;
+use Modules\Forum\Domain\Events\ForumUserSuspensionLifted;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Exceptions\InvalidModerationRecordException;
 use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
@@ -28,7 +29,8 @@ use Modules\Forum\Domain\ValueObjects\SuspensionId;
  * and only an admin suspends someone who moderates the whole forum. Nobody lifts their own
  * suspension, and only an admin lifts one an admin made or one of a forum moderator. Someone
  * suspended moderates nothing, so they neither suspend nor lift. A new suspension of
- * someone already suspended takes the old one's place. Both are logged.
+ * someone already suspended takes the old one's place. Both are logged, and lifting one still
+ * in force announces it (a suspension that ends by itself announces nothing).
  */
 final readonly class SuspensionService
 {
@@ -133,9 +135,17 @@ final readonly class SuspensionService
         }
 
         DB::transaction(function () use ($moderator, $suspension, $reason): void {
-            $suspension->lift(ForumBrowser::accountId($moderator), CarbonImmutable::now());
+            $now = CarbonImmutable::now();
+            // One that ended by itself already keeps nobody out: lifting it tells nothing
+            $wasInForce = $suspension->isActiveAt($now);
+            $suspension->lift(ForumBrowser::accountId($moderator), $now);
             $this->suspensions->save($suspension);
             $this->logger->recordForAccount(ModerationAction::SuspensionLifted, $moderator, $suspension->userId(), $reason);
+
+            if ($wasInForce) {
+                $event = new ForumUserSuspensionLifted($suspension->id()->value, $suspension->userId(), ForumBrowser::accountId($moderator));
+                DB::afterCommit(static fn () => event($event));
+            }
         });
 
         $this->current->forget($suspension->userId());

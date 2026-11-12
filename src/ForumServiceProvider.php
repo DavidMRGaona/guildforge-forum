@@ -55,6 +55,7 @@ use Modules\Forum\Domain\Dice\NumberGenerator;
 use Modules\Forum\Domain\Events\ForumPostApproved;
 use Modules\Forum\Domain\Events\ForumPostReported;
 use Modules\Forum\Domain\Events\ForumUserSuspended;
+use Modules\Forum\Domain\Events\ForumUserSuspensionLifted;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
@@ -70,6 +71,7 @@ use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
 use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
 use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
+use Modules\Forum\Infrastructure\Listeners\NotifyUserOfLiftedSuspension;
 use Modules\Forum\Infrastructure\Listeners\NotifyUserOfSuspension;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
@@ -206,6 +208,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // What moderation does is told to whom it concerns, after the commit
         Event::listen(ForumPostApproved::class, [NotifyPostAuthorOfApproval::class, 'handle']);
         Event::listen(ForumUserSuspended::class, [NotifyUserOfSuspension::class, 'handle']);
+        Event::listen(ForumUserSuspensionLifted::class, [NotifyUserOfLiftedSuspension::class, 'handle']);
         Event::listen(ForumPostReported::class, [NotifyModeratorsOfReport::class, 'handle']);
 
         // What authors deleted is emptied once its retention has passed

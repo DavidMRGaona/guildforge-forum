@@ -299,3 +299,45 @@ export interface ForumPendingItem {
     writtenLabel: string;
     moderationUrl: string;
 }
+
+export interface ForumSearchCategoryOption {
+    slug: string;
+    name: string;
+    /** 0 for a top-level category, 1 for a subcategory */
+    depth: number;
+}
+
+export interface ForumSearchSnippetPart {
+    text: string;
+    match: boolean;
+}
+
+export interface ForumSearchItem {
+    /** A discussion (title and opening message) or one of its replies */
+    kind: 'discussion' | 'post';
+    title: string;
+    url: string;
+    categoryName: string | null;
+    categoryUrl: string | null;
+    postNumber: number | null;
+    snippet: ForumSearchSnippetPart[];
+    publishedAt: string | null;
+    publishedLabel: string | null;
+}
+
+export interface ForumSearchResults {
+    items: ForumSearchItem[];
+    total: number;
+    page: number;
+    /** The search matches more than what was checked */
+    truncated: boolean;
+    prevUrl: string | null;
+    nextUrl: string | null;
+}
+
+/** What a page's search box needs: where it goes, the categories to look in and the one chosen. */
+export interface ForumSearchBox {
+    url: string;
+    category: string | null;
+    categories: ForumSearchCategoryOption[];
+}

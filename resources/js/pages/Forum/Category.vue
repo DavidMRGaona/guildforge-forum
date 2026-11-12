@@ -8,6 +8,7 @@ import type {
     ForumCategoryHeader,
     ForumDiscussionList,
     ForumListFilters,
+    ForumSearchBox,
 } from '../../types/forum';
 import CategoryFollowButton from '../../components/forum/CategoryFollowButton.vue';
 import CategoryIcon from '../../components/forum/CategoryIcon.vue';
@@ -15,6 +16,7 @@ import CategoryList from '../../components/forum/CategoryList.vue';
 import DiscussionFilters from '../../components/forum/DiscussionFilters.vue';
 import DiscussionList from '../../components/forum/DiscussionList.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
+import ForumSearchForm from '../../components/forum/ForumSearchForm.vue';
 import MarkReadButton from '../../components/forum/MarkReadButton.vue';
 import SpaceNotices from '../../components/spaces/SpaceNotices.vue';
 
@@ -23,6 +25,7 @@ const props = defineProps<{
     subcategories: ForumCategoryCard[];
     discussions: ForumDiscussionList;
     filters: ForumListFilters;
+    search: ForumSearchBox;
     canStart: boolean;
     newDiscussionUrl: string;
     markReadUrl: string | null;
@@ -78,6 +81,12 @@ const breadcrumbs = computed(() => [
     </div>
 
     <div class="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <ForumSearchForm
+            :action="search.url"
+            :category="search.category"
+            :categories="search.categories"
+        />
+
         <section v-if="subcategories.length > 0" aria-labelledby="forum-subcategories">
             <h2 id="forum-subcategories" class="mb-4 text-xl font-semibold text-base-primary">
                 {{ t('forum.categories.subcategories') }}

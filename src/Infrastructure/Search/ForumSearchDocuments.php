@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Search;
 
 use App\Application\Search\DTOs\SearchDocumentDTO;
+use App\Domain\Search\Enums\SearchAudience;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
@@ -87,7 +88,7 @@ final class ForumSearchDocuments
     {
         $category = $this->categories()[strtolower($discussion->category_id)] ?? null;
         $audience = $category instanceof Category ? $this->audiences->for($category, $this->categories()) : null;
-        if (! $category instanceof Category || $audience === null || $discussion->number === null) {
+        if (! $category instanceof Category || ! $audience instanceof SearchAudience || $discussion->number === null) {
             return null;
         }
 
@@ -106,7 +107,7 @@ final class ForumSearchDocuments
     {
         $category = $this->categories()[strtolower($discussion->category_id)] ?? null;
         $audience = $category instanceof Category ? $this->audiences->for($category, $this->categories()) : null;
-        if (! $category instanceof Category || $audience === null || $discussion->number === null || $post->number === null) {
+        if (! $category instanceof Category || ! $audience instanceof SearchAudience || $discussion->number === null || $post->number === null) {
             return null;
         }
 

@@ -46,6 +46,7 @@ final class CategoryController extends Controller
             'category' => [...$this->presenter->categoryHeader($access, $readable), 'follow' => $this->engagement->categoryFollow($reader, $access->category)],
             'subcategories' => $this->presenter->categoryTree($readable, $access->category->id()),
             ...$this->listProps($request, $scope, pinnedFirst: true, baseUrl: $this->urls->category($access->category)),
+            'search' => $this->presenter->searchBox($readable, $access->category),
             'canStart' => $canStart,
             'newDiscussionUrl' => route('forum.discussions.create', $access->canStartDiscussions() ? ['categoria' => $access->category->slug()->value] : []),
             'markReadUrl' => $reader === null ? null : route('forum.categories.read', ['category' => $access->category->slug()->value]),

@@ -38,6 +38,25 @@ final readonly class ForumPresenter
     ) {}
 
     /**
+     * What the search box of a page needs: where it goes, the categories to look in and the one chosen.
+     *
+     * @param  list<CategoryAccessDTO>  $readable
+     * @return array{url: string, category: string|null, categories: list<array{slug: string, name: string, depth: int}>}
+     */
+    public function searchBox(array $readable, ?Category $within = null): array
+    {
+        return [
+            'url' => route('forum.search', [], false),
+            'category' => $within?->slug()->value,
+            'categories' => array_map(static fn (CategoryAccessDTO $access): array => [
+                'slug' => $access->category->slug()->value,
+                'name' => $access->category->name(),
+                'depth' => $access->category->parentId() instanceof CategoryId ? 1 : 0,
+            ], $readable),
+        ];
+    }
+
+    /**
      * Top-level categories as cards, each with its readable subcategories.
      *
      * @param  list<CategoryAccessDTO>  $readable

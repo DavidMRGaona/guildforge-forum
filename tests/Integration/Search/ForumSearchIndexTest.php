@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Integration\Search;
 
 use App\Application\Modules\Services\EnabledModulesResolverInterface;
+use App\Application\Search\DTOs\SearchDocumentDTO;
 use App\Application\Search\Services\SearchIndexerInterface;
 use App\Application\Search\Services\SearchSourceRegistryInterface;
 use App\Domain\Search\Enums\SearchAudience;
@@ -12,15 +13,16 @@ use App\Infrastructure\Search\Index\NullSearchIndexWriter;
 use App\Infrastructure\Search\Index\SearchIndexWriterInterface;
 use App\Infrastructure\Search\Persistence\Eloquent\Models\SearchDocumentModel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
-use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
 use Modules\Forum\Infrastructure\Search\PostSearchSource;
 use Modules\Forum\Tests\Support\BuildsForumContent;
@@ -123,7 +125,7 @@ final class ForumSearchIndexTest extends ModuleTestCase
         $document = $this->discussions()->document($discussion->id()->value);
         $post = $this->posts()->document($reply->id()->value);
 
-        if ($expected === null) {
+        if (! $expected instanceof SearchAudience) {
             $this->assertNull($document);
             $this->assertNull($post);
 
@@ -158,7 +160,7 @@ final class ForumSearchIndexTest extends ModuleTestCase
         $category = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
         [$discussion] = $this->aDiscussion($category, title: 'Visible');
         [$hiddenDiscussion, $hiddenOpening] = $this->aDiscussion($category, title: 'Oculto');
-        [$awaiting] = $this->aDiscussion($category, title: 'Pendiente', needsApproval: true);
+        [$awaiting] = $this->aDiscussion($category, needsApproval: true, title: 'Pendiente');
         $visible = $this->aReply($discussion, '2026-11-10 18:10:00', text: 'Se ve');
         $hiddenReply = $this->aReply($discussion, '2026-11-10 18:11:00', text: 'Oculta');
         $pending = $this->aReply($discussion, '2026-11-10 18:12:00', needsApproval: true, text: 'Pendiente');
@@ -209,7 +211,7 @@ final class ForumSearchIndexTest extends ModuleTestCase
 
         $this->assertSame('Después', $this->row('forum-post', $reply->id()->value)?->body);
         $this->assertSame('Título nuevo', $this->row('forum-post', $reply->id()->value)->title);
-        $this->assertSame('/foro/t/1-titulo-nuevo/2', $this->row('forum-post', $reply->id()->value)->url);
+        $this->assertSame('/foro/t/1-titulo-nuevo/2', $this->row('forum-post', $reply->id()->value)?->url);
         $this->assertSame('Apertura editada', $this->row('forum-discussion', $discussion->id()->value)?->body);
         $this->assertSame('/foro/t/1-titulo-nuevo', $this->row('forum-discussion', $discussion->id()->value)->url);
     }
@@ -334,7 +336,7 @@ final class ForumSearchIndexTest extends ModuleTestCase
         $reply = $this->aReply($discussion, '2026-11-10 18:10:00');
         // A stale row for something that no longer exists, and a missing one
         SearchDocumentModel::query()->create([
-            'type' => 'forum-post', 'source_id' => (string) \Illuminate\Support\Str::uuid(), 'module' => 'forum', 'title' => 'Fantasma',
+            'type' => 'forum-post', 'source_id' => (string) Str::uuid(), 'module' => 'forum', 'title' => 'Fantasma',
             'body' => 'x', 'url' => '/foro/t/99', 'audience' => 'public', 'locale' => 'es',
         ]);
         SearchDocumentModel::query()->where('source_id', $reply->id()->value)->delete();
@@ -418,7 +420,7 @@ final class ForumSearchIndexTest extends ModuleTestCase
     }
 
     /**
-     * @param  iterable<\App\Application\Search\DTOs\SearchDocumentDTO>  $documents
+     * @param  iterable<SearchDocumentDTO>  $documents
      * @return list<string>
      */
     private function ids(iterable $documents): array

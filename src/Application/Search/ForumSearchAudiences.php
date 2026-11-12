@@ -33,13 +33,13 @@ final class ForumSearchAudiences
 
         $parentId = $category->parentId();
         if (! $parentId instanceof CategoryId) {
-            return self::audience($own);
+            return $this->audience($own);
         }
 
         $parent = $categories[$parentId->value] ?? null;
         $inherited = $parent instanceof Category && $parent->isTopLevel() ? $this->level($parent->viewAudience()) : null;
 
-        return $inherited === null ? null : self::audience(max($own, $inherited));
+        return $inherited === null ? null : $this->audience(max($own, $inherited));
     }
 
     /**
@@ -55,7 +55,7 @@ final class ForumSearchAudiences
         };
     }
 
-    private static function audience(int $level): SearchAudience
+    private function audience(int $level): SearchAudience
     {
         return match ($level) {
             0 => SearchAudience::Public,

@@ -522,6 +522,8 @@ return [
             'label' => 'Mensajes del foro',
             'item' => 'Mensaje del foro',
         ],
+        'page_title' => 'Buscar en el foro',
+        'page_description' => 'Encuentra temas y mensajes del foro.',
         'post_meta' => 'Mensaje n.º :number · :category',
     ],
 ];

@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Schema;
  *   stays without it, keeping the number taken and the gap explained.
  * - forum_discussion_redirects: a discussion merged into another, under its public number,
  *   which no other discussion takes. Merging the one it joined points it further on.
+ * - forum_posts (discussion_id, published_at): a discussion's last activity is its latest
+ *   publication, no longer its last number (merged posts are older than the ones before them),
+ *   and the counters look it up with every write.
  */
 return new class extends Migration
 {
@@ -33,6 +36,10 @@ return new class extends Migration
 
         Schema::table('forum_post_redirects', static function (Blueprint $table): void {
             $table->foreign('post_id')->references('id')->on('forum_posts')->nullOnDelete();
+        });
+
+        Schema::table('forum_posts', static function (Blueprint $table): void {
+            $table->index(['discussion_id', 'published_at']);
         });
 
         Schema::create('forum_discussion_redirects', static function (Blueprint $table): void {
@@ -53,5 +60,9 @@ return new class extends Migration
     {
         Schema::dropIfExists('forum_discussion_redirects');
         Schema::dropIfExists('forum_post_redirects');
+
+        Schema::table('forum_posts', static function (Blueprint $table): void {
+            $table->dropIndex(['discussion_id', 'published_at']);
+        });
     }
 };

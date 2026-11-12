@@ -206,7 +206,7 @@ El editor es TipTap en el navegador. Lo que se envía y se guarda es su document
 | `bulletList`, `orderedList` | `listItem` | `orderedList`: `start` opcional (1 a 100 000) |
 | `listItem` | bloques | ninguno |
 | `codeBlock` | texto sin marcas | `language` opcional (`[a-z0-9][a-z0-9+#.-]{0,29}`) |
-| `horizontalRule`, `image` | — | `image`: `origin` (`upload`; otros orígenes podrán añadirse sin migrar datos), `src` (ruta en `forum/posts/`) y `alt` opcional (300 caracteres) |
+| `horizontalRule`, `image` | — | `image`: `origin` (`upload` o `external`), `src`, `path` y `alt` opcional (300 caracteres). Una subida: `src` es su ruta en `forum/posts/` y `path` es nulo. Una imagen de otro sitio: `src` es su dirección https tal como la escribe el servidor y `path`, la copia del foro en `forum/external/` |
 | `hardBreak`, `mention` (inline) | — | `mention`: `id` de la cuenta |
 | `roll` | — | `expression` y `reason` (hasta 200 y 100 caracteres) y `rollId` (id de la tirada, solo lo pone el servidor); nunca un resultado |
 | `ooc` | bloques | ninguno: aparte fuera de personaje |
@@ -217,6 +217,13 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 
 - **Menciones y citas** guardan solo el id. El nombre y el enlace se buscan al pintar el mensaje, así que cambiar de nombre no rompe nada. Una cita muestra autor y enlace solo a quien puede leer el original, y al guardarla su texto tiene que estar en el mensaje citado (se comparan letras y cifras), para que nadie atribuya a otra persona lo que no dijo.
 - **Imágenes**: las sube quien tiene `forum:posts.upload_images` a `POST /foro/imagenes`, con los formatos (de JPEG, PNG, WebP y GIF; nunca SVG), el peso, el lado máximo, las imágenes por mensaje y las subidas por hora de los ajustes. El tipo se lee de los bytes. Se guardan en `forum/posts/<año>/<mes>/`. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado (hasta que se vacía).
+- **Imágenes de otros sitios**: las pone quien tiene `forum:posts.external_images`, desde los sitios de los ajustes (`imgur.com` por defecto; cada uno vale con sus subdominios y solo por https). El navegador nunca pide nada al otro sitio:
+  - El editor pide la copia a `POST /foro/imagenes/externas` (`{"url": …}`, mismo límite por hora que las subidas): botón «Imagen de otro sitio», o pegar la dirección de un archivo de imagen de un sitio permitido. Responde la dirección, la copia y dónde verla.
+  - El servidor la descarga una vez (`ExternalImageImporter`), la comprueba como una subida (imagen real por sus bytes, de un formato admitido, sin pasar el peso ni 8000 px) y la guarda reducida y sin metadatos en `forum/external/<año>/<mes>/`. La tabla `forum_external_images` dice de qué dirección es cada copia; la misma dirección se reutiliza.
+  - Al publicar (`ExternalImageRules`), cada imagen nueva necesita el permiso, un sitio que siga en la lista y la copia de esa misma dirección; si no, 422 (`external_image_not_allowed`, `external_image_host`, `invalid_image`). Las que el mensaje ya tenía se conservan al editarlo, también como moderación, sin volver a comprobarlas.
+  - Se pinta la copia con «Imagen de <sitio>» enlazando al original (`noreferrer`, `no-referrer`). Si la copia no se puede mostrar, queda el enlace. Si el original desaparece, la copia sigue.
+  - **SSRF** (`Infrastructure\Fetching\GuardedRemoteFetcher`): solo https al puerto 443 y a nombres de host, nunca IP. Se resuelve el DNS (`DnsHostResolver`) y todas las direcciones tienen que ser públicas (`Domain\ValueObjects\IpAddress`: se permite, no se deniega; fuera quedan bucle local, privadas, de enlace local y de metadatos, CGNAT, ULA, multicast, documentación, NAT64, 6to4, Teredo y las IPv4 en IPv6). curl se fija a la dirección comprobada (`CURLOPT_RESOLVE`), y después de conectar tiene que haber hablado con ella. Sin proxy del entorno, sin cookies, sin compresión, TLS verificado, 3 s para conectar y 8 en total, y el peso cortado mientras llega. Redirecciones: 3 como mucho, solo al mismo host y comprobando cada salto. Lo que no se puede comprobar se rechaza.
+- **Metadatos**: las subidas, las copias y los retratos de personajes se guardan sin EXIF (con su posición GPS), XMP, IPTC, comentarios ni textos (`Application\Images\ImageMetadataStripper`, que trabaja sobre la estructura del archivo y conserva perfiles de color y animaciones). Un JPEG girado por su EXIF se endereza antes. Lo que no se puede leer entero se rechaza.
 - **Tiradas** (`roll`): el editor guarda la expresión y el motivo, nunca el resultado. El servidor tira los dados al publicar (`random_int`, a través de `Domain\Dice\NumberGenerator`) y guarda la tirada aparte, en `forum_dice_rolls` (mensaje, posición, expresión, dados, total y fecha); el nodo solo lleva su id. Botón «Tirada de dados» o, en una línea propia, `/tirada 2d6+3 Ataque` y Intro.
   - **Sintaxis** (`Domain\Dice\Parser`): `2d6+3`, `1d20-1`, `3d6+1d4` (dados y constantes que suman o restan; `d%` es `d100`); `4dF` (Fate: -1, 0, +1); `5d10>=7` (reserva: cuántos dados llegan a 7; admite `>=`, `>`, `<=`, `<`, `=`); `5d10>=8f=1` (resta los que sacan 1); `4d6kh3`, `4d6dl1`, `2d20kl1` (quedarse con los más altos o bajos, o descartarlos: `kh`, `kl`, `dh`, `dl`); `3d6!`, `3d10!>=9` (el dado que saca el máximo, o cumple la condición, se vuelve a tirar). Mayúsculas y espacios alrededor de `+` y `-` no importan.
   - **Límites** (`Domain\Dice\Limits`, constantes): 10 tiradas y 300 dados por mensaje; 100 dados y 1000 caras por grupo; 10 grupos y 200 caracteres por expresión; 100 dados añadidos por las explosiones de un grupo. Una tirada que no se entiende o pasa un límite no se tira: se guarda con su error (`forum::messages.dice.errors.*`), se muestra con él y el resto del mensaje se publica. Pasar las 10 tiradas rechaza el documento (`too_many_rolls`).
@@ -238,6 +245,7 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 | `GET /foro/mensajes/{mensaje}/versiones` | Versiones, para quien modera |
 | `GET /foro/temas/{tema}/menciones?q=` | Personas que pueden leer el tema |
 | `POST /foro/imagenes` | Subir una imagen |
+| `POST /foro/imagenes/externas` | Copia del foro de una imagen de otro sitio (`{"url": …}`) |
 | `POST` / `DELETE /foro/mensajes/{mensaje}/me-gusta` | Dar y quitar «me gusta» |
 | `PUT /foro/temas/{tema}/seguimiento` | Nivel de seguimiento (`{"level": "following" \| "normal" \| "muted"}`) |
 | `PUT /foro/c/{categoría}/seguimiento` | Seguir una categoría (`{"follow": true}`) |
@@ -259,7 +267,7 @@ Un nodo nuevo (por ejemplo, los apartes fuera de personaje) se añade en los dos
 
 ### Componente
 
-`resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl` (solo a quien tiene el permiso de subir imágenes), `maxImages` e `imageTypes` (de los ajustes), `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
+`resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl` (solo a quien tiene el permiso de subir imágenes), `maxImages` e `imageTypes` (de los ajustes), `externalImageUrl` y `externalImageHosts` (solo a quien tiene el permiso de imágenes de otros sitios), `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
 
 ## Novedades sin recargar
 
@@ -327,6 +335,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 | `forum:categories.manage` | Gestionar las categorías y quién ve y escribe en cada una |
 | `forum:settings.manage` | Cambiar los ajustes del foro |
 | `forum:posts.upload_images` | Subir imágenes a los mensajes |
+| `forum:posts.external_images` | Poner imágenes de los sitios permitidos en los ajustes |
 | `forum:characters.use` | Tener personajes y escribir como ellos, cuando el ajuste lo pide |
 
 ## Panel
@@ -339,7 +348,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
   - *Historial*: el historial de moderación, lo más nuevo primero, con filtro por acción. Solo se lee.
   - Las tablas caben en todos los anchos: las columnas secundarias aparecen desde el ancho en que caben y «Ver detalles» muestra las ocultas.
 - **Actividad del foro**: widget del escritorio con los temas y mensajes de los últimos 30 días, las denuncias pendientes y lo pendiente de aprobación (enlaza a la moderación). Solo con `forum:forum.moderate`.
-- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10) y subidas por hora y persona (30). También quién puede tener personajes (nadie, cualquier cuenta con sesión o solo con permiso; cualquier cuenta por defecto).
+- **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10), subidas por hora y persona (30, también las de otros sitios) y los sitios de los que se pueden poner imágenes (`imgur.com`; sin ninguno, no se puede). También quién puede tener personajes (nadie, cualquier cuenta con sesión o solo con permiso; cualquier cuenta por defecto).
 
 ## Desarrollo
 

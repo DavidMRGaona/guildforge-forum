@@ -16,13 +16,15 @@ use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
+use Modules\Forum\Http\Presenters\MergedDiscussionAnswer;
 use Modules\Forum\Http\Presenters\ModerationProps;
 
 /**
  * What an open page asks for without reloading, as light JSON that no shared cache keeps:
  * - the posts of a discussion after the last one the page has (204 when there are none);
  * - the forum's summary for the menu and the lists.
- * A discussion the person may not read answers like one that does not exist.
+ * A discussion the person may not read answers like one that does not exist; one merged into
+ * another answers 410 with where it went, when the person may read that.
  */
 final class LiveUpdatesController extends Controller
 {
@@ -34,6 +36,7 @@ final class LiveUpdatesController extends Controller
         private readonly ForumPresenter $presenter,
         private readonly EngagementPresenter $engagement,
         private readonly ModerationProps $moderationProps,
+        private readonly MergedDiscussionAnswer $merged,
     ) {}
 
     public function posts(Request $request, string $discussion): JsonResponse|Response
@@ -44,6 +47,12 @@ final class LiveUpdatesController extends Controller
         try {
             $news = $this->reader->after($user, DiscussionId::fromString($discussion), (int) $validated['despues']);
         } catch (DiscussionNotFoundException) {
+            // A discussion merged into another says where it went, to whoever may read that
+            $gone = $this->merged->for($user, $discussion);
+            if ($gone instanceof JsonResponse) {
+                return $gone;
+            }
+
             // One answer for a discussion that does not exist and one that may not be read
             return response()->json(['message' => 'Not Found'], 404)->header('Cache-Control', self::NO_STORE);
         }

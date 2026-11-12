@@ -63,4 +63,18 @@ final readonly class ForumRedirects
 
         return $into instanceof Discussion && $this->access->canRead($reader, $into) ? new RedirectTargetDTO($into, null) : null;
     }
+
+    /**
+     * Where the discussion with this id went when it was merged into another (the id of a page
+     * that was open at the time); null when it was not merged, or the reader may not read where
+     * it went. A discussion that still exists never has a redirect, so an unreadable one is not
+     * told apart from a missing one.
+     */
+    public function mergedInto(?Authenticatable $reader, DiscussionId $id): ?RedirectTargetDTO
+    {
+        $into = $this->redirects->mergedDiscussionById($id)?->into;
+        $target = $into instanceof DiscussionId ? $this->discussions->find($into) : null;
+
+        return $target instanceof Discussion && $this->access->canRead($reader, $target) ? new RedirectTargetDTO($target, null) : null;
+    }
 }

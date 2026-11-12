@@ -69,4 +69,32 @@ final readonly class EloquentMovedPostsQuery implements MovedPostsQueryInterface
 
         return $resume;
     }
+
+    public function countInRanges(array $ranges): array
+    {
+        if ($ranges === []) {
+            return [];
+        }
+
+        // One range read of the primary key (discussion, number) per discussion, one question
+        $rows = DB::table(EloquentRedirectRepository::POSTS)
+            ->where(static function (Builder $query) use ($ranges): void {
+                foreach ($ranges as $discussionId => $range) {
+                    $query->orWhere(static fn (Builder $pair) => $pair
+                        ->where('from_discussion_id', $discussionId)
+                        ->where('from_number', '>', $range['after'])
+                        ->where('from_number', '<=', $range['through']));
+                }
+            })
+            ->groupBy('from_discussion_id')
+            ->selectRaw('from_discussion_id, COUNT(*) as moved')
+            ->get();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row->from_discussion_id] = (int) $row->moved;
+        }
+
+        return $counts;
+    }
 }

@@ -310,6 +310,10 @@ export default {
             newPosts: 'One new post | {count} new posts',
             view: 'View',
             listChanged: 'One discussion has news | {count} discussions have news',
+            merged: 'This discussion was merged into "{title}".',
+            mergedGo: 'Go to the discussion',
+            mergedReply:
+                'This discussion was merged into "{title}" and your message was not published. It is still in the editor: copy it and post it in the other discussion.',
             refreshList: 'Refresh the list',
             updated: 'Has news',
             unreadFollowed:

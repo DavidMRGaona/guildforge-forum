@@ -11,6 +11,7 @@ use Modules\Forum\Domain\Repositories\RedirectRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\MergedDiscussion;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use stdClass;
 
 /**
  * `forum_post_redirects` and `forum_discussion_redirects`. Instants are written as the database
@@ -75,8 +76,18 @@ final readonly class EloquentRedirectRepository implements RedirectRepositoryInt
 
     public function mergedDiscussion(int $number): ?MergedDiscussion
     {
-        $row = DB::table(self::DISCUSSIONS)->where('from_number', $number)->first(['from_discussion_id', 'to_discussion_id']);
-        if ($row === null || ! is_string($row->from_discussion_id)) {
+        return $this->merged(DB::table(self::DISCUSSIONS)->where('from_number', $number)->first(['from_discussion_id', 'to_discussion_id']));
+    }
+
+    public function mergedDiscussionById(DiscussionId $id): ?MergedDiscussion
+    {
+        // `from_discussion_id` is unique: one read of its index
+        return $this->merged(DB::table(self::DISCUSSIONS)->where('from_discussion_id', $id->value)->first(['from_discussion_id', 'to_discussion_id']));
+    }
+
+    private function merged(?stdClass $row): ?MergedDiscussion
+    {
+        if (! $row instanceof stdClass || ! is_string($row->from_discussion_id)) {
             return null;
         }
 

@@ -1,4 +1,5 @@
 import { csrfHeaders } from '@/utils/csrf';
+import type { ForumMergedInto } from '../types/forum';
 
 export interface JsonAnswer<T> {
     ok: boolean;
@@ -7,6 +8,8 @@ export interface JsonAnswer<T> {
     /** The server's message, or a field's first error, when it refused */
     message: string | null;
     errors: Record<string, string[]>;
+    /** Where the discussion went, when it answered 410 because it was merged into another */
+    mergedInto?: ForumMergedInto | null;
 }
 
 /**
@@ -77,12 +80,23 @@ async function readAnswer<T>(response: Response): Promise<JsonAnswer<T>> {
             ? (record.errors as Record<string, string[]>)
             : {};
 
+    const merged = record.mergedInto;
+    const mergedInto =
+        response.status === 410 &&
+        typeof merged === 'object' &&
+        merged !== null &&
+        typeof (merged as Record<string, unknown>).title === 'string' &&
+        typeof (merged as Record<string, unknown>).url === 'string'
+            ? (merged as ForumMergedInto)
+            : null;
+
     return {
         ok: response.ok,
         status: response.status,
         data: response.ok ? (payload as T) : null,
         message: typeof record.message === 'string' ? record.message : null,
         errors,
+        mergedInto,
     };
 }
 

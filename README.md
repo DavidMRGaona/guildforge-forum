@@ -96,7 +96,7 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
   - Se guarda en `forum_discussion_follows`. «Silenciar» es el silencio del core del tema (`MailSubjectMuteServiceInterface`, tipo `forum.discussion`), el mismo que ofrece el pie de cada correo, así que el foro, el correo y la pestaña «Avisos» del perfil siempre coinciden.
   - Abrir un tema o responder en él lo sigue, salvo que la persona lo haya quitado en la pestaña «Foro» del perfil (`forum_user_preferences`) o ya hubiera elegido algo para ese tema: una elección explícita no se pisa.
 - **Seguir una categoría** (`forum_category_follows`, botón en su página): avisa de cada tema nuevo en ella y en sus subcategorías. Al entrar en la plantilla de una campaña se sigue su espacio y llega el aviso «Te han añadido a la campaña X», una sola vez; al salir se deja de seguir, salvo que la persona lo siguiera por su cuenta. Lo hace `SpaceRosterFollows`, que relee el roster al ejecutarse.
-- **Avisos**, en la campana del core y por correo, con cuatro categorías en la sección «Foro» de la pestaña «Avisos»:
+- **Avisos**, en la campana del core y por correo, con siete categorías en la sección «Foro» de la pestaña «Avisos»:
 
 | Categoría | Qué avisa | Correo |
 |---|---|---|
@@ -104,12 +104,19 @@ Cada campaña tiene un espacio privado en el foro para su plantilla, donde jugar
 | `forum.discussions` | Temas nuevos en categorías que sigues y espacios de campaña en los que puedes entrar | Admite el resumen diario (el aviso del espacio va solo en la web) |
 | `forum.mentions` | Menciones y citas de un mensaje tuyo | Al momento |
 | `forum.likes` | «Me gusta» de tus mensajes (agrupados por mensaje) | Nunca: solo en la web |
+| `forum.approvals` | La moderación ha aprobado un mensaje o un tema tuyo que esperaba revisión (`ForumPostApproved`) | Al momento |
+| `forum.suspensions` | Te han suspendido en el foro, con el motivo y la fecha de fin o «hasta que se levante» (`ForumUserSuspended`). Obligatoria | Siempre, al momento |
+| `forum.reports` | Para quien modera: han denunciado un mensaje (`ForumPostReported`). En la web se agrupan por mensaje mientras haya denuncias abiertas | Solo por la primera denuncia abierta de cada mensaje |
 
 - Cada persona recibe un solo aviso por mensaje: mención antes que cita y cita antes que seguimiento. Al editar un mensaje, solo avisa a quien menciona o cita por primera vez.
 - Todo pasa por la cola: `ForumWriter` entrega cada mensaje que recibe número (respuestas, temas nuevos, aprobaciones y los mensajes de la cuenta del sistema) a `DeliverPostNoticesJob`, que decide a quién avisar (`PostNoticePlanner`), y cada aviso vuelve a comprobar al entregarse (`PostNoticeContext`) que la persona puede leer el tema en ese momento (`ForumAccessInterface`), que el mensaje sigue visible y que la cuenta está activa.
 - Nunca se avisa a quien escribió el mensaje, a cuentas desactivadas o anonimizadas, ni a la cuenta del sistema.
 - Los avisos tratan del tema (los de temas nuevos y espacios, de la categoría), así que silenciarlo desde el correo los calla también en la web. Al borrar un tema o una categoría se llama a `forgetSubject()`, que borra sus silencios y sus avisos.
 - Los nombres que van al correo pasan por `EscapesMarkdown`.
+- **Avisos de moderación** (`NotifyPostAuthorOfApproval`, `NotifyUserOfSuspension` y `NotifyModeratorsOfReport`, oyentes en cola de los tres eventos de la moderación):
+  - La aprobación avisa al autor desde el evento. A los seguidores, menciones y citas los avisa `ForumWriter::approvePost()` y el planificador nunca incluye al autor, así que nadie recibe dos avisos.
+  - Las denuncias llegan a quien modera el mensaje: `CategoryModeratorFinder` reúne a los candidatos (permiso del foro, roles moderadores y dirección de la plantilla, de la categoría y de la de arriba) y cada aviso vuelve a preguntar a `ForumAccessInterface::canModerate()` al entregarse, así que quien esté suspendido o haya perdido el rol no lo recibe. No dice quién denunció ni lo que escribió, y quien denunció no recibe el aviso de su propia denuncia. Una denuncia ya resuelta no se avisa.
+  - La suspensión solo se cuenta mientras sigue vigente y es la última de esa persona.
 
 ## Moderación
 

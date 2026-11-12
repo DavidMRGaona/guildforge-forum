@@ -49,6 +49,9 @@ use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
+use Modules\Forum\Domain\Events\ForumPostApproved;
+use Modules\Forum\Domain\Events\ForumPostReported;
+use Modules\Forum\Domain\Events\ForumUserSuspended;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
@@ -60,6 +63,9 @@ use Modules\Forum\Domain\Repositories\SuspensionRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Filament\Widgets\ForumActivityWidget;
+use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
+use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
+use Modules\Forum\Infrastructure\Listeners\NotifyUserOfSuspension;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
@@ -183,6 +189,11 @@ final class ForumServiceProvider extends ModuleServiceProvider
         Event::listen(PublicationRemoved::class, [QueuePublicationDiscussionSync::class, 'handle']);
         // Joining a campaign follows its space (and tells so); leaving it ends that follow
         Event::listen(PublicationRosterChanged::class, [QueueSpaceRosterSync::class, 'handle']);
+
+        // What moderation does is told to whom it concerns, after the commit
+        Event::listen(ForumPostApproved::class, [NotifyPostAuthorOfApproval::class, 'handle']);
+        Event::listen(ForumUserSuspended::class, [NotifyUserOfSuspension::class, 'handle']);
+        Event::listen(ForumPostReported::class, [NotifyModeratorsOfReport::class, 'handle']);
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {

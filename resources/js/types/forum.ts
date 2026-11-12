@@ -383,6 +383,12 @@ export interface ForumSearchBox {
     categories: ForumSearchCategoryOption[];
 }
 
+/** Where a discussion went when moderation merged it into another (what a 410 answer carries) */
+export interface ForumMergedInto {
+    title: string;
+    url: string;
+}
+
 /** What the endpoint of new posts answers (when there are any) */
 export interface ForumNewPosts {
     posts: ForumPost[];

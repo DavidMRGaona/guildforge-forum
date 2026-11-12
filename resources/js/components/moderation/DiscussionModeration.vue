@@ -4,10 +4,22 @@ import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { sendJson } from '../../forum/api';
 import type { ForumConversation, ForumDiscussionModeration } from '../../types/forum';
+import MergeDialog from './MergeDialog.vue';
 import ModerationDialog, { type ModerationDialogFields } from './ModerationDialog.vue';
 import ModerationMenu, { type ModerationMenuItem } from './ModerationMenu.vue';
 
-type Action = 'pin' | 'unpin' | 'close' | 'reopen' | 'hide' | 'show' | 'rename' | 'move' | 'delete';
+type Action =
+    | 'pin'
+    | 'unpin'
+    | 'close'
+    | 'reopen'
+    | 'hide'
+    | 'show'
+    | 'rename'
+    | 'move'
+    | 'split'
+    | 'merge'
+    | 'delete';
 
 /**
  * The discussion's moderation menu. Quick actions (pin, reopen, show) run at once; the others
@@ -19,12 +31,19 @@ const props = defineProps<{
     moderation: ForumDiscussionModeration;
 }>();
 
+// Splitting is chosen on the page itself, post by post: the page takes it from here
+const emit = defineEmits<{
+    split: [];
+}>();
+
 const { t } = useI18n();
 const pending = ref<Action | null>(null);
 const dialogOpen = ref(false);
 const busy = ref(false);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
+const mergeOpen = ref(false);
+const mergeError = ref<string | null>(null);
 
 const items = computed<ModerationMenuItem[]>(() => {
     if (props.discussion.isAwaitingApproval) {
@@ -51,6 +70,12 @@ const items = computed<ModerationMenuItem[]>(() => {
     ];
     if (props.moderation.moveTargets.length > 0) {
         list.push({ key: 'move', label: t('forum.moderation.discussion.move') });
+    }
+    if (props.moderation.splitUrl !== null) {
+        list.push({ key: 'split', label: t('forum.moderation.discussion.split') });
+    }
+    if (props.moderation.mergeUrl !== null) {
+        list.push({ key: 'merge', label: t('forum.moderation.discussion.merge') });
     }
     list.push({
         key: props.discussion.isHidden ? 'show' : 'hide',
@@ -93,6 +118,17 @@ const dialog = computed(() => {
 function select(key: string): void {
     const action = key as Action;
     error.value = null;
+    if (action === 'split') {
+        emit('split');
+
+        return;
+    }
+    if (action === 'merge') {
+        mergeError.value = null;
+        mergeOpen.value = true;
+
+        return;
+    }
     if (asksFirst.includes(action)) {
         pending.value = action;
         dialogOpen.value = true;
@@ -100,6 +136,29 @@ function select(key: string): void {
         return;
     }
     void run(action, { reason: '', title: '', category: '' });
+}
+
+async function merge(fields: { target: string; reason: string }): Promise<void> {
+    if (props.moderation.mergeUrl === null) {
+        return;
+    }
+    busy.value = true;
+    mergeError.value = null;
+    const answer = await sendJson<{ url: string }>(props.moderation.mergeUrl, 'POST', {
+        target: fields.target,
+        reason: fields.reason === '' ? undefined : fields.reason,
+        confirmed: true,
+    });
+    busy.value = false;
+
+    if (!answer.ok || answer.data === null) {
+        mergeError.value = answer.message ?? t('forum.moderation.errors.generic');
+
+        return;
+    }
+
+    mergeOpen.value = false;
+    router.visit(answer.data.url);
 }
 
 async function run(action: Action, fields: ModerationDialogFields): Promise<void> {
@@ -170,6 +229,15 @@ async function run(action: Action, fields: ModerationDialogFields): Promise<void
             :busy="busy"
             :error="error"
             @confirm="(fields) => pending && run(pending, fields)"
+        />
+        <MergeDialog
+            v-if="moderation.mergeTargetUrl"
+            v-model="mergeOpen"
+            :lookup-url="moderation.mergeTargetUrl"
+            :reason-max="moderation.limits.reasonMax"
+            :busy="busy"
+            :error="mergeError"
+            @confirm="merge"
         />
     </div>
 </template>

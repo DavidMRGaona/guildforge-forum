@@ -207,12 +207,39 @@ export interface ForumDiscussionModeration {
     /** Only for whoever moderates the whole forum */
     deleteUrl: string | null;
     moveTargets: ForumMoveTarget[];
+    /** Splitting posts off and merging into another discussion; null for publications' discussions */
+    splitUrl: string | null;
+    mergeUrl: string | null;
+    /** Finds the discussion to merge into by its number or address (`?tema=`) */
+    mergeTargetUrl: string | null;
+    /** Where split posts may go: the discussion's own category first */
+    splitCategories: ForumMoveTarget[];
     limits: {
         titleMin: number;
         titleMax: number;
         reasonMax: number;
         hiddenReasonMax: number;
+        splitMax: number;
     };
+}
+
+/** Numbers whose posts moderation moved to another discussion, shown in their place */
+export interface ForumMovedPosts {
+    fromNumber: number;
+    throughNumber: number;
+    count: number;
+    /** null for whoever may not read where they went (or once it is gone) */
+    title: string | null;
+    url: string | null;
+}
+
+/** The discussion a merge would join, as the server found it */
+export interface ForumMergeTarget {
+    id: string;
+    number: number;
+    title: string;
+    url: string;
+    categoryName: string | null;
 }
 
 export interface ForumPagination {

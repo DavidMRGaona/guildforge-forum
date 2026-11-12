@@ -6,18 +6,22 @@ import type { JSONContent } from '@tiptap/core';
 import { EyeOff, Lock, Pin } from '@lucide/vue';
 import { useAuth } from '@/composables/useAuth';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
+import MovedPostsNotice from '../../components/forum/MovedPostsNotice.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import NewPostsNotice from '../../components/live/NewPostsNotice.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import ReplyBox from '../../components/forum/ReplyBox.vue';
 import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
+import SplitPosts from '../../components/moderation/SplitPosts.vue';
 import { useNewPosts } from '../../composables/useNewPosts';
 import { useReadTracker } from '../../composables/useReadTracker';
+import { useSplitSelection } from '../../composables/useSplitSelection';
 import { pollNewPosts } from '../../live/transports';
 import { sendJson } from '../../forum/api';
 import type {
     ForumConversation,
     ForumDiscussionModeration,
+    ForumMovedPosts,
     ForumPagination,
     ForumPost,
     ForumReplySettings,
@@ -26,6 +30,8 @@ import type {
 const props = defineProps<{
     discussion: ForumConversation;
     posts: ForumPost[];
+    /** Where posts of this page's numbers went, when moderation moved them away */
+    moved?: ForumMovedPosts[];
     pagination: ForumPagination;
     focusNumber: number | null;
     lastReadNumber: number | null;
@@ -71,6 +77,32 @@ const live = useNewPosts({
     enabled: isLastPage,
 });
 const allMentionNames = computed(() => ({ ...props.mentionNames, ...live.mentionNames.value }));
+
+// Posts in their order, each run of moved ones in its place (posts awaiting approval last)
+type Entry =
+    | { key: string; post: ForumPost; moved?: never }
+    | { key: string; moved: ForumMovedPosts; post?: never };
+const entries = computed<Entry[]>(() => {
+    const placed = [
+        ...live.posts.value.map((post) => ({
+            at: post.number ?? Number.MAX_SAFE_INTEGER,
+            entry: { key: post.id, post },
+        })),
+        ...(props.moved ?? []).map((moved) => ({
+            at: moved.fromNumber,
+            entry: { key: `moved-${moved.fromNumber}`, moved },
+        })),
+    ];
+
+    return placed.sort((a, b) => a.at - b.at).map(({ entry }) => entry);
+});
+
+// Choosing posts to split off, kept across the discussion's pages in this tab
+const selection = useSplitSelection(props.discussion.id);
+const choosing = computed(
+    () => selection.active.value && (props.moderation?.splitUrl ?? null) !== null
+);
+const choosable = (post: ForumPost): boolean => post.number !== null && post.number > 1;
 
 // The tracker watches the posts that arrive too, and counts them read only once they were seen
 watch(
@@ -143,7 +175,11 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                         class="inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
                         >{{ t('forum.moderation.queueLink') }}</Link
                     >
-                    <DiscussionModeration :discussion="discussion" :moderation="moderation" />
+                    <DiscussionModeration
+                        :discussion="discussion"
+                        :moderation="moderation"
+                        @split="selection.start()"
+                    />
                 </div>
             </div>
             <h1
@@ -205,7 +241,20 @@ async function send(document: JSONContent, characterId: string | null): Promise<
         </div>
     </div>
 
-    <div class="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div
+        class="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 lg:px-8"
+        :class="{ 'pb-40 sm:pb-28': choosing }"
+    >
+        <div
+            v-if="choosing"
+            class="rounded-lg border border-default bg-primary-light px-4 py-3 text-sm text-base-primary"
+            data-testid="split-intro"
+        >
+            <p class="font-medium">{{ t('forum.moderation.discussion.splitChoosing') }}</p>
+            <p class="mt-1 text-base-secondary">
+                {{ t('forum.moderation.discussion.splitChoosingHelp') }}
+            </p>
+        </div>
         <nav
             v-if="pagination.pageCount > 1"
             :aria-label="t('forum.posts.pagesTop')"
@@ -247,23 +296,43 @@ async function send(document: JSONContent, characterId: string | null): Promise<
         </nav>
 
         <div ref="list" class="space-y-4">
-            <PostItem
-                v-for="post in live.posts.value"
-                :key="post.id"
-                :post="post"
-                :focused="post.number !== null && post.number === focusNumber"
-                :can-quote="reply.canPost"
-                :editor="reply"
-                :characters="reply.characters ?? null"
-                :mentions-url="reply.mentionsUrl"
-                :mention-names="allMentionNames"
-                :hidden-reason-max="moderation?.limits.hiddenReasonMax"
-                :reason-max="moderation?.limits.reasonMax"
-                :suspend-url="moderation?.suspendUrl ?? null"
-                :viewer-id="user?.id ?? null"
-                @quote="onQuote"
-                @changed="refresh"
-            />
+            <template v-for="entry in entries" :key="entry.key">
+                <MovedPostsNotice v-if="entry.moved" :moved="entry.moved" />
+                <div v-else-if="entry.post" class="space-y-2">
+                    <label
+                        v-if="choosing && choosable(entry.post)"
+                        class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-default bg-surface px-3 text-sm text-base-primary hover:bg-muted"
+                        data-testid="split-pick"
+                    >
+                        <input
+                            type="checkbox"
+                            class="h-5 w-5"
+                            :checked="selection.has(entry.post.number ?? 0)"
+                            @change="selection.toggle(entry.post.number ?? 0)"
+                        />
+                        <span>{{
+                            t('forum.moderation.discussion.splitPick', {
+                                number: entry.post.number,
+                            })
+                        }}</span>
+                    </label>
+                    <PostItem
+                        :post="entry.post"
+                        :focused="entry.post.number !== null && entry.post.number === focusNumber"
+                        :can-quote="reply.canPost"
+                        :editor="reply"
+                        :characters="reply.characters ?? null"
+                        :mentions-url="reply.mentionsUrl"
+                        :mention-names="allMentionNames"
+                        :hidden-reason-max="moderation?.limits.hiddenReasonMax"
+                        :reason-max="moderation?.limits.reasonMax"
+                        :suspend-url="moderation?.suspendUrl ?? null"
+                        :viewer-id="user?.id ?? null"
+                        @quote="onQuote"
+                        @changed="refresh"
+                    />
+                </div>
+            </template>
             <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
         </div>
 
@@ -319,6 +388,14 @@ async function send(document: JSONContent, characterId: string | null): Promise<
             </ReplyBox>
         </section>
     </div>
+
+    <SplitPosts
+        v-if="choosing && moderation"
+        :moderation="moderation"
+        :numbers="selection.numbers.value"
+        @cancel="selection.cancel()"
+        @done="selection.cancel()"
+    />
 </template>
 
 <style scoped>

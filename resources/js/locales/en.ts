@@ -111,6 +111,12 @@ export default {
             markCategoryRead: 'Mark the category {name} as read',
         },
         posts: {
+            moved: {
+                to: 'One post moved to | {count} posts moved to',
+                elsewhere:
+                    'One post moved to another discussion | {count} posts moved to another discussion',
+                numbers: '#{numbers}',
+            },
             reply: 'Reply',
             replyLabel: 'Your reply',
             replyGoesLast: 'Your reply will be published at the end of the discussion.',
@@ -189,6 +195,11 @@ export default {
                 categoryPlaceholder: 'Choose a category',
                 reason: 'Reason (optional)',
                 reasonHelp: 'It stays in the moderation log.',
+                splitTitle: 'Title of the new discussion',
+                splitCategory: 'Category of the new discussion',
+                mergeTarget: 'Discussion to join',
+                mergeTargetHelp:
+                    'Its number or its address, for instance 42 or /foro/t/42-its-title.',
             },
             discussion: {
                 menu: 'Moderate',
@@ -211,6 +222,30 @@ export default {
                     'The discussion and all its posts will be deleted for good. To take it down only, hide it.',
                 deleteConfirmation:
                     'I understand every post is deleted and that it cannot be undone',
+                split: 'Split posts off',
+                splitChoosing: 'Choose the posts that go to a new discussion',
+                splitChoosingHelp:
+                    'Tick their boxes; you may change pages without losing the choice. The first post stays.',
+                splitPick: 'Choose post #{number}',
+                splitChosen: 'No post chosen | 1 post chosen | {count} posts chosen',
+                splitContinue: 'Split off…',
+                splitCancel: 'Cancel',
+                splitTitle: 'Split posts off into a new discussion',
+                splitMessage:
+                    'They will go to the new discussion, numbered from 1: #{numbers}. A notice with the link stays here.',
+                splitConfirm: 'Split off',
+                splitConfirmation:
+                    'I understand the posts leave this discussion and that it cannot be undone',
+                merge: 'Merge into another discussion',
+                mergeTitle: 'Merge this discussion into another',
+                mergeMessage:
+                    'Its posts will go to the end of the other discussion and this one will be gone. Its links will lead there.',
+                mergeLookup: 'Find',
+                mergeFound: 'It will join «{title}»',
+                mergeFoundIn: 'in {category}',
+                mergeConfirm: 'Merge',
+                mergeConfirmation:
+                    'I understand this discussion is gone into the other and that it cannot be undone',
             },
             post: {
                 menu: 'Moderate',

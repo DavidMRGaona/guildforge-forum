@@ -386,6 +386,8 @@ final readonly class ForumPresenter
                 'atLabel' => $this->timezone->format($row->lastActivityAt),
                 'url' => $row->lastPostNumber === null ? null : $this->urls->discussionFrom($row->number, $row->title, $row->lastPostNumber),
             ],
+            // What the row showed when the page drew it: the list compares it with the forum's later answers
+            'lastPostNumber' => $row->lastPostNumber,
             'isPinned' => $row->pinned,
             'isClosed' => $row->status === DiscussionStatus::Closed,
             'isHidden' => $row->hidden,

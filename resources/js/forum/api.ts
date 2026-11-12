@@ -62,3 +62,15 @@ export async function sendJson<T>(
 export function subjectConversationUrl(subjectType: string, subjectId: string): string {
     return `/foro/fichas/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectId)}`;
 }
+
+/** The posts of a discussion after the number (LiveUpdatesController::posts) */
+export function discussionUpdatesUrl(discussionId: string, after: number): string {
+    return `/foro/temas/${encodeURIComponent(discussionId)}/novedades?despues=${after}`;
+}
+
+/** What changed in the forum for the signed-in person, and the last post of the discussions given */
+export function forumUpdatesUrl(discussionIds: string[] = []): string {
+    return discussionIds.length === 0
+        ? '/foro/novedades'
+        : `/foro/novedades?temas=${discussionIds.map(encodeURIComponent).join(',')}`;
+}

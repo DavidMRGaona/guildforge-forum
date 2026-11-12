@@ -272,6 +272,13 @@ export default {
                 'Este espacio es privado, pero la moderación del foro puede entrar en él para atender reportes.',
             readOnlyNotice: 'Solo lectura: ya no se puede escribir en este espacio.',
         },
+        live: {
+            newPosts: 'Un mensaje nuevo | {count} mensajes nuevos',
+            view: 'Ver',
+            listChanged: 'Un tema tiene novedades | {count} temas tienen novedades',
+            refreshList: 'Actualizar la lista',
+            updated: 'Con novedades',
+        },
         subjects: {
             title: 'Conversación',
             viewAll: 'Ver conversación completa',

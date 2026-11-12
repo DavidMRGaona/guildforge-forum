@@ -269,6 +269,13 @@ export default {
                 'This space is private, but the forum moderators may enter it to handle reports.',
             readOnlyNotice: 'Read only: this space takes no more posts.',
         },
+        live: {
+            newPosts: 'One new post | {count} new posts',
+            view: 'View',
+            listChanged: 'One discussion has news | {count} discussions have news',
+            refreshList: 'Refresh the list',
+            updated: 'Has news',
+        },
         subjects: {
             title: 'Conversation',
             viewAll: 'See the whole conversation',

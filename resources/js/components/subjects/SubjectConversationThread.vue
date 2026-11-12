@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import PostItem from '../forum/PostItem.vue';
 import { useReadTracker } from '../../composables/useReadTracker';
 import type { ForumEditorSettings, ForumPost } from '../../types/forum';
@@ -27,11 +27,17 @@ const emit = defineEmits<{
 
 const list = ref<HTMLElement | null>(null);
 
-useReadTracker({
+const tracker = useReadTracker({
     readUrl: props.readUrl,
     lastReadNumber: props.lastReadNumber,
     container: list,
 });
+
+// Posts that arrive while the page is open are watched too, and count as read once seen
+watch(
+    () => props.posts.length,
+    () => void nextTick(() => tracker.refresh())
+);
 </script>
 
 <template>

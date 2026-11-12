@@ -19,13 +19,17 @@ export interface ReadTrackerOptions {
  * seen once most of it (or the screen's height of it) was visible; nothing is reported for
  * posts never scrolled to, so the mark never goes ahead of the reader.
  */
-export function useReadTracker(options: ReadTrackerOptions): { flush: () => void } {
+export function useReadTracker(options: ReadTrackerOptions): {
+    flush: () => void;
+    refresh: () => void;
+} {
     const delay = options.delayMs ?? 1200;
     let highestSeen = options.lastReadNumber ?? 0;
     let reported = highestSeen;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let observer: IntersectionObserver | null = null;
     const visible = new Map<Element, number>();
+    const watched = new WeakSet<Element>();
 
     function send(keepalive: boolean): void {
         if (timer !== null) {
@@ -84,6 +88,19 @@ export function useReadTracker(options: ReadTrackerOptions): { flush: () => void
         send(true);
     }
 
+    /**
+     * Watches the posts that came to the list after it mounted. A post counts as read only when
+     * it is seen on screen, as any other: arriving marks nothing.
+     */
+    function observeNew(): void {
+        options.container.value?.querySelectorAll('[data-post-number]').forEach((element) => {
+            if (!watched.has(element)) {
+                watched.add(element);
+                observer?.observe(element);
+            }
+        });
+    }
+
     onMounted(() => {
         const root = options.container.value;
         if (root === null || typeof IntersectionObserver === 'undefined') {
@@ -118,9 +135,7 @@ export function useReadTracker(options: ReadTrackerOptions): { flush: () => void
             { threshold: [0, 0.3, 0.6, 1] }
         );
 
-        root.querySelectorAll('[data-post-number]').forEach((element) =>
-            observer?.observe(element)
-        );
+        observeNew();
         window.addEventListener('pagehide', onPageHide);
     });
 
@@ -130,5 +145,5 @@ export function useReadTracker(options: ReadTrackerOptions): { flush: () => void
         send(true);
     });
 
-    return { flush: () => send(false) };
+    return { flush: () => send(false), refresh: observeNew };
 }

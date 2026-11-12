@@ -41,6 +41,8 @@ export interface ForumCategoryHeader {
     canModerate: boolean;
     isPublicationSpace: boolean;
     readOnly: boolean;
+    /** A module it depends on is missing: only the forum's moderators reach it */
+    unavailable: boolean;
     /** Only on the category page, and null for guests */
     follow?: ForumCategoryFollow | null;
 }

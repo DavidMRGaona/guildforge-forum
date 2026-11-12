@@ -76,6 +76,7 @@ const breadcrumbs = computed(() => [
                 class="mt-4"
                 :is-publication-space="category.isPublicationSpace"
                 :read-only="category.readOnly"
+                :unavailable="category.unavailable"
             />
         </div>
     </div>

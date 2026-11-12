@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Search;
 
 use App\Domain\Search\Enums\SearchAudience;
+use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
@@ -18,9 +19,17 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
  * Reading a subcategory needs reading its parent too, so the documents of a subcategory take the
  * narrower of the two levels; a parent that is missing, is not top level or cannot be expressed
  * leaves them out, however wide the subcategory's own rule is.
+ *
+ * What depends on a module that is missing (PublicationAvailability) has no audience either, so it
+ * leaves the index: the core rebuilds every type in a new process when a module is enabled or
+ * disabled (search:sync), and the documents come back with the source.
  */
-final class ForumSearchAudiences
+final readonly class ForumSearchAudiences
 {
+    public function __construct(
+        private PublicationAvailability $availability,
+    ) {}
+
     /**
      * @param  array<string, Category>  $categories  every category by id
      */
@@ -33,11 +42,13 @@ final class ForumSearchAudiences
 
         $parentId = $category->parentId();
         if (! $parentId instanceof CategoryId) {
-            return $this->audience($own);
+            return $this->availability->isAvailable($category) ? $this->audience($own) : null;
         }
 
         $parent = $categories[$parentId->value] ?? null;
-        $inherited = $parent instanceof Category && $parent->isTopLevel() ? $this->level($parent->viewAudience()) : null;
+        $inherited = $parent instanceof Category && $parent->isTopLevel() && $this->availability->isAvailable($category, $parent)
+            ? $this->level($parent->viewAudience())
+            : null;
 
         return $inherited === null ? null : $this->audience(max($own, $inherited));
     }

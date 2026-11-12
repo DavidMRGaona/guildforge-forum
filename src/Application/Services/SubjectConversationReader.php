@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Services;
 
-use App\Application\Publications\Contracts\PublicationSourceInterface;
 use App\Application\Publications\Enums\PublicationState;
-use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use InvalidArgumentException;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\DTOs\SubjectClosedReason;
 use Modules\Forum\Application\DTOs\SubjectConversationDTO;
+use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Application\Publications\PublicationFacts;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\SubjectDiscussion;
@@ -23,7 +22,6 @@ use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
-use Throwable;
 
 /**
  * The conversation a record's page shows (a game table, a campaign, an event): the last posts
@@ -51,7 +49,7 @@ final readonly class SubjectConversationReader
         private PostingService $posting,
         private PostContentPresenter $presenter,
         private DiscussionReadsInterface $reads,
-        private PublicationSourceRegistryInterface $publications,
+        private PublicationAvailability $availability,
     ) {}
 
     /**
@@ -65,7 +63,7 @@ final readonly class SubjectConversationReader
             return null;
         }
 
-        if (! $this->isOffered($key->type)) {
+        if (! $this->availability->offers($key->type)) {
             return null;
         }
 
@@ -113,18 +111,6 @@ final readonly class SubjectConversationReader
             canPost: $this->posting->canPost($reader, $discussion),
             closedReason: $this->closedReason($discussion, $record),
         );
-    }
-
-    /**
-     * Whether an active publication source offers the type; a registry that fails says no.
-     */
-    private function isOffered(string $type): bool
-    {
-        try {
-            return $this->publications->source($type) instanceof PublicationSourceInterface;
-        } catch (Throwable) {
-            return false;
-        }
     }
 
     private function closedReason(Discussion $discussion, SubjectDiscussion $record): ?SubjectClosedReason

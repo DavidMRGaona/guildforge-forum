@@ -12,6 +12,8 @@ use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Domain\Events\UserAnonymized;
+use App\Domain\Modules\Events\ModuleEnabled;
+use App\Domain\Modules\Events\ModuleUpdated;
 use App\Domain\Publications\Events\PublicationChanged;
 use App\Domain\Publications\Events\PublicationRemoved;
 use App\Domain\Publications\Events\PublicationRosterChanged;
@@ -47,6 +49,7 @@ use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
 use Modules\Forum\Application\Queries\ForumActivityQueryInterface;
@@ -82,6 +85,7 @@ use Modules\Forum\Infrastructure\Listeners\NotifyUserOfLiftedSuspension;
 use Modules\Forum\Infrastructure\Listeners\NotifyUserOfSuspension;
 use Modules\Forum\Infrastructure\Listeners\QueuePublicationDiscussionSync;
 use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
+use Modules\Forum\Infrastructure\Listeners\SyncPublicationsOnModuleChange;
 use Modules\Forum\Infrastructure\Media\CharacterPortraitMediaSource;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
@@ -170,6 +174,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(ForumSettingsInterface::class, ForumSettings::class);
         // Roles and rosters are read once per request (or queue job)
         $this->app->scoped(CategoryAccessPolicy::class);
+        $this->app->scoped(PublicationAvailability::class);
         // Suspensions are read once per person and request (or queue job)
         $this->app->scoped(ForumSuspensions::class);
         $this->app->bind(AccountDirectoryInterface::class, EloquentAccountDirectory::class);
@@ -223,6 +228,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         Event::listen(PublicationRemoved::class, [QueuePublicationDiscussionSync::class, 'handle']);
         // Joining a campaign follows its space (and tells so); leaving it ends that follow
         Event::listen(PublicationRosterChanged::class, [QueueSpaceRosterSync::class, 'handle']);
+        // A module enabled or updated may bring the sources «Mesas» and «Campañas» need (forum#49)
+        Event::listen(ModuleEnabled::class, [SyncPublicationsOnModuleChange::class, 'handle']);
+        Event::listen(ModuleUpdated::class, [SyncPublicationsOnModuleChange::class, 'handle']);
 
         // What moderation does is told to whom it concerns, after the commit
         Event::listen(ForumPostApproved::class, [NotifyPostAuthorOfApproval::class, 'handle']);

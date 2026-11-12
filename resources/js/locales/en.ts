@@ -265,6 +265,8 @@ export default {
                 'You are suspended in the forum: you can read, but not post. Reason: {reason}',
         },
         spaces: {
+            unavailableNotice:
+                'Only the forum moderators see this category: the module it depends on is missing. It shows again as soon as that module is enabled.',
             moderationNotice:
                 'This space is private, but the forum moderators may enter it to handle reports.',
             readOnlyNotice: 'Read only: this space takes no more posts.',

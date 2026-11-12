@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Services;
 
+use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryIcon;
 use Modules\Forum\Domain\Enums\SystemCategory;
@@ -13,10 +14,15 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 
 /**
- * The categories a new forum starts with: «General», «Partidas por foro» and the three the
- * automatic discussions use («Mesas», «Campañas», «Eventos»). All of them are read by anyone and
- * written in by any account. Running it again creates only what is missing: a system category by
- * its key, the others by their slug.
+ * The categories a new forum starts with: «General», «Partidas por foro» and those of the automatic
+ * discussions («Mesas», «Campañas», «Eventos») whose publications some module offers
+ * (PublicationAvailability): without a module offering game tables there is no «Mesas» nor
+ * «Campañas». All of them are read by anyone and written in by any account. Running it again
+ * creates only what is missing: a system category by its key, the others by their slug.
+ *
+ * A system category whose source comes later (a module enabled after the forum) is created by the
+ * daily reconciliation, after any module is enabled, and when a publication first needs it
+ * (installSystemCategories(), systemCategory()); those never bring back the plain ones.
  */
 final readonly class DefaultCategoriesInstaller
 {
@@ -33,6 +39,7 @@ final readonly class DefaultCategoriesInstaller
 
     public function __construct(
         private CategoryRepositoryInterface $categories,
+        private PublicationAvailability $availability,
     ) {}
 
     public function install(): void
@@ -49,18 +56,37 @@ final readonly class DefaultCategoriesInstaller
             $this->categories->save($category);
         }
 
-        foreach (self::SYSTEM as $key => $icon) {
-            $systemKey = SystemCategory::from($key);
-            if ($this->categories->findBySystemKey($systemKey) instanceof Category) {
-                continue;
-            }
+        $this->installSystemCategories();
+    }
 
-            $name = __("forum::messages.defaults.{$key}.name");
-            $category = Category::system(CategoryId::generate(), $systemKey, $name, $this->freeSlug($name), $this->categories->nextPosition());
-            $category->rename($name, $category->slug(), __("forum::messages.defaults.{$key}.description"));
-            $category->restyle(new CategoryAppearance(null, $icon));
-            $this->categories->save($category);
+    /**
+     * Creates the system categories some source feeds and the forum lacks.
+     */
+    public function installSystemCategories(): void
+    {
+        foreach ($this->availability->systemCategories() as $key) {
+            $this->systemCategory($key);
         }
+    }
+
+    /**
+     * The system category, created first when its source is there and it is missing; null when no
+     * module offers its publications.
+     */
+    public function systemCategory(SystemCategory $key): ?Category
+    {
+        $existing = $this->categories->findBySystemKey($key);
+        if ($existing instanceof Category || ! $this->availability->offers($key->publicationType())) {
+            return $existing;
+        }
+
+        $name = __("forum::messages.defaults.{$key->value}.name");
+        $category = Category::system(CategoryId::generate(), $key, $name, $this->freeSlug($name), $this->categories->nextPosition());
+        $category->rename($name, $category->slug(), __("forum::messages.defaults.{$key->value}.description"));
+        $category->restyle(new CategoryAppearance(null, self::SYSTEM[$key->value]));
+        $this->categories->save($category);
+
+        return $category;
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Integration\Search;
 
 use App\Application\Modules\Services\EnabledModulesResolverInterface;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Application\Search\DTOs\SearchDocumentDTO;
 use App\Application\Search\Services\SearchIndexerInterface;
 use App\Application\Search\Services\SearchSourceRegistryInterface;
@@ -18,6 +19,7 @@ use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -26,6 +28,7 @@ use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
 use Modules\Forum\Infrastructure\Search\PostSearchSource;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
@@ -327,6 +330,37 @@ final class ForumSearchIndexTest extends ModuleTestCase
         app(CategoryManager::class)->delete($category->id(), $other->id());
         $this->assertSame('members', $this->row('forum-discussion', $stays->id()->value)?->audience);
         $this->assertSame('members', $this->row('forum-post', $staysReply->id()->value)?->audience);
+    }
+
+    public function test_what_a_missing_module_fed_is_out_of_the_search_until_it_is_back(): void
+    {
+        $tables = Category::system(CategoryId::generate(), SystemCategory::GameTables, 'Mesas', new CategorySlug('mesas'), 1);
+        app(CategoryRepositoryInterface::class)->save($tables);
+        $child = $this->aCategoryFor(CategoryAudience::everyone(), 'dudas', parent: $tables);
+        [$inTables] = $this->aDiscussion($tables);
+        [$inChild] = $this->aDiscussion($child);
+        $reply = $this->aReply($inTables, '2026-11-10 18:10:00');
+
+        // No module offers game tables: nothing of it is a document, so the site search never shows it
+        $this->assertNull($this->discussions()->document($inTables->id()->value));
+        $this->assertNull($this->discussions()->document($inChild->id()->value));
+        $this->assertNull($this->row('forum-post', $reply->id()->value));
+
+        // Enabling a module rebuilds every type in a new process (the core's search:sync), which sees the source
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        $this->app->forgetScopedInstances();
+        $this->assertNull(app(SearchIndexerInterface::class)->sync()->error);
+
+        $this->assertSame('public', $this->row('forum-discussion', $inTables->id()->value)?->audience);
+        $this->assertSame('public', $this->row('forum-discussion', $inChild->id()->value)?->audience);
+        $this->assertSame('public', $this->row('forum-post', $reply->id()->value)?->audience);
+
+        app(PublicationSourceRegistryInterface::class)->unregisterModule('example');
+        $this->app->forgetScopedInstances();
+        $this->assertNull(app(SearchIndexerInterface::class)->sync()->error);
+
+        $this->assertNull($this->row('forum-discussion', $inTables->id()->value));
+        $this->assertNull($this->row('forum-post', $reply->id()->value));
     }
 
     public function test_the_core_reconciliation_rebuilds_the_forum_types_and_drops_stale_rows(): void

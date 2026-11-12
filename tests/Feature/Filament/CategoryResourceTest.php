@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Filament;
 
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Filament\Actions\RowDetailsAction;
 use App\Filament\Support\PanelNavigationGroup;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
@@ -30,6 +31,7 @@ use Modules\Forum\Filament\Resources\CategoryResource\Pages\ListCategories;
 use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\Modules\InteractsWithModulePanel;
 use Tests\Support\Modules\ModuleTestCase;
@@ -165,6 +167,45 @@ final class CategoryResourceTest extends ModuleTestCase
         $this->assertArrayNotHasKey($parent->id()->value, CategoryResource::parentOptions($parent->id()->value));
     }
 
+    public function test_categories_of_a_missing_module_are_listed_marked_and_never_offered_as_parent_or_target(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+        $general = $this->aCategory('general');
+        $tables = Category::system(CategoryId::generate(), SystemCategory::GameTables, 'Mesas', new CategorySlug('mesas'), 1);
+        app(CategoryRepositoryInterface::class)->save($tables);
+        $child = new Category(CategoryId::generate(), 'Dudas', new CategorySlug('dudas'), parentId: $tables->id());
+        app(CategoryRepositoryInterface::class)->save($child);
+        $hidden = [$tables->id()->value, $child->id()->value];
+
+        // Listed, so whoever runs the site can still see, edit or delete them, each with a badge and a help text
+        Livewire::test(ListCategories::class)
+            ->assertCanSeeTableRecords([$general->id()->value, ...$hidden])
+            ->assertTableColumnStateSet('availability', 'Sin el módulo que la alimenta', $tables->id()->value)
+            ->assertTableColumnStateSet('availability', 'Sin el módulo que la alimenta', $child->id()->value)
+            ->assertTableColumnStateNotSet('availability', 'Sin el módulo que la alimenta', $general->id()->value)
+            ->assertTableColumnHasDescription('name', __('forum::messages.categories.unavailable_help'), $tables->id()->value)
+            ->assertTableColumnHasDescription('name', __('forum::messages.categories.unavailable_help'), $child->id()->value);
+        $this->get(CategoryResource::getUrl('edit', ['record' => $tables->id()->value]))->assertOk();
+
+        // Never where new discussions or subcategories would go
+        $this->assertSame([$general->id()->value], array_keys(CategoryResource::parentOptions(null)));
+        $this->assertSame([], CategoryResource::moveTargets($general->id()->value));
+        $this->assertSame([$general->id()->value], array_keys(CategoryResource::moveTargets($child->id()->value)));
+
+        // A hidden subcategory keeps its hidden parent when it is saved
+        Livewire::test(EditCategory::class, ['record' => $child->id()->value])
+            ->fillForm(['name' => 'Dudas de reglas'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertTrue(app(CategoryRepositoryInterface::class)->findOrFail($child->id())->parentId()?->equals($tables->id()));
+
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        $this->app->forgetScopedInstances();
+
+        Livewire::test(ListCategories::class)->assertTableColumnStateNotSet('availability', 'Sin el módulo que la alimenta', $tables->id()->value);
+        $this->assertArrayHasKey($tables->id()->value, CategoryResource::parentOptions(null));
+    }
+
     public function test_slugs_are_unique_and_kebab_case(): void
     {
         $this->actingAs($this->userWith([self::MANAGE]));
@@ -284,6 +325,7 @@ final class CategoryResourceTest extends ModuleTestCase
         yield 'discussions' => ['discussion_count', 'md'];
         yield 'readers' => ['view_rule', 'xl'];
         yield 'system' => ['system_key', 'xl'];
+        yield 'availability' => ['availability', '2xl'];
     }
 
     #[DataProvider('columnBreakpoints')]

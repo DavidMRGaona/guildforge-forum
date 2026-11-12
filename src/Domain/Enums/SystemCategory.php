@@ -13,4 +13,16 @@ enum SystemCategory: string
     case GameTables = 'game-tables';
     case Campaigns = 'campaigns';
     case Events = 'events';
+
+    /**
+     * The type of the core's publication sources whose publications fill it.
+     */
+    public function publicationType(): string
+    {
+        return match ($this) {
+            self::GameTables => 'game-table',
+            self::Campaigns => 'campaign',
+            self::Events => 'event',
+        };
+    }
 }

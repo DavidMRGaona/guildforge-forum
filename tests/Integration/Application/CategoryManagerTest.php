@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Application;
 
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
@@ -21,6 +22,8 @@ use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeCampaignSource;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\ModuleTestCase;
 
 final class CategoryManagerTest extends ModuleTestCase
@@ -166,6 +169,8 @@ final class CategoryManagerTest extends ModuleTestCase
 
     public function test_the_installer_creates_the_starting_categories_once(): void
     {
+        $this->registerGameTables();
+
         app(DefaultCategoriesInstaller::class)->install();
         app(DefaultCategoriesInstaller::class)->install();
 
@@ -182,6 +187,29 @@ final class CategoryManagerTest extends ModuleTestCase
         }
     }
 
+    public function test_without_game_tables_the_installer_leaves_out_tables_and_campaigns(): void
+    {
+        app(DefaultCategoriesInstaller::class)->install();
+
+        $this->assertSame(['General', 'Partidas por foro', 'Eventos'], array_map(fn (Category $category): string => $category->name(), $this->categories()->all()));
+        $this->assertNull($this->categories()->findBySystemKey(SystemCategory::GameTables));
+        $this->assertNull($this->categories()->findBySystemKey(SystemCategory::Campaigns));
+    }
+
+    public function test_the_system_categories_of_a_source_that_comes_later_are_created_then(): void
+    {
+        app(DefaultCategoriesInstaller::class)->install();
+        $general = $this->categories()->findBySlug(new CategorySlug('general'));
+        $this->assertNotNull($general);
+        $this->manager()->delete($general->id(), null);
+
+        $this->registerGameTables();
+        app(DefaultCategoriesInstaller::class)->installSystemCategories();
+
+        // Only the missing system categories: «General», deleted by hand, is not brought back
+        $this->assertSame(['Partidas por foro', 'Eventos', 'Mesas', 'Campañas'], array_map(fn (Category $category): string => $category->name(), $this->categories()->all()));
+    }
+
     public function test_a_renamed_system_category_is_not_created_again(): void
     {
         app(DefaultCategoriesInstaller::class)->install();
@@ -192,7 +220,7 @@ final class CategoryManagerTest extends ModuleTestCase
 
         app(DefaultCategoriesInstaller::class)->install();
 
-        $this->assertCount(5, $this->categories()->all());
+        $this->assertCount(3, $this->categories()->all());
     }
 
     public function test_the_seeder_installs_them_only_when_allowed_in_tests(): void
@@ -202,7 +230,7 @@ final class CategoryManagerTest extends ModuleTestCase
 
         DefaultCategoriesSeeder::$seedInTests = true;
         $this->seed(DefaultCategoriesSeeder::class);
-        $this->assertCount(5, $this->categories()->all());
+        $this->assertCount(3, $this->categories()->all());
     }
 
     public function test_a_discussion_keeps_its_game_system_tags(): void
@@ -222,6 +250,13 @@ final class CategoryManagerTest extends ModuleTestCase
     private function newCategory(string $slug, ?CategoryId $parentId = null, ?CategoryAudience $view = null): Category
     {
         return new Category(CategoryId::generate(), ucfirst($slug), new CategorySlug($slug), parentId: $parentId, viewAudience: $view);
+    }
+
+    private function registerGameTables(): void
+    {
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        app(PublicationSourceRegistryInterface::class)->register(FakeCampaignSource::class, 'example');
+        $this->app->forgetScopedInstances();
     }
 
     private function manager(): CategoryManager

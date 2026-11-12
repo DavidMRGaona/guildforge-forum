@@ -473,7 +473,7 @@ final readonly class ForumModeration
 
     private function isMoveTarget(Authenticatable $moderator, Category $category): bool
     {
-        return ! $category->isSystem() && $this->policy->canModerate($moderator, $category);
+        return ! $category->isSystem() && $this->policy->isAvailable($category) && $this->policy->canModerate($moderator, $category);
     }
 
     /**

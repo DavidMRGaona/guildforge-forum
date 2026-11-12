@@ -8,13 +8,16 @@ use App\Application\Publications\Contracts\PublicationSourceInterface;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use InvalidArgumentException;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
+use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Throwable;
 
 /**
- * The daily catch-up: queues a check of every publication its source lists as published and not
+ * The daily catch-up (also run after any module is enabled): first creates the system categories
+ * of sources that came after the forum («Mesas» and «Campañas» once a module offers game tables),
+ * then queues a check of every publication its source lists as published and not
  * over (what was published before the module was enabled, or a change whose check was lost) and
  * of every one the forum still follows that the source no longer lists (taken down, over), and
  * of every campaign whose space still takes posts. The
@@ -28,6 +31,7 @@ final readonly class PublicationDiscussionReconciler
         private SubjectDiscussionRepositoryInterface $records,
         private CategoryRepositoryInterface $categories,
         private PublicationSyncQueueInterface $queue,
+        private DefaultCategoriesInstaller $installer,
     ) {}
 
     /**
@@ -35,6 +39,8 @@ final readonly class PublicationDiscussionReconciler
      */
     public function reconcile(): int
     {
+        $this->installer->installSystemCategories();
+
         $queued = 0;
 
         foreach (array_keys(PublicationDiscussionSync::CATEGORIES) as $type) {

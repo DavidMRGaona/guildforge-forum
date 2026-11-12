@@ -10,6 +10,7 @@ use App\Application\Modules\Services\ModuleSettingsStoreInterface;
 use App\Domain\Modules\ValueObjects\ModuleName;
 use App\Filament\Clusters\SettingsCluster;
 use App\Filament\Concerns\ChecksPermissions;
+use App\Filament\Concerns\HasKnowledgeGuideAction;
 use App\Filament\Concerns\SafeModuleNavigation;
 use BackedEnum;
 use Closure;
@@ -42,6 +43,7 @@ use Modules\Forum\Infrastructure\Services\ForumSettings;
 final class ForumSettingsPage extends Page implements HasForms
 {
     use ChecksPermissions;
+    use HasKnowledgeGuideAction;
     use InteractsWithForms;
     use SafeModuleNavigation;
 
@@ -225,6 +227,14 @@ final class ForumSettingsPage extends Page implements HasForms
             ->title(__('forum::messages.settings.saved'))
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return array_filter([$this->knowledgeGuideAction('forum.panel.settings')]);
     }
 
     /**

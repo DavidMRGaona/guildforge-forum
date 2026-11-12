@@ -7,6 +7,7 @@ namespace Modules\Forum\Filament\Pages;
 use App\Application\Services\TimezoneServiceInterface;
 use App\Filament\Actions\RowDetailsAction;
 use App\Filament\Concerns\ChecksPermissions;
+use App\Filament\Concerns\HasKnowledgeGuideAction;
 use App\Filament\Support\PanelNavigationGroup;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use BackedEnum;
@@ -61,6 +62,7 @@ use Throwable;
 final class ForumModerationPage extends Page implements HasTable
 {
     use ChecksPermissions;
+    use HasKnowledgeGuideAction;
     use InteractsWithTable;
 
     public const string TAB_REPORTS = 'reports';
@@ -132,7 +134,7 @@ final class ForumModerationPage extends Page implements HasTable
      */
     protected function getHeaderActions(): array
     {
-        return [$this->suspendAction()];
+        return array_filter([$this->suspendAction(), $this->knowledgeGuideAction('forum.panel.moderation')]);
     }
 
     public function content(Schema $schema): Schema

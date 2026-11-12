@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Feature\Filament;
 
 use App\Filament\Clusters\SettingsCluster;
+use App\Filament\Pages\KnowledgeBasePage;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -162,6 +163,16 @@ final class ForumSettingsPageTest extends ModuleTestCase
 
         $this->actingAs($this->userWith([]));
         $page->call('save')->assertForbidden();
+    }
+
+    public function test_the_header_offers_the_settings_guide_to_whoever_sees_it(): void
+    {
+        $this->artisanCommand('knowledge:sync')->assertSuccessful()->run();
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->assertActionVisible('contextualHelp')
+            ->assertActionHasUrl('contextualHelp', KnowledgeBasePage::getUrl(['guia' => 'forum.panel.settings']));
     }
 
     /**

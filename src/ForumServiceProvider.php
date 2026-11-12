@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum;
 
+use App\Application\Knowledge\Contracts\KnowledgeCapabilityInterface;
 use App\Application\Mail\DTOs\MailCategoryDTO;
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
 use App\Application\Modules\DTOs\ModuleRouteDTO;
@@ -90,6 +91,12 @@ use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
 use Modules\Forum\Infrastructure\Fetching\DnsHostResolver;
 use Modules\Forum\Infrastructure\Fetching\GuardedRemoteFetcher;
+use Modules\Forum\Infrastructure\Knowledge\EmbedsEnabledCapability;
+use Modules\Forum\Infrastructure\Knowledge\ModeratesCapability;
+use Modules\Forum\Infrastructure\Knowledge\ModeratesForumCapability;
+use Modules\Forum\Infrastructure\Knowledge\OffersCampaignsCapability;
+use Modules\Forum\Infrastructure\Knowledge\OffersGameTablesCapability;
+use Modules\Forum\Infrastructure\Knowledge\UsesCharactersCapability;
 use Modules\Forum\Infrastructure\Listeners\ForgetAnonymizedAccount;
 use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
 use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
@@ -323,6 +330,25 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerMediaSources(): array
     {
         return [PostImageMediaSource::class, CharacterPortraitMediaSource::class];
+    }
+
+    /**
+     * The questions the help guides ask (what the forum offers and to whom). Each reuses the rule
+     * that decides the thing itself, and the ones about other modules go through
+     * PublicationAvailability: no module is named, only the sources the core's registry offers.
+     *
+     * @return array<class-string<KnowledgeCapabilityInterface>>
+     */
+    public function registerKnowledgeCapabilities(): array
+    {
+        return [
+            ModeratesForumCapability::class,
+            ModeratesCapability::class,
+            UsesCharactersCapability::class,
+            EmbedsEnabledCapability::class,
+            OffersGameTablesCapability::class,
+            OffersCampaignsCapability::class,
+        ];
     }
 
     /**

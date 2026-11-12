@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Filament\Resources\CategoryResource\Pages;
 
+use App\Filament\Concerns\HasKnowledgeGuideAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Forum\Filament\Resources\CategoryResource;
@@ -12,11 +13,13 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 
 final class EditCategory extends EditRecord
 {
+    use HasKnowledgeGuideAction;
+
     protected static string $resource = CategoryResource::class;
 
     protected function getHeaderActions(): array
     {
-        return [CategoryResource::deleteAction()];
+        return array_filter([CategoryResource::deleteAction(), $this->knowledgeGuideAction('forum.panel.categories')]);
     }
 
     /**

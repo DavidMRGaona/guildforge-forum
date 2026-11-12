@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Feature\Filament;
 
 use App\Filament\Actions\RowDetailsAction;
+use App\Filament\Pages\KnowledgeBasePage;
 use App\Filament\Support\PanelNavigationGroup;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
@@ -378,6 +379,16 @@ final class ForumModerationPageTest extends ModuleTestCase
         $this->assertInstanceOf(HasTable::class, $instance);
 
         return $instance->getTable();
+    }
+
+    public function test_the_header_offers_the_moderation_guide_next_to_suspending(): void
+    {
+        $this->artisanCommand('knowledge:sync')->assertSuccessful()->run();
+        $this->actingAs($this->panelUser([self::MODERATE]));
+
+        Livewire::test(ForumModerationPage::class)
+            ->assertActionVisible('contextualHelp')
+            ->assertActionHasUrl('contextualHelp', KnowledgeBasePage::getUrl(['guia' => 'forum.panel.moderation']));
     }
 
     /**

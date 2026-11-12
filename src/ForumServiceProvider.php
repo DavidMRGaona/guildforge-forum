@@ -264,8 +264,6 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * - The «Foro» tab of the profile: following after posting, and what the person follows.
      *   The section loads GET /foro/preferencias itself.
-     * - The «Foro» link's mark of unread followed discussions: a component with no output in the
-     *   site's `after-header` slot.
      * - The conversation of a record (game table, campaign, event) in its page: the page hands
      *   `subjectType` and `subjectId` to the slot, and the component asks for the rest.
      *
@@ -286,14 +284,6 @@ final class ForumServiceProvider extends ModuleServiceProvider
                     'icon' => 'cog',
                     'labelKey' => 'forum.preferences.tabLabel',
                 ],
-            ),
-            // Draws nothing: asks every minute whether followed discussions have unread posts and
-            // marks the «Foro» link of the menu (ForumMenuPulse)
-            new SlotRegistrationDTO(
-                slot: 'after-header',
-                component: 'components/live/ForumMenuPulse.vue',
-                module: $this->moduleName(),
-                order: 10,
             ),
             new SlotRegistrationDTO(
                 slot: 'subject-discussion',

@@ -272,9 +272,6 @@ export default {
         live: {
             newPosts: 'One new post | {count} new posts',
             view: 'View',
-            unreadFollowed:
-                'One of the discussions you follow in the forum has unread posts | {count} of the discussions you follow in the forum have unread posts',
-            unreadFollowedMany: 'Many of the discussions you follow in the forum have unread posts',
             listChanged: 'One discussion has news | {count} discussions have news',
             refreshList: 'Refresh the list',
             updated: 'Has news',

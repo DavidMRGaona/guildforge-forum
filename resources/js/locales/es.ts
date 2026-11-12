@@ -275,9 +275,6 @@ export default {
         live: {
             newPosts: 'Un mensaje nuevo | {count} mensajes nuevos',
             view: 'Ver',
-            unreadFollowed:
-                'Hay un tema sin leer entre los que sigues en el foro | Hay {count} temas sin leer entre los que sigues en el foro',
-            unreadFollowedMany: 'Hay muchos temas sin leer entre los que sigues en el foro',
             listChanged: 'Un tema tiene novedades | {count} temas tienen novedades',
             refreshList: 'Actualizar la lista',
             updated: 'Con novedades',

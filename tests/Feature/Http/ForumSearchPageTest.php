@@ -151,7 +151,7 @@ final class ForumSearchPageTest extends ModuleTestCase
             ->assertInertia(fn (Assert $page) => $page->where('results.total', 1)->where('results.items.0.title', 'Fantasma de espacio'));
     }
 
-    public function test_a_discussion_whose_opening_message_was_hidden_keeps_its_title_but_never_quotes_the_old_text(): void
+    public function test_a_discussion_whose_opening_message_was_hidden_is_found_by_its_title_only_and_never_quotes_the_old_text(): void
     {
         [$discussion, $opening] = $this->aDiscussion($this->general, title: 'Tema con apertura retirada');
         $this->assertStringContainsString('Primer mensaje', (string) SearchDocumentModel::query()->where('source_id', $discussion->id()->value)->value('body'));
@@ -163,7 +163,9 @@ final class ForumSearchPageTest extends ModuleTestCase
             ->where('results.total', 1)
             ->where('results.items.0.title', 'Tema con apertura retirada')
             ->where('results.items.0.snippet', []));
-        $this->get('/foro/buscar?q=primer')->assertInertia(fn (Assert $page) => $page->where('results.total', 1)->where('results.items.0.snippet', []));
+        // The hidden text must not be findable through the stale index either
+        $this->get('/foro/buscar?q=primer')->assertInertia(fn (Assert $page) => $page->where('results.total', 0));
+        $this->get('/foro/buscar?q=retirada+primer')->assertInertia(fn (Assert $page) => $page->where('results.total', 0));
     }
 
     public function test_an_empty_or_too_short_query_searches_nothing(): void

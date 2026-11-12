@@ -76,9 +76,17 @@ final readonly class ForumSearch
             $hits = [];
             foreach ($found as [$hit, $address]) {
                 $live = $visible["{$address[0]}:{$address[1]}"] ?? null;
-                if ($live instanceof VisibleSearchHitDTO && isset($scope[$live->categoryId])) {
-                    $hits[] = $this->hitOf($hit, $live, $address[1]);
+                if (! $live instanceof VisibleSearchHitDTO || ! isset($scope[$live->categoryId])) {
+                    continue;
                 }
+
+                // A discussion whose opening message is no longer visible may have matched on that message,
+                // which the index still holds: it stays only if the title alone explains the match
+                if ($address[1] === 0 && ! $live->openingVisible && ! $this->titleHasEveryTerm($query, $live->title)) {
+                    continue;
+                }
+
+                $hits[] = $this->hitOf($hit, $live, $address[1]);
             }
         } catch (Throwable $exception) {
             report($exception);
@@ -97,6 +105,16 @@ final readonly class ForumSearch
             truncated: $result->total > self::FETCH,
             failed: false,
         );
+    }
+
+    private function titleHasEveryTerm(string $query, string $title): bool
+    {
+        $terms = preg_split('/[\s\p{P}]+/u', $query, -1, PREG_SPLIT_NO_EMPTY);
+        if ($terms === false || $terms === []) {
+            return false;
+        }
+
+        return array_all($terms, fn ($term) => mb_stripos($title, $term) !== false);
     }
 
     /**

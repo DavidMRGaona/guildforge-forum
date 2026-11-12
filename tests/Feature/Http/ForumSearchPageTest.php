@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Application\Search\DTOs\SiteSearchQueryDTO;
 use App\Application\Search\DTOs\SiteSearchResultDTO;
 use App\Application\Search\Services\SiteSearchInterface;
@@ -11,12 +12,18 @@ use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Search\Index\NullSearchIndexWriter;
 use App\Infrastructure\Search\Index\SearchIndexWriterInterface;
 use App\Infrastructure\Search\Persistence\Eloquent\Models\SearchDocumentModel;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Enums\SystemCategory;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
+use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -151,6 +158,34 @@ final class ForumSearchPageTest extends ModuleTestCase
             ->assertInertia(fn (Assert $page) => $page->where('results.total', 1)->where('results.items.0.title', 'Fantasma de espacio'));
     }
 
+    public function test_what_a_module_just_disabled_fed_is_never_found_while_the_index_still_holds_it(): void
+    {
+        $registry = app(PublicationSourceRegistryInterface::class);
+        $registry->register(FakeGameTableSource::class, 'example');
+        $this->asANewProcess();
+        $tables = Category::system(CategoryId::generate(), SystemCategory::GameTables, 'Mesas', new CategorySlug('mesas'), 2);
+        app(CategoryRepositoryInterface::class)->save($tables);
+        [$discussion] = $this->aDiscussion($tables, title: 'Mesa de Pathfinder');
+        $this->aReply($discussion, '2026-11-10 18:10:00', text: 'Llevo Pathfinder');
+        $this->get('/foro/buscar?q=pathfinder')->assertInertia(fn (Assert $page) => $page->where('results.total', 2));
+
+        // Game tables are disabled; the core's search:sync, which drops these documents, has not run yet
+        $registry->unregisterModule('example');
+        $this->asANewProcess();
+        $this->assertSame(2, SearchDocumentModel::query()->where('module', 'forum')->where('audience', 'public')->count());
+
+        foreach ([null, $this->anAccount()] as $reader) {
+            $request = $reader instanceof UserModel ? $this->actingAs($reader) : $this;
+            $request->get('/foro/buscar?q=pathfinder')
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('results.total', 0)->has('results.items', 0));
+        }
+
+        // The forum's moderators still read it, as in the forum itself
+        $this->actingAs($this->anAccount('forum:forum.moderate'))->get('/foro/buscar?q=pathfinder')
+            ->assertInertia(fn (Assert $page) => $page->where('results.total', 2));
+    }
+
     public function test_a_discussion_whose_opening_message_was_hidden_is_found_by_its_title_only_and_never_quotes_the_old_text(): void
     {
         [$discussion, $opening] = $this->aDiscussion($this->general, title: 'Tema con apertura retirada');
@@ -225,5 +260,17 @@ final class ForumSearchPageTest extends ModuleTestCase
 
         app(ForumModeration::class)->hide($moderator, $discussion->id());
         $this->get('/foro/buscar?q=torneo')->assertInertia(fn (Assert $page) => $page->where('results.total', 0));
+    }
+
+    /**
+     * Enabling or disabling a module takes effect in the next process. Here the test's requests share
+     * one application: answers remembered per request (scoped) and the controllers routes keep are let go.
+     */
+    private function asANewProcess(): void
+    {
+        $this->app->forgetScopedInstances();
+        foreach (app(Router::class)->getRoutes()->getRoutes() as $route) {
+            $route->controller = null;
+        }
     }
 }

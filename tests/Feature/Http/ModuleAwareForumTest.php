@@ -9,10 +9,12 @@ use App\Application\SiteNotifications\Services\SiteNotificationServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Search\Index\NullSearchIndexWriter;
 use App\Infrastructure\Search\Index\SearchIndexWriterInterface;
+use ArrayObject;
 use Carbon\CarbonImmutable;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
@@ -32,6 +34,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Notifications\ReplyPostedNotification;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeCampaignSource;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
@@ -189,6 +192,43 @@ final class ModuleAwareForumTest extends ModuleTestCase
 
         $this->assertSame([], $mailed);
         $this->assertSame(0, app(SiteNotificationServiceInterface::class)->total($follower));
+    }
+
+    public function test_a_notice_queued_before_the_module_went_away_is_not_delivered(): void
+    {
+        $registry = app(PublicationSourceRegistryInterface::class);
+        $registry->register(FakeGameTableSource::class, 'example');
+        $registry->register(FakeCampaignSource::class, 'example');
+        $this->asANewProcess();
+
+        $follower = $this->anAccount();
+        /** @var ArrayObject<int, class-string> $mailed */
+        $mailed = new ArrayObject;
+        Event::listen(NotificationSent::class, static function (NotificationSent $event) use ($mailed): void {
+            if ($event->channel === 'mail') {
+                $mailed->append($event->notification::class);
+            }
+        });
+        app(FollowsInterface::class)->setDiscussionLevel(strtolower($follower->id), $this->tableDiscussion->id(), FollowLevel::Following, CarbonImmutable::now());
+
+        // The reply's notices wait in the queue, as the worker gets them: decided only when delivered
+        Queue::fake();
+        $reply = app(ForumWriter::class)->reply($this->tableDiscussion->id(), PostId::generate(), strtolower($this->forumModerator()->id), self::aBody('Cambiamos de hora'), CarbonImmutable::now(), needsApproval: false);
+        $queued = serialize(new ReplyPostedNotification($reply->id()->value));
+
+        $follower->notifyNow(unserialize($queued));
+        $this->assertCount(1, $mailed, 'While the module is there, the notice is delivered.');
+
+        // The module is disabled before the worker delivers another copy
+        $registry->unregisterModule('example');
+        $this->asANewProcess();
+
+        $notice = unserialize($queued);
+        $this->assertInstanceOf(ReplyPostedNotification::class, $notice);
+        $this->assertFalse($notice->shouldSend($follower, 'mail'));
+        $this->assertFalse($notice->shouldSend($follower, 'site'));
+        $follower->notifyNow(unserialize($queued));
+        $this->assertCount(1, $mailed);
     }
 
     /**

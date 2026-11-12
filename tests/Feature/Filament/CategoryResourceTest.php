@@ -167,7 +167,7 @@ final class CategoryResourceTest extends ModuleTestCase
         $this->assertArrayNotHasKey($parent->id()->value, CategoryResource::parentOptions($parent->id()->value));
     }
 
-    public function test_categories_of_a_missing_module_are_left_out_until_it_is_back(): void
+    public function test_categories_of_a_missing_module_are_listed_marked_and_never_offered_as_parent_or_target(): void
     {
         $this->actingAs($this->userWith([self::MANAGE]));
         $general = $this->aCategory('general');
@@ -177,17 +177,32 @@ final class CategoryResourceTest extends ModuleTestCase
         app(CategoryRepositoryInterface::class)->save($child);
         $hidden = [$tables->id()->value, $child->id()->value];
 
+        // Listed, so whoever runs the site can still see, edit or delete them, each with a badge and a help text
         Livewire::test(ListCategories::class)
-            ->assertCanSeeTableRecords([$general->id()->value])
-            ->assertCanNotSeeTableRecords($hidden);
+            ->assertCanSeeTableRecords([$general->id()->value, ...$hidden])
+            ->assertTableColumnStateSet('availability', 'Sin el módulo que la alimenta', $tables->id()->value)
+            ->assertTableColumnStateSet('availability', 'Sin el módulo que la alimenta', $child->id()->value)
+            ->assertTableColumnStateNotSet('availability', 'Sin el módulo que la alimenta', $general->id()->value)
+            ->assertTableColumnHasDescription('name', __('forum::messages.categories.unavailable_help'), $tables->id()->value)
+            ->assertTableColumnHasDescription('name', __('forum::messages.categories.unavailable_help'), $child->id()->value);
+        $this->get(CategoryResource::getUrl('edit', ['record' => $tables->id()->value]))->assertOk();
+
+        // Never where new discussions or subcategories would go
         $this->assertSame([$general->id()->value], array_keys(CategoryResource::parentOptions(null)));
         $this->assertSame([], CategoryResource::moveTargets($general->id()->value));
-        $this->get(CategoryResource::getUrl('edit', ['record' => $tables->id()->value]))->assertNotFound();
+        $this->assertSame([$general->id()->value], array_keys(CategoryResource::moveTargets($child->id()->value)));
+
+        // A hidden subcategory keeps its hidden parent when it is saved
+        Livewire::test(EditCategory::class, ['record' => $child->id()->value])
+            ->fillForm(['name' => 'Dudas de reglas'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertTrue(app(CategoryRepositoryInterface::class)->findOrFail($child->id())->parentId()?->equals($tables->id()));
 
         app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
         $this->app->forgetScopedInstances();
 
-        Livewire::test(ListCategories::class)->assertCanSeeTableRecords([$general->id()->value, ...$hidden]);
+        Livewire::test(ListCategories::class)->assertTableColumnStateNotSet('availability', 'Sin el módulo que la alimenta', $tables->id()->value);
         $this->assertArrayHasKey($tables->id()->value, CategoryResource::parentOptions(null));
     }
 
@@ -310,6 +325,7 @@ final class CategoryResourceTest extends ModuleTestCase
         yield 'discussions' => ['discussion_count', 'md'];
         yield 'readers' => ['view_rule', 'xl'];
         yield 'system' => ['system_key', 'xl'];
+        yield 'availability' => ['availability', '2xl'];
     }
 
     #[DataProvider('columnBreakpoints')]

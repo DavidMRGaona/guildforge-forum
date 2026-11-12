@@ -45,6 +45,7 @@ use Modules\Forum\Filament\Resources\CategoryResource\Pages\ListCategories;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use Throwable;
+use WeakMap;
 
 /**
  * The forum's categories: two levels, dragged into order, each with who reads it, who writes in
@@ -53,6 +54,9 @@ use Throwable;
  */
 final class CategoryResource extends BaseResource
 {
+    /** @var WeakMap<CategoryAccessPolicy, list<string>>|null unavailable ids, per request (the policy is scoped) */
+    private static ?WeakMap $unavailable = null;
+
     protected static ?string $model = CategoryModel::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
@@ -117,7 +121,7 @@ final class CategoryResource extends BaseResource
                         ->label(__('forum::messages.categories.fields.parent'))
                         ->helperText(__('forum::messages.categories.fields.parent_help'))
                         ->native(false)
-                        ->options(fn (?CategoryModel $record): array => self::parentOptions($record?->id))
+                        ->options(fn (?CategoryModel $record): array => self::parentOptions($record?->id, $record?->parent_id))
                         ->disabled(fn (?CategoryModel $record): bool => $record?->children()->exists() === true)
                         ->placeholder(__('forum::messages.categories.fields.parent_none')),
                 ]),
@@ -195,35 +199,42 @@ final class CategoryResource extends BaseResource
     }
 
     /**
-     * Categories that depend on a module that is missing (PublicationAvailability: «Mesas» or
-     * «Campañas» without a module offering game tables, a campaign's space, and their subcategories)
-     * are left out of the list, the edit page, and the parent and move options. Nothing is deleted:
-     * they come back with the module.
+     * Ids of the categories that depend on a module that is missing (PublicationAvailability:
+     * «Mesas» or «Campañas» without a module offering game tables, a campaign's space, and their
+     * subcategories). They stay in the list, marked, so whoever runs the site can still see, edit or
+     * delete them, but are never offered as a parent or as where discussions go. Worked out once per
+     * request.
      *
-     * @return Builder<CategoryModel>
-     */
-    public static function getEloquentQuery(): Builder
-    {
-        /** @var Builder<CategoryModel> $query */
-        $query = parent::getEloquentQuery();
-
-        return $query->whereKeyNot(self::unavailableIds());
-    }
-
-    /**
      * @return list<string>
      */
     public static function unavailableIds(): array
     {
         $policy = app(CategoryAccessPolicy::class);
-        $ids = [];
-        foreach (app(CategoryRepositoryInterface::class)->all() as $category) {
-            if (! $policy->isAvailable($category)) {
-                $ids[] = $category->id()->value;
+        self::$unavailable ??= new WeakMap;
+        if (! isset(self::$unavailable[$policy])) {
+            $ids = [];
+            foreach (app(CategoryRepositoryInterface::class)->all() as $category) {
+                if (! $policy->isAvailable($category)) {
+                    $ids[] = $category->id()->value;
+                }
             }
+
+            self::$unavailable[$policy] = $ids;
         }
 
-        return $ids;
+        return self::$unavailable[$policy];
+    }
+
+    public static function isUnavailable(CategoryModel $record): bool
+    {
+        return in_array($record->id, self::unavailableIds(), true);
+    }
+
+    private static function text(string $key): string
+    {
+        $text = __($key);
+
+        return is_string($text) ? $text : $key;
     }
 
     public static function table(Table $table): Table
@@ -234,7 +245,7 @@ final class CategoryResource extends BaseResource
                 TextColumn::make('name')
                     ->label(__('forum::messages.categories.fields.name'))
                     ->formatStateUsing(fn (string $state, CategoryModel $record): string => $record->parent_id === null ? $state : "— {$state}")
-                    ->description(fn (CategoryModel $record): ?string => $record->description)
+                    ->description(fn (CategoryModel $record): ?string => self::isUnavailable($record) ? self::text('forum::messages.categories.unavailable_help') : $record->description)
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('parent.name')
@@ -258,6 +269,13 @@ final class CategoryResource extends BaseResource
                     ->formatStateUsing(fn (?string $state): string => $state === null ? '' : __('forum::messages.categories.system_badge'))
                     ->placeholder('—')
                     ->visibleFrom('xl'),
+                TextColumn::make('availability')
+                    ->label(__('forum::messages.categories.fields.availability'))
+                    ->badge()
+                    ->color('warning')
+                    ->getStateUsing(fn (CategoryModel $record): ?string => self::isUnavailable($record) ? self::text('forum::messages.categories.unavailable_badge') : null)
+                    ->placeholder('—')
+                    ->visibleFrom('2xl'),
             ])
             ->reorderable('position')
             // Dragging saves the order of the rows on screen: all of them must be on screen
@@ -329,15 +347,17 @@ final class CategoryResource extends BaseResource
     }
 
     /**
-     * Top-level categories a category may go under (never itself).
+     * Top-level categories a category may go under (never itself, nor one whose module is missing,
+     * except the parent it already has).
      *
      * @return array<string, string>
      */
-    public static function parentOptions(?string $exceptId): array
+    public static function parentOptions(?string $exceptId, ?string $currentParentId = null): array
     {
         /** @var array<string, string> */
-        return self::getEloquentQuery()
+        return CategoryModel::query()
             ->whereNull('parent_id')
+            ->whereKeyNot(array_values(array_diff(self::unavailableIds(), [$currentParentId])))
             ->when($exceptId !== null, fn (Builder $query): Builder => $query->whereKeyNot($exceptId))
             ->orderBy('position')
             ->orderBy('name')
@@ -346,12 +366,14 @@ final class CategoryResource extends BaseResource
     }
 
     /**
+     * Where the discussions of a category being deleted may go: never itself, nor one whose module is missing.
+     *
      * @return array<string, string>
      */
     public static function moveTargets(string $exceptId): array
     {
         /** @var array<string, string> */
-        return EloquentCategoryRepository::inTreeOrder(self::getEloquentQuery()->whereKeyNot($exceptId))
+        return EloquentCategoryRepository::inTreeOrder(CategoryModel::query()->whereKeyNot([$exceptId, ...self::unavailableIds()]))
             ->pluck('forum_categories.name', 'forum_categories.id')
             ->all();
     }

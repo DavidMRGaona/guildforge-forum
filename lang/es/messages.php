@@ -113,6 +113,8 @@ return [
         'plural' => 'categorías',
         'list_help' => 'Arrastra las filas para cambiar el orden. Las subcategorías aparecen bajo su categoría.',
         'system_badge' => 'Del sistema',
+        'unavailable_badge' => 'Sin el módulo que la alimenta',
+        'unavailable_help' => 'Falta el módulo del que depende: solo la moderación del foro la ve, y no se ofrece como categoría madre ni como destino. Vuelve a verse en cuanto se habilite de nuevo.',
         'sections' => [
             'general' => 'General',
             'appearance' => 'Aspecto',
@@ -145,6 +147,7 @@ return [
             'read_only_by_system' => 'La ha puesto el foro porque la campaña terminó, se canceló o se retiró, y se quita sola si vuelve a estar en marcha. Si la apagas, se puede volver a escribir.',
             'discussions' => 'Temas',
             'system' => 'Sistema',
+            'availability' => 'Disponibilidad',
         ],
         'actions' => [
             'delete' => 'Borrar',

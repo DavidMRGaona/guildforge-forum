@@ -95,8 +95,10 @@ El foro nunca pregunta qué módulos hay ni importa nada de ellos: decide por lo
 
 - **Sin la fuente**, lo que depende de ella se oculta para todos salvo quien tiene `forum:forum.moderate`, también para los moderadores de la propia categoría. No se borra nada ni hace falta migrar datos: un sitio que ya tiene «Mesas» y «Campañas» sin game-tables las deja ocultas al momento.
   - No sale en la lista de categorías ni de temas, las páginas dan 404, no se ofrece para abrir temas ni para moverlos (tampoco a la moderación) y no se indexa.
+  - Búsqueda: `/foro/buscar` comprueba cada resultado contra las tablas, así que nunca lo enseña. En `/buscar` del core, los documentos que ya estaban indexados siguen saliendo, con su audiencia, hasta que termina el `search:sync` que el core encola al deshabilitar el módulo (core#533).
   - Avisos, correo y seguimientos no entregan nada de lo oculto, y los temas seguidos no cuentan para la marca del menú.
-  - En el panel, el recurso de categorías no la lista ni la ofrece como madre o como destino. Los ajustes no la ofrecen para anunciar. La página de moderación sigue mostrando sus denuncias y pendientes, porque solo la abre la moderación del foro.
+  - En el panel, el recurso de categorías la sigue listando, con la insignia «Sin el módulo que la alimenta» (desde `2xl`, y en «Ver detalles») y un texto de ayuda bajo el nombre, para que quien administra pueda verla, editarla o borrarla. Nunca se ofrece como madre ni como destino al borrar (una subcategoría oculta conserva su madre al guardarla). Los ajustes no la ofrecen para anunciar. La página de moderación sigue mostrando sus denuncias y pendientes, porque solo la abre la moderación del foro.
+  - Los avisos que ya estaban en cola se vuelven a comprobar al entregarse, así que tampoco llegan.
   - La moderación del foro la sigue viendo, con un aviso en la cabecera («Solo la moderación del foro ve esta categoría…»), y puede responder, cerrar o sacar temas de ella.
 - **Al volver la fuente**, todo se ve otra vez tal cual. Si la categoría no existía (el foro se habilitó antes), se crea al habilitar el módulo, en la reconciliación diaria o en cuanto una publicación la necesita.
 
@@ -325,7 +327,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 
 ## Panel
 
-- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Las que dependen de un módulo que falta no salen (ver [Depende de otros módulos](#depende-de-otros-módulos)). Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
+- **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Las que dependen de un módulo que falta salen marcadas y no se ofrecen como madre ni como destino (ver [Depende de otros módulos](#depende-de-otros-módulos)). Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
 - **Moderación del foro**: en *Comunicación* (hueco 35), con `forum:forum.moderate`. El número del menú suma denuncias abiertas y mensajes pendientes. Cuatro pestañas (`?pestana=`):
   - *Denuncias*: las abiertas, lo más antiguo primero. «Ocultar el mensaje» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro», «Resolver sin acción» y «Resolver como editado».
   - *Pendientes*: lo que espera aprobación, lo más antiguo primero. «Aprobar» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro» y «Rechazar», que pide un motivo opcional y marcar una casilla.

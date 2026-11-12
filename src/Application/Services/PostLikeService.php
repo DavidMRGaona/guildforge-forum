@@ -86,7 +86,7 @@ final readonly class PostLikeService
             && ! $this->systemAccount->isSystemAccount($authorId)
             && $this->access->canRead($user, $discussion)
             // Someone suspended in the forum reads, but does not like
-            && ! $this->suspensions->isSuspended($user);
+            && ! $this->suspensions->isBarred($user);
     }
 
     /**

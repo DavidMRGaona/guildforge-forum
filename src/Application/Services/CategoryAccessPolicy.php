@@ -28,7 +28,7 @@ use Throwable;
  *
  * - Reading a subcategory needs reading its parent as well.
  * - Writing needs an account that may read the category, has no email verification pending, is
- *   not suspended in the forum (ForumSuspensions), and
+ *   not barred (suspended in the forum, or a deactivated or anonymized account: ForumSuspensions), and
  *   is let in by the write rule or moderates the category. In a read-only category (or under a
  *   read-only parent) only whoever moderates the whole forum writes; its own moderators still
  *   moderate it.
@@ -72,7 +72,7 @@ final class CategoryAccessPolicy
     public function canWrite(?Authenticatable $user, Category $category): bool
     {
         return $this->decide(function () use ($user, $category): bool {
-            if (! $user instanceof Authenticatable || $this->emailVerification->mustVerify($user) || $this->suspensions->isSuspended($user)) {
+            if (! $user instanceof Authenticatable || $this->emailVerification->mustVerify($user) || $this->suspensions->isBarred($user)) {
                 return false;
             }
 
@@ -91,9 +91,9 @@ final class CategoryAccessPolicy
 
     public function canModerate(?Authenticatable $user, Category $category): bool
     {
-        // Someone suspended in the forum moderates nothing, not even whoever moderates all of it
+        // Someone suspended in the forum, or whose account is deactivated, moderates nothing, not even whoever moderates all of it
         return $this->decide(fn (): bool => $user instanceof Authenticatable
-            && ! $this->suspensions->isSuspended($user)
+            && ! $this->suspensions->isBarred($user)
             && ($this->moderatesForum($user) || ($this->reads($user, $category) && $this->moderatesCategory($user, $category))));
     }
 
@@ -102,7 +102,7 @@ final class CategoryAccessPolicy
      */
     public function canModerateForum(?Authenticatable $user): bool
     {
-        return $this->decide(fn (): bool => $this->moderatesForum($user) && ! $this->suspensions->isSuspended($user));
+        return $this->decide(fn (): bool => $this->moderatesForum($user) && ! $this->suspensions->isBarred($user));
     }
 
     private function moderatesForum(?Authenticatable $user): bool

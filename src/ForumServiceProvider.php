@@ -11,6 +11,7 @@ use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
+use App\Domain\Events\UserAnonymized;
 use App\Domain\Publications\Events\PublicationChanged;
 use App\Domain\Publications\Events\PublicationRemoved;
 use App\Domain\Publications\Events\PublicationRosterChanged;
@@ -29,6 +30,7 @@ use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
 use Modules\Forum\Application\Content\DocumentSchema;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
+use Modules\Forum\Application\Contracts\AccountEngagementStoreInterface;
 use Modules\Forum\Application\Contracts\CharacterPortraitStorageInterface;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\FollowsInterface;
@@ -38,6 +40,7 @@ use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
+use Modules\Forum\Application\Contracts\MentionTextsInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLikesInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
@@ -72,6 +75,7 @@ use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
+use Modules\Forum\Infrastructure\Listeners\ForgetAnonymizedAccount;
 use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
 use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
 use Modules\Forum\Infrastructure\Listeners\NotifyUserOfLiftedSuspension;
@@ -106,10 +110,12 @@ use Modules\Forum\Infrastructure\Services\CloudinaryCharacterPortraitStorage;
 use Modules\Forum\Infrastructure\Services\CloudinaryPostImageStorage;
 use Modules\Forum\Infrastructure\Services\DiscussionPostLinks;
 use Modules\Forum\Infrastructure\Services\EloquentAccountDirectory;
+use Modules\Forum\Infrastructure\Services\EloquentAccountEngagementStore;
 use Modules\Forum\Infrastructure\Services\EloquentDiscussionReads;
 use Modules\Forum\Infrastructure\Services\EloquentFollows;
 use Modules\Forum\Infrastructure\Services\EloquentForumCounters;
 use Modules\Forum\Infrastructure\Services\EloquentMentionCandidates;
+use Modules\Forum\Infrastructure\Services\EloquentMentionTexts;
 use Modules\Forum\Infrastructure\Services\EloquentPostLikes;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
@@ -167,6 +173,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // Suspensions are read once per person and request (or queue job)
         $this->app->scoped(ForumSuspensions::class);
         $this->app->bind(AccountDirectoryInterface::class, EloquentAccountDirectory::class);
+        $this->app->bind(AccountEngagementStoreInterface::class, EloquentAccountEngagementStore::class);
+        $this->app->bind(MentionTextsInterface::class, EloquentMentionTexts::class);
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
         $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
@@ -221,6 +229,15 @@ final class ForumServiceProvider extends ModuleServiceProvider
         Event::listen(ForumUserSuspended::class, [NotifyUserOfSuspension::class, 'handle']);
         Event::listen(ForumUserSuspensionLifted::class, [NotifyUserOfLiftedSuspension::class, 'handle']);
         Event::listen(ForumPostReported::class, [NotifyModeratorsOfReport::class, 'handle']);
+
+        // Accounts (core#461). Anonymizing forgets what only mattered to the person and closes their
+        // characters. Deactivating and restoring need no listener: the forum stores nothing about
+        // them, it asks the account every time (ForumSuspensions::isBarred). A change of name or
+        // avatar (UserProfileUpdated) needs none either: names are read from the account when
+        // painting, no avatar of an author is shown and nothing is cached. The one copy of a name,
+        // the plain text of a post that mentions someone, says what was true when it was written,
+        // like a quotation does; only anonymizing writes it again.
+        Event::listen(UserAnonymized::class, [ForgetAnonymizedAccount::class, 'handle']);
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {

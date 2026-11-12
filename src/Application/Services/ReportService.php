@@ -56,7 +56,7 @@ final readonly class ReportService
             && $post->status() === PostStatus::Visible
             && $post->authorId() !== $userId
             && $this->access->canRead($user, $discussion)
-            && ! $this->suspensions->isSuspended($user);
+            && ! $this->suspensions->isBarred($user);
     }
 
     /**

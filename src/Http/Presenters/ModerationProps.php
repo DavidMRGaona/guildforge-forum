@@ -33,7 +33,7 @@ final readonly class ModerationProps
     public function withReportLinks(array $posts, ?Authenticatable $reader): array
     {
         $readerId = ForumBrowser::accountId($reader);
-        $reports = $readerId !== null && ! $this->suspensions->isSuspended($reader);
+        $reports = $readerId !== null && ! $this->suspensions->isBarred($reader);
 
         return array_map(static fn (array $post): array => [
             ...$post,

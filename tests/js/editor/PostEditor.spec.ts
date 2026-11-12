@@ -260,6 +260,95 @@ describe('PostEditor', () => {
         vi.unstubAllGlobals();
     });
 
+    it('reads a link to a post of another service through the server and embeds it', async () => {
+        const fetch = vi.fn().mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    service: 'youtube',
+                    id: 'dQw4w9WgXcQ',
+                    label: 'YouTube',
+                    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                    card: {
+                        available: true,
+                        title: 'Partida épica',
+                        authorName: null,
+                        thumbnailUrl: null,
+                    },
+                }),
+                { status: 201 }
+            )
+        );
+        vi.stubGlobal('fetch', fetch);
+        const wrapper = mountEditor({
+            modelValue: TEXT,
+            embedUrl: '/foro/incrustaciones',
+            embedServices: [
+                { key: 'youtube', label: 'YouTube', hosts: ['youtube.com', 'youtu.be'] },
+            ],
+        });
+        await settle();
+
+        await wrapper.find('[data-toolbar-item="embed"]').trigger('click');
+        await wrapper.find('#forum-editor-embed').setValue('https://youtu.be/dQw4w9WgXcQ');
+        await (
+            wrapper.find('#forum-editor-embed').element as HTMLInputElement
+        ).form?.requestSubmit();
+        await settle();
+
+        expect(fetch).toHaveBeenCalledWith(
+            '/foro/incrustaciones',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ url: 'https://youtu.be/dQw4w9WgXcQ' }),
+            })
+        );
+        expect((wrapper.vm as unknown as Exposed).getDocument()?.content).toContainEqual({
+            type: 'embed',
+            attrs: { service: 'youtube', id: 'dQw4w9WgXcQ' },
+        });
+        const draft = wrapper.find('.forum-embed-draft');
+        expect(draft.text()).toContain('YouTube');
+        expect(draft.text()).toContain('Partida épica');
+        expect(wrapper.find('.forum-editor__content iframe').exists()).toBe(false);
+        vi.unstubAllGlobals();
+    });
+
+    it('offers to embed a pasted link of a service the forum embeds', async () => {
+        const wrapper = mountEditor({
+            modelValue: TEXT,
+            embedUrl: '/foro/incrustaciones',
+            embedServices: [{ key: 'vimeo', label: 'Vimeo', hosts: ['vimeo.com'] }],
+        });
+        await settle();
+
+        const content = wrapper.find('.forum-editor__content');
+        const paste = (text: string): Event => {
+            const event = new Event('paste', { bubbles: true, cancelable: true });
+            Object.defineProperty(event, 'clipboardData', {
+                value: {
+                    files: [],
+                    getData: (type: string) => (type === 'text/plain' ? text : ''),
+                },
+            });
+
+            return event;
+        };
+        content.element.dispatchEvent(paste('https://vimeo.com/76979871'));
+        await settle();
+        expect(wrapper.text()).toContain('Este enlace es de Vimeo');
+
+        content.element.dispatchEvent(paste('https://example.com/otra-cosa'));
+        await settle();
+        expect(wrapper.text()).not.toContain('Este enlace es de');
+    });
+
+    it('offers no embeds without services', async () => {
+        const wrapper = mountEditor({ embedUrl: '/foro/incrustaciones', embedServices: [] });
+        await settle();
+
+        expect(wrapper.find('[data-toolbar-item="embed"]').exists()).toBe(false);
+    });
+
     it('offers no images from other sites without the permission or without sites', async () => {
         const without = mountEditor({ externalImageUrl: null, externalImageHosts: ['imgur.com'] });
         const empty = mountEditor({

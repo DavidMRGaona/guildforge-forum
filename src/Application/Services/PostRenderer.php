@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Forum\Application\Content\Nodes\EmbedNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
 use Modules\Forum\Application\Content\Nodes\RollNode;
@@ -44,6 +45,7 @@ final readonly class PostRenderer
         private PostLinksInterface $links,
         private PostImageStorageInterface $images,
         private DiceRollRepositoryInterface $diceRolls,
+        private EmbedViews $embedViews,
     ) {}
 
     /**
@@ -127,12 +129,17 @@ final readonly class PostRenderer
         $mention = (new MentionNode)->name();
         $quote = (new PostQuoteNode)->name();
         $roll = (new RollNode)->name();
+        $embed = (new EmbedNode)->name();
         $accountIds = [];
         $postIds = [];
         $rollIds = [];
+        $embeds = [];
 
         foreach ($bodies as $body) {
-            $found = $this->renderer->attributesOf($body->document, [$mention, $quote, $roll]);
+            $found = $this->renderer->attributesOf($body->document, [$mention, $quote, $roll, $embed]);
+            foreach ($found[$embed] ?? [] as $attributes) {
+                $embeds[] = $attributes;
+            }
             foreach ($found[$mention] ?? [] as $attributes) {
                 $accountIds[] = AccountId::normalize(is_string($attributes['id'] ?? null) ? $attributes['id'] : '');
             }
@@ -149,6 +156,7 @@ final readonly class PostRenderer
             quotes: $this->quoteSources($this->distinct($postIds), $reader),
             imageUrl: fn (string $path): ?string => $this->images->url($path),
             rolls: $this->rollViews($this->distinct($rollIds)),
+            embeds: $this->embedViews->for($embeds),
         );
     }
 

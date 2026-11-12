@@ -1,3 +1,4 @@
+import type { EmbedService } from '../editor/document';
 import type { JSONContent } from '@tiptap/core';
 
 /** Props the forum pages receive from the server (see ForumPresenter). */
@@ -261,6 +262,10 @@ export interface ForumEditorSettings {
     externalImageUrl: string | null;
     /** The sites images may come from (each with its subdomains) */
     externalImageHosts: string[];
+    /** Where to read a link to a post of another service; null without session or services */
+    embedUrl: string | null;
+    /** The services whose posts the forum embeds */
+    embedServices: EmbedService[];
 }
 
 /** Why and until when the reader may not write; null unless they are suspended */

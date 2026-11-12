@@ -117,4 +117,27 @@ final class ForumSettingsTest extends TestCase
         config(['modules.settings.forum' => ['external_image_hosts' => 'imgur.com']]);
         $this->assertSame(['imgur.com'], (new ForumSettings)->externalImageHosts());
     }
+
+    public function test_every_service_is_embedded_by_default_and_unknown_keys_are_ignored(): void
+    {
+        config(['modules.settings.forum' => []]);
+        $this->assertSame(['reddit', 'x', 'bluesky', 'instagram', 'tiktok', 'youtube', 'vimeo', 'twitch'], (new ForumSettings)->embedServices());
+
+        config(['modules.settings.forum' => ['embed_services' => ['youtube', 'myspace', 'reddit']]]);
+        $this->assertSame(['reddit', 'youtube'], (new ForumSettings)->embedServices());
+
+        config(['modules.settings.forum' => ['embed_services' => []]]);
+        $this->assertSame([], (new ForumSettings)->embedServices());
+    }
+
+    public function test_cookie_categories_are_slugs_or_marketing(): void
+    {
+        config(['modules.settings.forum' => ['embed_cookie_categories' => ['youtube' => 'videos', 'x' => 'Mal escrito', 'vimeo' => 42]]]);
+        $settings = new ForumSettings;
+
+        $this->assertSame('videos', $settings->embedCookieCategory('youtube'));
+        $this->assertSame('marketing', $settings->embedCookieCategory('x'));
+        $this->assertSame('marketing', $settings->embedCookieCategory('vimeo'));
+        $this->assertSame('marketing', $settings->embedCookieCategory('reddit'));
+    }
 }

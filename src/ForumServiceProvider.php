@@ -52,6 +52,7 @@ use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
@@ -72,6 +73,7 @@ use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ExternalImageCopyRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
@@ -103,6 +105,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCateg
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCharacterRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiceRollRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentEmbedCardRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentExternalImageCopyRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
@@ -198,6 +201,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
         $this->app->bind(ExternalImageCopyRepositoryInterface::class, EloquentExternalImageCopyRepository::class);
+        $this->app->bind(EmbedCardRepositoryInterface::class, EloquentEmbedCardRepository::class);
+        $this->app->singleton(EmbedProviders::class, static fn (): EmbedProviders => EmbedProviders::builtIn());
         $this->app->bind(HostResolverInterface::class, DnsHostResolver::class);
         $this->app->bind(RemoteFetcherInterface::class, static fn (Application $app): GuardedRemoteFetcher => new GuardedRemoteFetcher($app->make(HostResolverInterface::class)));
         $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
@@ -456,7 +461,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     {
         foreach ([$post->getOriginal('body'), $post->getAttribute('body')] as $body) {
             $json = json_encode($body, JSON_UNESCAPED_SLASHES);
-            if (is_string($json) && (str_contains($json, ImageNode::FOLDER) || str_contains($json, ImageNode::EXTERNAL_FOLDER))) {
+            if (is_string($json) && (str_contains($json, ImageNode::FOLDER) || str_contains($json, ImageNode::EXTERNAL_FOLDER) || str_contains($json, '"embed"'))) {
                 return true;
             }
         }

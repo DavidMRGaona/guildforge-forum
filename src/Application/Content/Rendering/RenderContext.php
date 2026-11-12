@@ -9,7 +9,8 @@ use Closure;
 /**
  * What the renderer needs to know about the world outside the document, looked up in one go
  * for every post shown: the current names of mentioned accounts (so a rename shows at once),
- * the quoted posts the reader may see, the dice rolls, and where images are delivered from.
+ * the quoted posts the reader may see, the dice rolls, where images are delivered from, and
+ * the cards of embedded posts.
  * Each post adds who it speaks as (withSpeaker()): the name its rolls are thrown by.
  */
 final readonly class RenderContext
@@ -20,6 +21,7 @@ final readonly class RenderContext
      * @param  (Closure(string): ?string)|null  $imageUrl  the delivery URL of a stored image
      * @param  array<string, RollView>  $rolls  by roll id
      * @param  string|null  $speaker  the name of the character the post speaks as; null out of character
+     * @param  array<string, EmbedView>  $embeds  by EmbedView::key()
      */
     public function __construct(
         private array $accountNames = [],
@@ -27,6 +29,7 @@ final readonly class RenderContext
         private ?Closure $imageUrl = null,
         private array $rolls = [],
         private ?string $speaker = null,
+        private array $embeds = [],
     ) {}
 
     /**
@@ -34,7 +37,7 @@ final readonly class RenderContext
      */
     public function withSpeaker(?string $speaker): self
     {
-        return new self($this->accountNames, $this->quotes, $this->imageUrl, $this->rolls, $speaker);
+        return new self($this->accountNames, $this->quotes, $this->imageUrl, $this->rolls, $speaker, $this->embeds);
     }
 
     /** Who the text being rendered is said by: a character's name, or null out of character */
@@ -56,6 +59,12 @@ final readonly class RenderContext
     public function roll(string $rollId): ?RollView
     {
         return $this->rolls[$rollId] ?? null;
+    }
+
+    /** What the reader is shown of an embedded post; null when nothing was looked up (only its link) */
+    public function embed(string $service, string $id): ?EmbedView
+    {
+        return $this->embeds[EmbedView::key($service, $id)] ?? null;
     }
 
     public function imageUrl(string $path): ?string

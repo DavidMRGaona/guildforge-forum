@@ -65,4 +65,14 @@ interface ForumSettingsInterface
      * @return list<string>
      */
     public function externalImageHosts(): array;
+
+    /**
+     * The services whose posts may be embedded (keys of EmbedProviders); all by default.
+     *
+     * @return list<string>
+     */
+    public function embedServices(): array;
+
+    /** The cookie category whose consent loads the service's player without a click */
+    public function embedCookieCategory(string $service): string;
 }

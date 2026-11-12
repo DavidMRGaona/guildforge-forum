@@ -181,6 +181,21 @@ describe('images from other sites', () => {
         expect(looksLikeImageFile('https://imgur.com/gallery/abc')).toBe(false);
     });
 
+    it('keep embeds with their service and id only', () => {
+        expect(
+            sanitizeContent({
+                type: 'embed',
+                attrs: { service: 'youtube', id: 'dQw4w9WgXcQ', html: '<iframe>' },
+            })
+        ).toEqual({ type: 'embed', attrs: { service: 'youtube', id: 'dQw4w9WgXcQ' } });
+        expect(
+            sanitizeContent({ type: 'embed', attrs: { service: 'YouTube', id: 'x' } })
+        ).toBeNull();
+        expect(
+            sanitizeContent({ type: 'embed', attrs: { service: 'youtube', id: '"><script>' } })
+        ).toBeNull();
+    });
+
     it('keeps them when converted only with the forum copy', () => {
         const image = (attrs: Record<string, unknown>): JSONContent | null =>
             sanitizeContent({ type: 'image', attrs });

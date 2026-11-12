@@ -36,6 +36,20 @@ export interface ExternalImage {
     previewUrl: string | null;
 }
 
+/** What the endpoint that reads a link to a post of another service answers (EmbedController) */
+export interface EmbedAnswer {
+    service: string;
+    id: string;
+    label: string;
+    url: string;
+    card: {
+        available: boolean;
+        title: string | null;
+        authorName: string | null;
+        thumbnailUrl: string | null;
+    };
+}
+
 /** What the image upload endpoint answers (PostImageController) */
 export interface UploadedImage {
     path: string;

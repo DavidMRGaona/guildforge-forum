@@ -73,6 +73,17 @@ final class InvalidDocumentException extends DomainException
     /** An image from another site heavier than uploads may be */
     public const string EXTERNAL_IMAGE_TOO_LARGE = 'external_image_too_large';
 
+    /** An embed of an unknown service, or an id its service does not read */
+    public const string INVALID_EMBED = 'invalid_embed';
+
+    /** A link that is not a post of a service the forum embeds */
+    public const string UNKNOWN_EMBED = 'unknown_embed';
+
+    /** An embed of a service the forum settings turned off */
+    public const string EMBED_DISABLED = 'embed_disabled';
+
+    public const string TOO_MANY_EMBEDS = 'too_many_embeds';
+
     private function __construct(
         public readonly string $reason,
         public readonly string $path,

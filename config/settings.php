@@ -26,6 +26,19 @@ return [
     'image_uploads_per_hour' => 30,
     // Sites images may be taken from, each with its subdomains (host names; https only). Empty turns it off
     'external_image_hosts' => ['imgur.com'],
+    // Services whose posts may be embedded (reddit, x, bluesky, instagram, tiktok, youtube, vimeo, twitch)
+    'embed_services' => ['reddit', 'x', 'bluesky', 'instagram', 'tiktok', 'youtube', 'vimeo', 'twitch'],
+    // The cookie category whose consent loads each service's player without a click (cookie consent module)
+    'embed_cookie_categories' => [
+        'reddit' => 'marketing',
+        'x' => 'marketing',
+        'bluesky' => 'marketing',
+        'instagram' => 'marketing',
+        'tiktok' => 'marketing',
+        'youtube' => 'marketing',
+        'vimeo' => 'marketing',
+        'twitch' => 'marketing',
+    ],
     // Who may have characters and write as them: nobody, everyone (signed in) or permission (forum:characters.use)
     'characters_access' => 'everyone',
     // Categories whose new discussions are announced on the site's channels (ids; only those guests can read)

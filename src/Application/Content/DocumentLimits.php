@@ -30,4 +30,6 @@ final class DocumentLimits
 
     /** Dice rolls per post (the rest of their limits live in Domain\Dice\Limits) */
     public const int MAX_ROLLS = Limits::MAX_ROLLS_PER_POST;
+
+    public const int MAX_EMBEDS = 5;
 }

@@ -7,6 +7,7 @@ use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Http\Controllers\CategoryController;
 use Modules\Forum\Http\Controllers\CharacterController;
 use Modules\Forum\Http\Controllers\DiscussionController;
+use Modules\Forum\Http\Controllers\EmbedController;
 use Modules\Forum\Http\Controllers\ExternalImageController;
 use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
@@ -150,6 +151,10 @@ Route::prefix('foro')
             Route::post('imagenes/externas', [ExternalImageController::class, 'store'])
                 ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
                 ->name('images.external');
+            // What a link to a post of another service is, with its card fetched by the server
+            Route::post('incrustaciones', [EmbedController::class, 'store'])
+                ->middleware('throttle:30,10,forum-embeds')
+                ->name('embeds.store');
         });
 
         // Likes, follows, characters and the forum's preferences, all JSON

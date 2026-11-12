@@ -26,7 +26,7 @@ describe('ForumSearchForm', () => {
         expect(wrapper.get(`label[for="${input.attributes('id')}"]`).text()).toBe(
             'Buscar en el foro'
         );
-        expect(wrapper.get('select[name="categoria"]').exists()).toBe(true);
+        expect(wrapper.find('select[name="categoria"]').exists()).toBe(true);
     });
 
     it('searches the text in the chosen category', async () => {

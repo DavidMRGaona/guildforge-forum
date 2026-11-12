@@ -57,11 +57,12 @@ final readonly class DiscussionSearchSource implements IndexedSearchSourceInterf
      */
     public function documents(): iterable
     {
-        $after = '';
+        $after = null;
 
         // By key in chunks, the openings of each chunk read in one query
         while (true) {
-            $chunk = ForumSearchDocuments::discussions()->where('id', '>', $after)->orderBy('id')->limit(200)->get();
+            // No bound on the first chunk: an empty string is not a uuid for PostgreSQL
+            $chunk = ForumSearchDocuments::discussions()->when($after !== null, static fn ($query) => $query->where('id', '>', $after))->orderBy('id')->limit(200)->get();
             $last = $chunk->last();
             if (! $last instanceof DiscussionModel) {
                 return;

@@ -27,7 +27,8 @@ use Psr\Http\Message\ResponseInterface;
  * - no proxy from the environment, https only, TLS verified, no cookies, no compression (so
  *   the size limit counts what arrives);
  * - redirects are followed by hand, only to the same host, each looked up and checked again;
- * - a time limit, and a size limit enforced by curl as the body arrives and again at the end.
+ * - a time limit, and a size limit: an announced length past it is refused before the body,
+ *   and the body is written to a capped sink that stops the transfer as soon as it passes.
  *
  * Anything that cannot be checked (no peer reported, an unreadable answer) is refused.
  */
@@ -41,8 +42,8 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
 
     private const array REDIRECTS = [301, 302, 303, 307, 308];
 
-    /** curl's codes for a transfer stopped by the size limit or by the progress guard */
-    private const array SIZE_ERRORS = [42, 63];
+    /** curl's code for a transfer stopped by its maximum file size */
+    private const int MAX_FILE_SIZE_ERROR = 63;
 
     private const string USER_AGENT = 'Mozilla/5.0 (compatible; ForumMediaProxy/1.0)';
 
@@ -120,6 +121,7 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
     private function send(RemoteUrl $url, IpAddress $pinned, int $maxBytes, string $accept): ResponseInterface
     {
         $peer = null;
+        $sink = new CappedStream($maxBytes);
 
         try {
             $response = $this->client->request('GET', $url->value, [
@@ -134,15 +136,19 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
                     'Accept-Encoding' => 'identity',
                     'User-Agent' => self::USER_AGENT,
                 ],
+                'protocols' => ['https'],
+                // Set, so the proxy of the environment is never used
+                'proxy' => '',
+                'sink' => $sink,
+                'on_headers' => static function (ResponseInterface $response) use ($maxBytes): void {
+                    $announced = $response->getHeaderLine('Content-Length');
+                    if (ctype_digit($announced) && (int) $announced > $maxBytes) {
+                        throw RemoteFetchException::because(RemoteFetchException::TOO_LARGE, "Announced {$announced} bytes");
+                    }
+                },
                 'curl' => [
                     CURLOPT_RESOLVE => ["{$url->host}:443:{$pinned->forCurlResolve()}"],
-                    CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-                    CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
-                    CURLOPT_PROXY => '',
-                    CURLOPT_NOPROXY => '*',
                     CURLOPT_MAXFILESIZE_LARGE => $maxBytes,
-                    CURLOPT_NOPROGRESS => false,
-                    CURLOPT_XFERINFOFUNCTION => static fn (mixed $handle, int $downloadTotal, int $downloaded): int => $downloaded > $maxBytes ? 1 : 0,
                 ],
                 'on_stats' => static function (TransferStats $stats) use (&$peer): void {
                     $ip = $stats->getHandlerStat('primary_ip');
@@ -150,10 +156,12 @@ final readonly class GuardedRemoteFetcher implements RemoteFetcherInterface
                 },
             ]);
         } catch (RequestException $exception) {
-            $errno = $exception->getHandlerContext()['errno'] ?? null;
+            $tooLarge = $sink->exceeded()
+                || ($exception->getHandlerContext()['errno'] ?? null) === self::MAX_FILE_SIZE_ERROR
+                || ($exception->getPrevious() instanceof RemoteFetchException && $exception->getPrevious()->reason === RemoteFetchException::TOO_LARGE);
 
             throw RemoteFetchException::because(
-                in_array($errno, self::SIZE_ERRORS, true) ? RemoteFetchException::TOO_LARGE : RemoteFetchException::UNAVAILABLE,
+                $tooLarge ? RemoteFetchException::TOO_LARGE : RemoteFetchException::UNAVAILABLE,
                 "{$url->value}: {$exception->getMessage()}",
             );
         } catch (GuzzleException $exception) {

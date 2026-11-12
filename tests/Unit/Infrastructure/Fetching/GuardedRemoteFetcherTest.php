@@ -15,6 +15,7 @@ use Modules\Forum\Application\Contracts\HostResolverInterface;
 use Modules\Forum\Domain\Exceptions\RemoteFetchException;
 use Modules\Forum\Domain\ValueObjects\IpAddress;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
+use Modules\Forum\Infrastructure\Fetching\CappedStream;
 use Modules\Forum\Infrastructure\Fetching\GuardedRemoteFetcher;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -65,11 +66,11 @@ final class GuardedRemoteFetcherTest extends TestCase
         $this->assertIsArray($curl);
         // The connection goes to the address that was checked, not to a second lookup
         $this->assertSame(['i.imgur.com:443:'.self::PUBLIC_IP], $curl[CURLOPT_RESOLVE]);
-        $this->assertSame(CURLPROTO_HTTPS, $curl[CURLOPT_PROTOCOLS]);
-        // No proxy from the environment
-        $this->assertSame('', $curl[CURLOPT_PROXY]);
-        $this->assertSame('*', $curl[CURLOPT_NOPROXY]);
         $this->assertSame(1000, $curl[CURLOPT_MAXFILESIZE_LARGE]);
+        $this->assertSame(['https'], $options['protocols']);
+        // No proxy from the environment
+        $this->assertSame('', $options['proxy']);
+        $this->assertInstanceOf(CappedStream::class, $options['sink']);
         $this->assertGreaterThan(0, $options['timeout']);
         $this->assertGreaterThan(0, $options['connect_timeout']);
         $this->assertSame('identity', $this->sent[0]['request']->getHeaderLine('Accept-Encoding'));
@@ -211,25 +212,55 @@ final class GuardedRemoteFetcherTest extends TestCase
         $this->assertRefused(RemoteFetchException::TOO_LARGE, 'https://i.imgur.com/a.png');
     }
 
-    public function test_a_transfer_aborted_while_it_grows_is_refused_as_too_large(): void
+    public function test_a_body_growing_past_the_limit_stops_the_transfer_as_it_arrives(): void
     {
-        $this->answers[] = static fn (RequestInterface $request): PromiseInterface => Create::rejectionFor(
-            new RequestException('cURL error 42: Callback aborted', $request, null, null, ['errno' => 42]),
-        );
+        $this->answers[] = static function (RequestInterface $request, array $options): PromiseInterface {
+            // As curl does: it writes the body to the sink, and a short write aborts (error 23)
+            $sink = $options['sink'];
+            assert($sink instanceof CappedStream);
+            $sink->write(str_repeat('x', 600));
+            $written = $sink->write(str_repeat('x', 600));
+
+            return Create::rejectionFor(new RequestException(
+                $written === 0 ? 'cURL error 23: Failure writing output' : 'unexpected',
+                $request,
+                null,
+                null,
+                ['errno' => 23],
+            ));
+        };
 
         $this->assertRefused(RemoteFetchException::TOO_LARGE, 'https://i.imgur.com/a.png');
     }
 
-    public function test_the_size_guard_stops_the_transfer_as_it_arrives(): void
+    public function test_an_announced_size_past_the_limit_is_refused_before_the_body(): void
     {
-        $this->answers[] = $this->answer(new Response(200, [], 'x'));
-        $this->fetcher()->fetch($this->url('https://i.imgur.com/a.png'), 1000, 'image/*');
+        $this->answers[] = static function (RequestInterface $request, array $options): PromiseInterface {
+            $onHeaders = $options['on_headers'] ?? null;
+            assert(is_callable($onHeaders));
 
-        $progress = $this->sent[0]['options']['curl'][CURLOPT_XFERINFOFUNCTION] ?? null;
-        $this->assertFalse($this->sent[0]['options']['curl'][CURLOPT_NOPROGRESS] ?? null);
-        $this->assertIsCallable($progress);
-        $this->assertSame(0, $progress(null, 0, 1000, 0, 0));
-        $this->assertSame(1, $progress(null, 0, 1001, 0, 0));
+            try {
+                $onHeaders(new Response(200, ['Content-Length' => '5000']));
+            } catch (\Throwable $exception) {
+                return Create::rejectionFor(new RequestException('An error was encountered during the on_headers event', $request, null, $exception));
+            }
+
+            return Create::promiseFor(new Response(200));
+        };
+
+        $this->assertRefused(RemoteFetchException::TOO_LARGE, 'https://i.imgur.com/a.png');
+    }
+
+    public function test_the_capped_sink_takes_up_to_its_limit_only(): void
+    {
+        $sink = new CappedStream(10);
+
+        $this->assertSame(6, $sink->write('abcdef'));
+        $this->assertSame(4, $sink->write('ghij'));
+        $this->assertFalse($sink->exceeded());
+        $this->assertSame(0, $sink->write('k'));
+        $this->assertTrue($sink->exceeded());
+        $this->assertSame('abcdefghij', (string) $sink);
     }
 
     public function test_timeouts_and_network_errors_are_refused(): void

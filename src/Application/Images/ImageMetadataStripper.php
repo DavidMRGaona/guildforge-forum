@@ -58,6 +58,7 @@ final class ImageMetadataStripper
 
         $kept = "\xFF\xD8";
         $orientation = 1;
+        $scans = 0;
         $length = strlen($bytes);
         $offset = 2;
 
@@ -75,16 +76,9 @@ final class ImageMetadataStripper
 
             $marker = ord($bytes[$offset + 1]);
 
-            // Start of scan: the compressed image and whatever follows it, as it is
-            if ($marker === 0xDA) {
-                $kept .= substr($bytes, $offset);
-
-                break;
-            }
-
-            // End of image before any scan: nothing to draw
+            // End of image: whatever follows it is not part of the image, and goes
             if ($marker === 0xD9) {
-                return null;
+                break;
             }
 
             // Markers without a length
@@ -105,6 +99,23 @@ final class ImageMetadataStripper
 
             $segment = substr($bytes, $offset, 2 + $size);
             $payload = substr($segment, 4);
+            $offset += 2 + $size;
+
+            // Start of scan: its header, then the compressed data up to the next marker. A
+            // progressive image has several scans, with tables (and maybe metadata) between them
+            if ($marker === 0xDA) {
+                $end = $this->jpegScanEnd($bytes, $offset);
+                $kept .= $segment.substr($bytes, $offset, $end - $offset);
+                $offset = $end;
+                $scans++;
+
+                if ($end >= $length) {
+                    // Cut short after its data: what there is gets its end
+                    break;
+                }
+
+                continue;
+            }
 
             if ($marker === 0xE1 && str_starts_with($payload, "Exif\0\0")) {
                 $orientation = $this->exifOrientation(substr($payload, 6)) ?? $orientation;
@@ -113,11 +124,47 @@ final class ImageMetadataStripper
             if (! $this->dropsJpegSegment($marker, $payload)) {
                 $kept .= $segment;
             }
-
-            $offset += 2 + $size;
         }
 
+        if ($scans === 0) {
+            // Nothing to draw
+            return null;
+        }
+
+        $kept .= "\xFF\xD9";
+
         return $orientation === 1 ? $kept : $this->upright($kept, $orientation);
+    }
+
+    /**
+     * Where the compressed data of a scan ends: at the first marker that is not a stuffed byte
+     * (FF 00), a restart marker or fill, or at the end of the file.
+     */
+    private function jpegScanEnd(string $bytes, int $offset): int
+    {
+        $length = strlen($bytes);
+
+        while (($next = strpos($bytes, "\xFF", $offset)) !== false) {
+            if ($next + 1 >= $length) {
+                return $length;
+            }
+
+            $following = ord($bytes[$next + 1]);
+            if ($following === 0x00 || ($following >= 0xD0 && $following <= 0xD7)) {
+                $offset = $next + 2;
+
+                continue;
+            }
+            if ($following === 0xFF) {
+                $offset = $next + 1;
+
+                continue;
+            }
+
+            return $next;
+        }
+
+        return $length;
     }
 
     /**
@@ -266,7 +313,6 @@ final class ImageMetadataStripper
         $length = min(strlen($bytes), 8 + $declared);
         $offset = 12;
         $chunks = [];
-        $changed = false;
 
         while ($offset + 8 <= $length) {
             $fourCc = substr($bytes, $offset, 4);
@@ -280,29 +326,20 @@ final class ImageMetadataStripper
             $offset += 8 + $padded;
 
             if (! in_array($fourCc, self::WEBP_KEPT, true)) {
-                $changed = true;
-
                 continue;
             }
 
             if ($fourCc === 'VP8X' && $size >= 1) {
-                $flags = ord($chunk[8]);
-                $cleared = $flags & ~(self::WEBP_FLAG_EXIF | self::WEBP_FLAG_XMP);
-                if ($cleared !== $flags) {
-                    $chunk[8] = chr($cleared);
-                    $changed = true;
-                }
+                $chunk[8] = chr(ord($chunk[8]) & ~(self::WEBP_FLAG_EXIF | self::WEBP_FLAG_XMP));
             }
 
             $chunks[] = $chunk;
         }
 
-        if ($chunks === [] || $offset < $length - 1) {
+        // Chunks must fill the declared size (a padding byte at most is left), and the file is
+        // always written again from them: nothing outside them, before or after, is kept
+        if ($chunks === [] || $offset < $length - 1 || strlen($bytes) < 8 + $declared) {
             return null;
-        }
-
-        if (! $changed) {
-            return $bytes;
         }
 
         $body = 'WEBP'.implode('', $chunks);

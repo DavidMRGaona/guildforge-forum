@@ -45,6 +45,27 @@ final class ImageMetadataStripperTest extends TestCase
         $this->assertSame([40, 20], $this->dimensions($stripped));
     }
 
+    public function test_jpeg_loses_what_hides_between_its_scans_and_after_its_end(): void
+    {
+        // A progressive JPEG has several scans: a comment between two of them, and bytes after
+        // the end of the image, are not image data
+        $image = imagecreatetruecolor(40, 20);
+        $this->assertInstanceOf(GdImage::class, $image);
+        imageinterlace($image, true);
+        $progressive = $this->encodeJpeg($image);
+        $second = strpos($progressive, "\xFF\xDA", (int) strpos($progressive, "\xFF\xDA") + 2);
+        $this->assertIsInt($second, 'GD wrote a progressive JPEG');
+        $tagged = substr($progressive, 0, $second).$this->segment(0xFE, self::SECRET).$this->segment(0xE1, "Exif\0\0".self::SECRET).substr($progressive, $second).self::SECRET;
+
+        $stripped = $this->stripper->strip($tagged, PostImageType::Jpeg);
+
+        $this->assertIsString($stripped);
+        $this->assertStringNotContainsString(self::SECRET, $stripped);
+        $this->assertStringEndsWith("\xFF\xD9", $stripped);
+        $this->assertSame([40, 20], $this->dimensions($stripped));
+        $this->assertInstanceOf(GdImage::class, imagecreatefromstring($stripped));
+    }
+
     public function test_jpeg_keeps_its_colour_profile(): void
     {
         $tagged = $this->insertAfterSoi($this->jpeg(8, 8), [$this->segment(0xE2, "ICC_PROFILE\0\x01\x01profile-bytes")]);
@@ -136,6 +157,30 @@ final class ImageMetadataStripperTest extends TestCase
         $this->assertSame(strlen($stripped) - 8, unpack('V', substr($stripped, 4, 4))[1] ?? null);
         $this->assertSame(0, ord($stripped[20]) & (0x08 | 0x04));
         $this->assertSame([10, 10], $this->dimensions($stripped));
+    }
+
+    public function test_webp_loses_what_comes_after_its_declared_size(): void
+    {
+        $image = imagecreatetruecolor(6, 6);
+        $this->assertInstanceOf(GdImage::class, $image);
+        ob_start();
+        imagewebp($image);
+        $simple = (string) ob_get_clean();
+
+        $stripped = $this->stripper->strip($simple.self::SECRET, PostImageType::Webp);
+
+        $this->assertSame($simple, $stripped);
+    }
+
+    public function test_webp_shorter_than_it_says_is_refused(): void
+    {
+        $image = imagecreatetruecolor(6, 6);
+        $this->assertInstanceOf(GdImage::class, $image);
+        ob_start();
+        imagewebp($image);
+        $simple = (string) ob_get_clean();
+
+        $this->assertNull($this->stripper->strip(substr($simple, 0, -4), PostImageType::Webp));
     }
 
     public function test_simple_webp_has_nothing_to_lose(): void

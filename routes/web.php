@@ -10,6 +10,7 @@ use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
 use Modules\Forum\Http\Controllers\ForumSearchController;
+use Modules\Forum\Http\Controllers\LiveUpdatesController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\ModerationController;
 use Modules\Forum\Http\Controllers\ModerationQueueController;
@@ -54,6 +55,16 @@ Route::prefix('foro')
             ->where(['type' => '[^/]{1,64}', 'id' => '[^/]{1,100}'])
             ->middleware('throttle:120,1,forum-subjects')
             ->name('subjects.show');
+
+        // What an open page asks for while it is open. Whoever may not read a discussion gets what
+        // a missing one gets; the limits leave room for a few tabs asking every 20 s with backoff
+        Route::get('temas/{discussion}/novedades', [LiveUpdatesController::class, 'posts'])
+            ->whereUuid('discussion')
+            ->middleware('throttle:30,1,forum-updates')
+            ->name('discussions.updates');
+        Route::get('novedades', [LiveUpdatesController::class, 'forum'])
+            ->middleware(['auth', 'throttle:20,1,forum-pulse'])
+            ->name('updates');
 
         Route::middleware('auth')->group(function (): void {
             Route::get('nuevo', [DiscussionController::class, 'create'])->name('discussions.create');

@@ -45,6 +45,7 @@ use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
+use Modules\Forum\Application\Queries\ForumActivityQueryInterface;
 use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
 use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
@@ -89,6 +90,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubje
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSuspensionRepository;
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
+use Modules\Forum\Infrastructure\Queries\EloquentForumActivityQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentModerationQueueQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentSearchHitsQuery;
 use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
@@ -167,6 +169,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(FollowsInterface::class, EloquentFollows::class);
         $this->app->bind(ForumNoticesInterface::class, QueuedForumNotices::class);
         $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
+        $this->app->bind(ForumActivityQueryInterface::class, EloquentForumActivityQuery::class);
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
         $this->app->bind(ModerationQueueQueryInterface::class, EloquentModerationQueueQuery::class);
         $this->app->bind(SearchHitsQueryInterface::class, EloquentSearchHitsQuery::class);

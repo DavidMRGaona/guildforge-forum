@@ -120,6 +120,74 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+const MERGED = { title: 'Destino', url: '/foro/t/2-destino' };
+
+function serveMerged(): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn(
+        async () =>
+            new Response(JSON.stringify({ message: 'Este tema se ha unido', mergedInto: MERGED }), {
+                status: 410,
+                headers: { 'Content-Type': 'application/json' },
+            })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    return fetchMock;
+}
+
+describe('Discussion page, when its discussion is merged into another', () => {
+    it('stops asking and offers the way to the target without taking the reader there', async () => {
+        const fetchMock = serveMerged();
+        const wrapper = mountPage(null);
+
+        await vi.advanceTimersByTimeAsync(20_000);
+        await flushPromises();
+
+        const notice = wrapper.get('[data-testid="merged-notice"]');
+        expect(notice.attributes('role')).toBe('status');
+        expect(notice.text()).toContain('Destino');
+        expect(notice.get('a').attributes('href')).toBe('/foro/t/2-destino');
+        expect(router.visit).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        // What the page had stays where it was
+        expect(wrapper.findAll('article')).toHaveLength(3);
+    });
+
+    it('shows no notice while nothing was merged', async () => {
+        serve({});
+        const wrapper = mountPage(null);
+
+        await vi.advanceTimersByTimeAsync(20_000);
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="merged-notice"]').exists()).toBe(false);
+    });
+
+    it('answers a reply from the old page with a clear error and the same way on', async () => {
+        const fetchMock = serveMerged();
+        const wrapper = mountPage(null);
+
+        wrapper
+            .findComponent({ name: 'ReplyBox' })
+            .vm.$emit('submit', { type: 'doc', content: [] }, null);
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/foro/temas/discussion-1/mensajes',
+            expect.anything()
+        );
+        expect(wrapper.get('[data-testid="merged-notice"] a').attributes('href')).toBe(
+            '/foro/t/2-destino'
+        );
+        expect(wrapper.findComponent({ name: 'ReplyBox' }).props('error')).toContain(
+            'no se ha publicado'
+        );
+        expect(router.visit).not.toHaveBeenCalled();
+    });
+});
+
 describe('Discussion page, while it stays open', () => {
     it('follows the end of the discussion: the new posts go after the page’s own', async () => {
         const fetchMock = serve({

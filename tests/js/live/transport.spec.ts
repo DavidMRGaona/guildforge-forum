@@ -84,6 +84,40 @@ describe('pollingTransport', () => {
         expect(request).toHaveBeenCalledTimes(1);
     });
 
+    it('tells where a discussion went when the server says it was merged, and ends', async () => {
+        const merged = { title: 'Destino', url: '/foro/t/2-destino' };
+        const request = vi.fn().mockResolvedValue({ ...answer(410), mergedInto: merged });
+        const onMerged = vi.fn();
+        pollingTransport<{ n: number }>({
+            intervalMs: 1000,
+            request,
+            visibility: VISIBLE,
+            random: () => 0.5,
+        }).connect({ cursor: () => 7 }, () => undefined, onMerged);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(600_000);
+
+        expect(onMerged).toHaveBeenCalledExactlyOnceWith(merged);
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends quietly after a 410 that says nothing about where', async () => {
+        const request = vi.fn().mockResolvedValue(answer(410));
+        const onMerged = vi.fn();
+        pollingTransport<{ n: number }>({
+            intervalMs: 1000,
+            request,
+            visibility: VISIBLE,
+            random: () => 0.5,
+        }).connect({ cursor: () => 7 }, () => undefined, onMerged);
+
+        await vi.advanceTimersByTimeAsync(600_000);
+
+        expect(onMerged).not.toHaveBeenCalled();
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+
     it('can be asked for news now and stopped', async () => {
         const request = vi.fn().mockResolvedValue(answer(204));
         const { refresh, stop } = connect(request);

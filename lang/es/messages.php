@@ -453,6 +453,7 @@ return [
         'too_fast' => 'Has publicado muchos mensajes seguidos. Espera :seconds segundos y vuelve a intentarlo.',
         'too_many_discussions' => 'Has abierto muchos temas en la última hora. Podrás abrir otro dentro de :minutes min.',
         'post_state' => 'Este mensaje ya no se puede cambiar.',
+        'merged' => 'Este tema se ha unido a «:title».',
         'discussion_state' => 'El tema ya estaba así. Recarga la página para ver cómo está ahora.',
         'image_upload' => 'No se ha podido subir la imagen. Inténtalo de nuevo más tarde.',
         'document' => [

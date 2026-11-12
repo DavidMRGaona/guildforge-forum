@@ -8,6 +8,7 @@ import { useAuth } from '@/composables/useAuth';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import MovedPostsNotice from '../../components/forum/MovedPostsNotice.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
+import MergedNotice from '../../components/live/MergedNotice.vue';
 import NewPostsNotice from '../../components/live/NewPostsNotice.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import ReplyBox from '../../components/forum/ReplyBox.vue';
@@ -153,6 +154,14 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 ? props.discussion.url
                 : `${props.discussion.url}/${number}`
         );
+
+        return;
+    }
+
+    // The discussion was merged into another while this page stayed open
+    if (answer.status === 410 && answer.mergedInto) {
+        live.markMerged(answer.mergedInto);
+        replyError.value = t('forum.live.mergedReply', { title: answer.mergedInto.title });
 
         return;
     }
@@ -334,6 +343,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 </div>
             </template>
             <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
+            <MergedNotice :target="live.mergedInto.value" />
         </div>
 
         <nav

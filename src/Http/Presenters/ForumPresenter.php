@@ -161,7 +161,17 @@ final readonly class ForumPresenter
         }
         $resume = $this->moved->resumeAfterMoves($resumeFrom);
 
-        $present = fn (DiscussionRowDTO $row): array => $this->discussionRow($row, $categories[$row->categoryId] ?? null, $names, $resume[$row->id] ?? null);
+        // Numbers that left a row after what was read are not unread posts: counted apart, and
+        // only for the rows with something unread
+        $unreadSpans = [];
+        foreach ($rows as $row) {
+            if ($row->lastReadNumber !== null && $row->lastPostNumber !== null && $row->lastReadNumber < $row->lastPostNumber) {
+                $unreadSpans[$row->id] = ['after' => $row->lastReadNumber, 'through' => $row->lastPostNumber];
+            }
+        }
+        $moved = $this->moved->countInRanges($unreadSpans);
+
+        $present = fn (DiscussionRowDTO $row): array => $this->discussionRow($row, $categories[$row->categoryId] ?? null, $names, $resume[$row->id] ?? null, $moved[$row->id] ?? 0);
 
         return [
             'pinned' => array_map($present, $page->pinned),
@@ -404,11 +414,11 @@ final readonly class ForumPresenter
      * @param  array<string, string>  $names
      * @return array<string, mixed>
      */
-    private function discussionRow(DiscussionRowDTO $row, ?Category $category, array $names, ?int $resumeAt = null): array
+    private function discussionRow(DiscussionRowDTO $row, ?Category $category, array $names, ?int $resumeAt = null, int $movedAway = 0): array
     {
         $unreadCount = $row->lastReadNumber === null || $row->lastPostNumber === null
             ? null
-            : max(0, $row->lastPostNumber - $row->lastReadNumber);
+            : max(0, $row->lastPostNumber - $row->lastReadNumber - $movedAway);
 
         return [
             'id' => $row->id,

@@ -1,4 +1,5 @@
 import type { JsonAnswer } from '../forum/api';
+import type { ForumMergedInto } from '../types/forum';
 import { createPoller, type PollOutcome, type PollerVisibility } from './poller';
 
 /**
@@ -19,7 +20,15 @@ export interface LiveConnection {
 }
 
 export interface LiveTransport<T> {
-    connect: (context: LiveContext, onUpdate: (update: T) => void) => LiveConnection;
+    /**
+     * `onMerged` hears that the discussion was merged into another and where it went; the
+     * connection ends there.
+     */
+    connect: (
+        context: LiveContext,
+        onUpdate: (update: T) => void,
+        onMerged?: (target: ForumMergedInto) => void
+    ) => LiveConnection;
 }
 
 export interface PollingOptions<T> {
@@ -34,11 +43,11 @@ export interface PollingOptions<T> {
 }
 
 /** A session that ended, a page that is gone or no longer allowed: asking again changes nothing */
-const FINAL_STATUSES = [401, 403, 404];
+const FINAL_STATUSES = [401, 403, 404, 410];
 
 export function pollingTransport<T>(options: PollingOptions<T>): LiveTransport<T> {
     return {
-        connect(context, onUpdate): LiveConnection {
+        connect(context, onUpdate, onMerged): LiveConnection {
             const poller = createPoller({
                 intervalMs: options.intervalMs,
                 maxIntervalMs: options.maxIntervalMs ?? Math.min(options.intervalMs * 8, 300_000),
@@ -53,6 +62,11 @@ export function pollingTransport<T>(options: PollingOptions<T>): LiveTransport<T
                         }
 
                         return 'ok';
+                    }
+
+                    // 410: merged into another discussion, and the person may read where
+                    if (answer.status === 410 && answer.mergedInto) {
+                        onMerged?.(answer.mergedInto);
                     }
 
                     // Network failures (0), limits (429) and server errors wait longer

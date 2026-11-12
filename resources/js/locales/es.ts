@@ -312,6 +312,10 @@ export default {
             newPosts: 'Un mensaje nuevo | {count} mensajes nuevos',
             view: 'Ver',
             listChanged: 'Un tema tiene novedades | {count} temas tienen novedades',
+            merged: 'Este tema se ha unido a «{title}».',
+            mergedGo: 'Ir al tema',
+            mergedReply:
+                'Este tema se ha unido a «{title}» y tu mensaje no se ha publicado. Sigue en el editor: cópialo y publícalo en el otro tema.',
             refreshList: 'Actualizar la lista',
             updated: 'Con novedades',
             unreadFollowed:

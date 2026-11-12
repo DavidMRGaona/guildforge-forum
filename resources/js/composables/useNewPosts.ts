@@ -10,7 +10,7 @@ import {
     type Ref,
 } from 'vue';
 import type { LiveConnection, LiveTransport } from '../live/transport';
-import type { ForumNewPosts, ForumPost } from '../types/forum';
+import type { ForumMergedInto, ForumNewPosts, ForumPost } from '../types/forum';
 
 export interface NewPostsOptions {
     /** The posts the page drew */
@@ -34,6 +34,10 @@ export interface NewPosts {
     unseen: ComputedRef<ForumPost[]>;
     /** The reader saw or jumped to them: the notice goes away */
     acknowledge: () => void;
+    /** Where the discussion went, once it was merged into another (the page stops following it) */
+    mergedInto: Ref<ForumMergedInto | null>;
+    /** The page learned it another way (a reply refused because of it) */
+    markMerged: (target: ForumMergedInto) => void;
     /** Forgets the new posts (the page reloaded its own) and asks again at once */
     reset: () => void;
 }
@@ -48,6 +52,7 @@ export function useNewPosts(options: NewPostsOptions): NewPosts {
     const arrived = ref<ForumPost[]>([]);
     const unseenIds = ref<string[]>([]);
     const mentionNames = ref<Record<string, string>>({});
+    const mergedInto = ref<ForumMergedInto | null>(null);
     let connection: LiveConnection | null = null;
 
     const base = computed(() => toValue(options.posts));
@@ -93,12 +98,17 @@ export function useNewPosts(options: NewPostsOptions): NewPosts {
         }
     }
 
+    function markMerged(target: ForumMergedInto): void {
+        mergedInto.value = target;
+        disconnect();
+    }
+
     function connect(): void {
-        if (connection !== null) {
+        if (connection !== null || mergedInto.value !== null) {
             return;
         }
 
-        connection = options.transport.connect({ cursor: () => cursor.value }, receive);
+        connection = options.transport.connect({ cursor: () => cursor.value }, receive, markMerged);
     }
 
     function disconnect(): void {
@@ -121,6 +131,8 @@ export function useNewPosts(options: NewPostsOptions): NewPosts {
         posts,
         mentionNames,
         unseen,
+        mergedInto,
+        markMerged,
         acknowledge: (): void => {
             unseenIds.value = [];
         },

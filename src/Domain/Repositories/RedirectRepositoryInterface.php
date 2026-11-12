@@ -44,4 +44,10 @@ interface RedirectRepositoryInterface
      * The discussion that had the public number and was merged into another; null when none was.
      */
     public function mergedDiscussion(int $number): ?MergedDiscussion;
+
+    /**
+     * The merge of the discussion with this id (the one that no longer exists); null when it was
+     * not merged.
+     */
+    public function mergedDiscussionById(DiscussionId $id): ?MergedDiscussion;
 }

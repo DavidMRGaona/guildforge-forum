@@ -323,6 +323,13 @@ final class ForumServiceProvider extends ModuleServiceProvider
                 module: $this->moduleName(),
                 order: 10,
             ),
+            // Draws nothing: it marks the «Foro» menu link when followed discussions have news
+            new SlotRegistrationDTO(
+                slot: 'after-header',
+                component: 'components/live/ForumMenuPulse.vue',
+                module: $this->moduleName(),
+                order: 90,
+            ),
         ];
     }
 

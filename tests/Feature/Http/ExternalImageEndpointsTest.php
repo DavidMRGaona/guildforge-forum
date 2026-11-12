@@ -13,6 +13,7 @@ use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
 use Modules\Forum\Application\Services\ExternalImageRules;
+use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\RemoteFetchException;
@@ -118,6 +119,18 @@ final class ExternalImageEndpointsTest extends ModuleTestCase
         yield 'an address' => ['https://127.0.0.1/a.png'];
         yield 'credentials' => ['https://user@i.imgur.com/a.png'];
         yield 'not an address' => ['imgur'];
+    }
+
+    public function test_a_suspended_or_anonymized_account_cannot_ask_for_a_copy(): void
+    {
+        app(SuspensionService::class)->suspend($this->anAccount('forum:forum.moderate'), $this->author->id, 'Insultos', null);
+        $this->import(self::REMOTE)->assertForbidden();
+
+        $anonymized = $this->anAccount(ExternalImageRules::PERMISSION);
+        $anonymized->forceFill(['anonymized_at' => now()])->save();
+        $this->actingAs($anonymized)->postJson('/foro/imagenes/externas', ['url' => self::REMOTE])->assertForbidden();
+
+        $this->assertSame([], $this->fetcher->fetched);
     }
 
     #[DataProvider('addressesNotAllowed')]

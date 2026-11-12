@@ -66,6 +66,50 @@ final class ImageMetadataStripperTest extends TestCase
         $this->assertInstanceOf(GdImage::class, imagecreatefromstring($stripped));
     }
 
+    public function test_a_photo_with_its_gps_position_loses_it_and_decodes_to_the_same_pixels(): void
+    {
+        $image = imagecreatetruecolor(32, 24);
+        $this->assertInstanceOf(GdImage::class, $image);
+        for ($x = 0; $x < 32; $x++) {
+            imageline($image, $x, 0, $x, 23, (int) imagecolorallocate($image, $x * 8, 255 - $x * 8, 128));
+        }
+        $tagged = $this->insertAfterSoi($this->encodeJpeg($image), [$this->segment(0xE1, $this->exifWithGps())]);
+
+        // A real EXIF block: PHP reads the camera and the position from it
+        $before = $this->exifOf($tagged);
+        $this->assertSame('SecretCam', $before['Make'] ?? null);
+        $this->assertSame('N', $before['GPSLatitudeRef'] ?? null);
+        $this->assertSame(['40/1', '25/1', '0/1'], $before['GPSLatitude'] ?? null);
+
+        $stripped = $this->stripper->strip($tagged, PostImageType::Jpeg);
+
+        $this->assertIsString($stripped);
+        $after = $this->exifOf($stripped);
+        $this->assertArrayNotHasKey('GPSLatitude', $after);
+        $this->assertArrayNotHasKey('GPSLongitude', $after);
+        $this->assertArrayNotHasKey('Make', $after);
+        $this->assertSame($this->pixels($tagged), $this->pixels($stripped));
+    }
+
+    public function test_a_png_with_its_gps_position_loses_it_and_decodes_to_the_same_pixels(): void
+    {
+        $image = imagecreatetruecolor(16, 16);
+        $this->assertInstanceOf(GdImage::class, $image);
+        imagefilledrectangle($image, 0, 0, 7, 15, (int) imagecolorallocate($image, 200, 30, 30));
+        ob_start();
+        imagepng($image);
+        $png = (string) ob_get_clean();
+        $tagged = $this->insertBeforeIend($png, [$this->chunk('eXIf', substr($this->exifWithGps(), 6))]);
+        $this->assertStringContainsString('SecretCam', $tagged);
+
+        $stripped = $this->stripper->strip($tagged, PostImageType::Png);
+
+        $this->assertIsString($stripped);
+        $this->assertStringNotContainsString('SecretCam', $stripped);
+        $this->assertStringNotContainsString('eXIf', $stripped);
+        $this->assertSame($this->pixels($tagged), $this->pixels($stripped));
+    }
+
     public function test_jpeg_keeps_its_colour_profile(): void
     {
         $tagged = $this->insertAfterSoi($this->jpeg(8, 8), [$this->segment(0xE2, "ICC_PROFILE\0\x01\x01profile-bytes")]);
@@ -255,6 +299,60 @@ final class ImageMetadataStripperTest extends TestCase
         $info = getimagesizefromstring($bytes);
 
         return $info === false ? null : [$info[0], $info[1]];
+    }
+
+    /**
+     * An Exif APP1 payload as a phone writes it, in Intel order: the camera's make and a GPS
+     * IFD with latitude 40°25'0" N and longitude 3°42'0" W.
+     */
+    private function exifWithGps(): string
+    {
+        $entry = static fn (int $tag, int $type, int $count, string $value): string => pack('vvV', $tag, $type, $count).str_pad($value, 4, "\0");
+        $rational = static fn (int ...$parts): string => implode('', array_map(static fn (int $part): string => pack('VV', $part, 1), $parts));
+
+        // Header (8), IFD0 with two entries (2 + 24 + 4 = 30): Make text at 38, GPS IFD at 48
+        $make = "SecretCam\0";
+        $ifd0 = pack('v', 2)
+            .$entry(0x010F, 2, strlen($make), pack('V', 38))
+            .$entry(0x8825, 4, 1, pack('V', 48))
+            .pack('V', 0);
+        // GPS IFD with four entries (2 + 48 + 4 = 54): its rationals from 102
+        $gps = pack('v', 4)
+            .$entry(0x0001, 2, 2, "N\0")
+            .$entry(0x0002, 5, 3, pack('V', 102))
+            .$entry(0x0003, 2, 2, "W\0")
+            .$entry(0x0004, 5, 3, pack('V', 126))
+            .pack('V', 0);
+        $tiff = 'II'.pack('v', 42).pack('V', 8).$ifd0.$make.$gps.$rational(40, 25, 0).$rational(3, 42, 0);
+
+        return "Exif\0\0".$tiff;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exifOf(string $jpeg): array
+    {
+        $data = @exif_read_data('data://image/jpeg;base64,'.base64_encode($jpeg));
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Every pixel of the decoded image, so two files can be compared by what they show.
+     */
+    private function pixels(string $bytes): string
+    {
+        $image = imagecreatefromstring($bytes);
+        $this->assertInstanceOf(GdImage::class, $image);
+        $pixels = '';
+        for ($y = 0; $y < imagesy($image); $y++) {
+            for ($x = 0; $x < imagesx($image); $x++) {
+                $pixels .= pack('N', imagecolorat($image, $x, $y));
+            }
+        }
+
+        return hash('sha256', $pixels);
     }
 
     /**

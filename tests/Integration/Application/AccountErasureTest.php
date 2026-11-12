@@ -201,6 +201,20 @@ final class AccountErasureTest extends ModuleTestCase
         $this->assertStringContainsString('forum/posts/2026/11/x.webp', (string) json_encode($this->postRow($this->personsPost)->body, JSON_UNESCAPED_SLASHES));
     }
 
+    public function test_images_from_other_sites_stay_with_their_copy(): void
+    {
+        $copy = 'forum/external/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.png';
+        $document = ['type' => 'doc', 'content' => [['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://i.imgur.com/AbC123.png', 'path' => $copy]]]];
+        DB::table('forum_posts')->where('id', $this->personsPost->id()->value)->update(['body' => json_encode($document, JSON_UNESCAPED_SLASHES)]);
+        DB::table('forum_external_images')->insert(['id' => (string) Str::uuid(), 'url_hash' => hash('sha256', 'https://i.imgur.com/AbC123.png'), 'url' => 'https://i.imgur.com/AbC123.png', 'path' => $copy, 'fetched_at' => now()]);
+
+        $this->anonymize();
+
+        $this->assertStringContainsString($copy, (string) json_encode($this->postRow($this->personsPost)->body, JSON_UNESCAPED_SLASHES));
+        // The copy holds nobody's data: it stays for the post that shows it
+        $this->assertSame($copy, DB::table('forum_external_images')->value('path'));
+    }
+
     public function test_it_is_idempotent(): void
     {
         $this->seedEngagement($this->person);

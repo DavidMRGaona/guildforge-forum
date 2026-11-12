@@ -7,19 +7,22 @@ namespace Modules\Forum\Http\Requests;
 use App\Application\Authorization\Services\AuthorizationServiceInterface;
 use Illuminate\Foundation\Http\FormRequest;
 use Modules\Forum\Application\Services\ExternalImageRules;
+use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 
 /**
- * The address of an image on another site, from someone with forum:posts.external_images.
+ * The address of an image on another site, from someone with forum:posts.external_images who
+ * may act in the forum (not suspended, deactivated or anonymized).
  * Whether its site is allowed and what it holds is checked when the server fetches it.
  */
 final class StoreExternalImageRequest extends FormRequest
 {
-    public function authorize(AuthorizationServiceInterface $authorization): bool
+    public function authorize(AuthorizationServiceInterface $authorization, ForumSuspensions $suspensions): bool
     {
         $user = $this->user();
 
-        return $user !== null && $authorization->can($user, ExternalImageRules::PERMISSION);
+        // Copying makes the server fetch from the other site: not for whoever may not act in the forum
+        return $user !== null && $authorization->can($user, ExternalImageRules::PERMISSION) && ! $suspensions->isBarred($user);
     }
 
     /**

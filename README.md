@@ -359,6 +359,28 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 - **Actividad del foro**: widget del escritorio con los temas y mensajes de los últimos 30 días, las denuncias pendientes y lo pendiente de aprobación (enlaza a la moderación). Solo con `forum:forum.moderate`.
 - **Ajustes**: en *Sistema → Configuración → Foro* (hueco 125 del clúster), con el permiso `forum:settings.manage`. Cuántos temas y mensajes se muestran por página (de 10 a 100; 20 por defecto), las categorías cuyos temas nuevos se anuncian en los canales del sitio (solo las que se leen sin sesión; ninguna por defecto), cuántos mensajes puede publicar una persona por minuto (de 1 a 60; 6 por defecto), cuántos temas puede abrir por hora (de 1 a 60; 5 por defecto) y las imágenes: formatos (los cuatro por defecto), peso máximo (4096 KB), lado máximo (2000 px), imágenes por mensaje (10), subidas por hora y persona (30, también las de otros sitios) y los sitios de los que se pueden poner imágenes (`imgur.com`; sin ninguno, no se puede). En *Incrustaciones*, los servicios activos (todos por defecto) y la categoría de cookies de cada uno (`marketing` por defecto). También quién puede tener personajes (nadie, cualquier cuenta con sesión o solo con permiso; cualquier cuenta por defecto).
 
+## Guías de ayuda
+
+El módulo trae sus guías para la base de conocimiento del core (`resources/knowledge/es/site` y `panel`, ids `forum.site.*` y `forum.panel.*`; formato en `docs/modules/knowledge-guides.md` del core). Las del sitio van en las categorías `community`, `events-and-games` y `campaigns`; las del panel, en `content`.
+
+| Guía | Quién la ve |
+|------|-------------|
+| `forum.site.overview`, `writing`, `notices`, `play-by-post`, `dice` | Cualquier cuenta |
+| `forum.site.images` | Con `forum:posts.upload_images` |
+| `forum.site.external-images` | Con `forum:posts.external_images` |
+| `forum.site.embeds` | Mientras algún servicio de incrustación esté activo (`forum.embeds_enabled`) |
+| `forum.site.characters` | Quien puede tener personajes según el ajuste y el permiso (`forum.uses_characters`) |
+| `forum.site.table-topics` | Solo con una fuente de mesas (`forum.offers_game_tables`) |
+| `forum.site.campaign-spaces` | Solo con una fuente de campañas (`forum.offers_campaigns`) |
+| `forum.site.moderating` | Quien modera algo en el foro (`forum.moderates`) |
+| `forum.panel.categories` | Con `forum:categories.manage` |
+| `forum.panel.permissions` | Con `roles.create` o `roles.update` |
+| `forum.panel.moderation` | Quien modera todo el foro (`forum.moderates_forum`) |
+| `forum.panel.settings` | Con `forum:settings.manage` |
+
+- **Capacidades** (`Infrastructure/Knowledge`, registradas en `registerKnowledgeCapabilities()`): cada una reutiliza la regla que decide la cosa misma. `forum.offers_game_tables` y `forum.offers_campaigns` preguntan a `PublicationAvailability` (la misma regla que oculta «Mesas», «Campañas» y los espacios), así que una guía sobre otro módulo desaparece cuando su fuente deja de ofrecerse, sin nombrar nunca ese módulo, y fallan cerrado como ella. `forum.moderates` cuenta quien modera todo el foro o al menos una categoría que puede leer (y nunca a quien está suspendido); `forum.moderates_forum` es la regla de la página de moderación del panel. Una guía sobre algo que depende de otro módulo o de un permiso va aparte: las condiciones de una guía no se pueden aplicar a una sección.
+- **Ayuda contextual**: `knowledgeGuideAction()` al final de las cabeceras de la lista, el formulario y la edición de categorías, de la página de moderación y de la de ajustes; `HelpLink` junto al título del foro (`forum.site.overview`) y en el pie del editor (`forum.site.writing`). `KnowledgeGuidesTest` comprueba el lint, que cada botón apunta a una guía del módulo y la visibilidad con y sin fuentes de mesas y campañas y con y sin permiso de moderación.
+
 ## Desarrollo
 
 Tests del módulo desde `src/` del core:

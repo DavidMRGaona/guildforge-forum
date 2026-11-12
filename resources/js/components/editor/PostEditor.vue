@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AnyExtension, JSONContent } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
+import HelpLink from '@/components/knowledge/HelpLink.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { buildImageUrl } from '@/utils/cloudinary';
 import { csrfHeaders, isCsrfFailure } from '@/utils/csrf';
@@ -778,9 +779,12 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             v-if="submitLabel !== null || $slots['actions']"
             class="border-default flex flex-wrap items-center justify-end gap-2 border-t px-3 py-2"
         >
-            <span class="text-base-muted mr-auto hidden text-xs sm:inline">{{
-                t('forum.editor.submit_hint')
-            }}</span>
+            <div class="mr-auto flex items-center gap-2">
+                <HelpLink guide="forum.site.writing" />
+                <span class="text-base-muted hidden text-xs sm:inline">{{
+                    t('forum.editor.submit_hint')
+                }}</span>
+            </div>
             <slot name="actions" />
             <BaseButton
                 v-if="submitLabel !== null"

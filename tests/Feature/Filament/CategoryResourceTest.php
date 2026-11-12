@@ -6,6 +6,8 @@ namespace Modules\Forum\Tests\Feature\Filament;
 
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Filament\Actions\RowDetailsAction;
+use App\Filament\Pages\KnowledgeBasePage;
+use App\Filament\Support\PanelGuideUrl;
 use App\Filament\Support\PanelNavigationGroup;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
@@ -351,6 +353,29 @@ final class CategoryResourceTest extends ModuleTestCase
         $this->assertInstanceOf(HasTable::class, $instance);
 
         return $instance->getTable();
+    }
+
+    public function test_the_list_the_form_and_the_edit_page_offer_the_categories_guide(): void
+    {
+        $this->artisanCommand('knowledge:sync')->assertSuccessful()->run();
+        $this->actingAs($this->userWith(['forum:categories.manage']));
+        $url = KnowledgeBasePage::getUrl(['guia' => 'forum.panel.categories']);
+
+        Livewire::test(ListCategories::class)->assertActionVisible('contextualHelp')->assertActionHasUrl('contextualHelp', $url);
+        Livewire::test(CreateCategory::class)->assertActionVisible('contextualHelp')->assertActionHasUrl('contextualHelp', $url);
+
+        $category = $this->aCategory('general');
+        Livewire::test(EditCategory::class, ['record' => $category->id()->value])
+            ->assertActionVisible('contextualHelp')
+            ->assertActionHasUrl('contextualHelp', $url);
+    }
+
+    public function test_whoever_does_not_see_the_guide_gets_no_help_button(): void
+    {
+        $this->artisanCommand('knowledge:sync')->assertSuccessful()->run();
+        $this->actingAs($this->userWith(['forum:settings.manage']));
+
+        $this->assertNull(PanelGuideUrl::for('forum.panel.categories'));
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
+use App\Application\Security\Services\ContentSecurityPolicySourcesInterface;
 use App\Domain\Events\UserAnonymized;
 use App\Domain\Modules\Events\ModuleEnabled;
 use App\Domain\Modules\Events\ModuleUpdated;
@@ -61,6 +62,7 @@ use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -269,6 +271,12 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // the plain text of a post that mentions someone, says what was true when it was written,
         // like a quotation does; only anonymizing writes it again.
         Event::listen(UserAnonymized::class, [ForgetAnonymizedAccount::class, 'handle']);
+
+        // The pages may frame the players of the enabled services (core 3.57): the function runs
+        // every time the header is built, so it follows the settings
+        $this->callAfterResolving(ContentSecurityPolicySourcesInterface::class, function (ContentSecurityPolicySourcesInterface $sources): void {
+            $sources->allowFrames(fn (): array => $this->app->make(EmbedFrameOrigins::class)->enabled());
+        });
 
         // What authors deleted is emptied once its retention has passed
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {

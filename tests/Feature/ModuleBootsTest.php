@@ -42,8 +42,9 @@ final class ModuleBootsTest extends ModuleTestCase
         $this->assertSame('Foro', $manifest['displayName']);
         $this->assertSame('DavidMRGaona/guildforge-forum', $manifest['repository']);
         // The site notifications and the props of the subject-discussion slot came with 3.54,
-        // the seeders run with the module's provider in 3.55.4 and the menu badges in 3.56
-        $this->assertSame('^3.56.0', $manifest['requires']['core']);
+        // the seeders run with the module's provider in 3.55.4, the menu badges in 3.56 and the
+        // frame-src origins of the embedded players in 3.57
+        $this->assertSame('^3.57.0', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }
 

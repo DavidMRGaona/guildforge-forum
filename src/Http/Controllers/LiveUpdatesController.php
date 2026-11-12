@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
+use Modules\Forum\Application\DTOs\NewPostsDTO;
 use Modules\Forum\Application\Services\ForumPulse;
 use Modules\Forum\Application\Services\NewPostsReader;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
@@ -47,7 +48,7 @@ final class LiveUpdatesController extends Controller
             return response()->json(['message' => 'Not Found'], 404)->header('Cache-Control', self::NO_STORE);
         }
 
-        if ($news === null) {
+        if (! $news instanceof NewPostsDTO) {
             return response()->noContent()->header('Cache-Control', self::NO_STORE);
         }
 

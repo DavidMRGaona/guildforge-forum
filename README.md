@@ -225,6 +225,19 @@ Un nodo nuevo (por ejemplo, los apartes fuera de personaje) se añade en los dos
 
 `resources/js/components/editor/PostEditor.vue`. La página le da `label`, y si procede `mentionsUrl`, `uploadUrl` (solo a quien tiene el permiso de subir imágenes), `maxImages` e `imageTypes` (de los ajustes), `draftKey` (borrador en el navegador por tema), `mentionNames` (nombres de las menciones del documento inicial) y `submitLabel`. Emite `submit` con el documento y expone `clear()`, `quote({ postId, text | content })`, `focus()` y `getDocument()`. Atajos: los de Markdown al escribir, Ctrl+Intro para enviar y Ctrl+K para el enlace; el Markdown pegado como texto se convierte.
 
+## Novedades sin recargar
+
+Con la página abierta, el foro pregunta por lo nuevo con consultas ligeras (JSON, `Cache-Control: private, no-store`). Se eligió un endpoint propio y no una recarga parcial de Inertia: una recarga vuelve a ejecutar el controlador de la página entera (presentadores, «me gusta», seguimiento), no sirve en las fichas (que no son páginas de Inertia) y no puede responder «nada nuevo» sin cuerpo.
+
+- `GET /foro/temas/{tema}/novedades?despues=<n>` (público, 30 por minuto): los mensajes numerados posteriores al nº `n`, como los pinta la página (máximo 50; `more` dice si quedan). Responde **204** si no hay ninguno, tras una sola lectura del índice `(discussion_id, number)`. Un tema que la persona no puede leer responde 404 igual que uno inexistente. Nunca salen mensajes pendientes de aprobación (no tienen número) ni se toca la marca de leído.
+- `GET /foro/novedades[?temas=<id>,<id>…]` (con sesión, 20 por minuto, hasta 100 ids): `unreadFollowed` (temas seguidos, o de categorías seguidas con actividad en los últimos 90 días, con mensajes sin leer; se cuenta hasta 100) y `discussions` (el último mensaje de los temas pedidos que la persona puede ver; los demás faltan, sin distinguir). Las dos consultas leen por clave primaria, sin recalcular contadores.
+
+En la web (`resources/js/live/`, `composables/`):
+- `poller.ts`: pregunta cada intervalo (con ±10 % de variación), se detiene con la pestaña oculta y pregunta en cuanto vuelve a verse (así, con varias pestañas, solo pregunta la visible), espera el doble tras cada fallo hasta un tope y se detiene del todo con 401, 403 o 404.
+- `transport.ts`: el contrato `LiveTransport` (`connect(contexto, alActualizar)` → `{ stop, refresh }`) y su implementación por consulta, `pollingTransport`. El tiempo real (#17) será otra implementación del mismo contrato: `useNewPosts` y `useForumPulse` y los componentes no cambian.
+- Tema abierto (página del foro, solo en la última página, y ficha, salvo cerrado): cada 20 s; los nuevos se añaden al final y `NewPostsNotice` avisa «N mensajes nuevos» en una región `role="status"` educada que ya existe antes del cambio, sin mover la página ni el foco. La ficha nunca pide el mensaje de apertura. El lector de marcas observa también los mensajes que llegan: **llegar no marca nada como leído**, solo verlos en pantalla, con la regla de continuidad de siempre.
+- Menú y lista: cada 60 s, solo con sesión. `ForumMenuPulse` (ranura `after-header`, sin salida visible) pone `data-forum-unread` en `<html>` (el punto del enlace «Foro» es una regla de `module.css`) y describe el enlace a los lectores de pantalla; `DiscussionList` marca «Con novedades» los temas cuyo último mensaje es posterior al que se pintó y ofrece «Actualizar la lista».
+
 ## Búsqueda
 
 El foro ofrece al buscador del sitio dos tipos de documento (`registerSearchSources()`, core ≥ 3.36):

@@ -38,8 +38,6 @@ final class LiveUpdatesEndpointsTest extends ModuleTestCase
 
     private UserModel $reader;
 
-    private UserModel $author;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -48,7 +46,6 @@ final class LiveUpdatesEndpointsTest extends ModuleTestCase
         $this->public = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
         $this->members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios', position: 1);
         $this->reader = UserModel::factory()->create();
-        $this->author = UserModel::factory()->create();
     }
 
     public function test_nothing_after_the_last_post_answers_no_content(): void

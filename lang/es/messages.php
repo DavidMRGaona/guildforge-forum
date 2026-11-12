@@ -21,6 +21,8 @@ return [
         'posts' => [
             'upload_images' => 'Subir imágenes al foro',
             'upload_images_description' => 'Añadir imágenes a los mensajes, con los formatos y límites de los ajustes del foro.',
+            'external_images' => 'Poner imágenes de otros sitios',
+            'external_images_description' => 'Añadir a los mensajes imágenes de los sitios permitidos en los ajustes del foro. El foro guarda una copia y quien lee nunca contacta con el otro sitio.',
         ],
         'characters' => [
             'use' => 'Tener personajes en el foro',
@@ -50,6 +52,11 @@ return [
         'image_max_dimension_help' => 'Las imágenes más grandes se reducen a este tamaño.',
         'images_per_post' => 'Imágenes por mensaje',
         'image_uploads_per_hour' => 'Subidas por hora y persona',
+        'image_uploads_per_hour_help' => 'Cuenta también las imágenes de otros sitios. De :min a :max.',
+        'external_image_hosts' => 'Sitios de los que se pueden poner imágenes',
+        'external_image_hosts_help' => 'Un dominio por entrada, sin https:// (imgur.com vale también para i.imgur.com). Solo se admiten direcciones https. Sin ninguno, no se pueden poner imágenes de otros sitios. Hace falta el permiso «Poner imágenes de otros sitios».',
+        'external_image_hosts_invalid' => 'Escribe solo dominios, como imgur.com, sin https:// ni rutas.',
+        'external_image_hosts_placeholder' => 'Añade un dominio',
         'range_help' => 'De :min a :max.',
         'saved' => 'Ajustes guardados',
         'announcements' => 'Avisos de temas nuevos',
@@ -381,6 +388,7 @@ return [
         'quote_by' => ':name escribió:',
         'unknown_account' => 'cuenta eliminada',
         'ooc' => 'Fuera de personaje',
+        'image_source' => 'Imagen de',
     ],
 
     'characters' => [
@@ -454,7 +462,7 @@ return [
             'invalid_text' => 'El mensaje tiene un texto no válido.',
             'invalid_attribute' => 'El mensaje tiene un elemento con un valor no válido.',
             'invalid_link' => 'Los enlaces solo pueden ir a direcciones http, https o mailto.',
-            'invalid_image' => 'Las imágenes deben ser de un formato que admita el foro y estar subidas a él.',
+            'invalid_image' => 'Las imágenes deben ser de un formato que admita el foro, y estar subidas a él o copiadas por él de otro sitio.',
             'too_many_images' => 'El mensaje lleva más imágenes de las que permite el foro.',
             'too_many_mentions' => 'Un mensaje puede mencionar a 20 personas como mucho.',
             'too_many_quotes' => 'Un mensaje puede citar 10 mensajes como mucho.',
@@ -463,11 +471,16 @@ return [
             'invalid_quote' => 'La cita no coincide con el mensaje citado.',
             'too_many_rolls' => 'Un mensaje puede llevar 10 tiradas como mucho.',
             'unknown_roll' => 'El mensaje lleva una tirada que no es suya o que ya se quitó.',
+            'external_image_not_allowed' => 'No tienes permiso para poner imágenes de otros sitios.',
+            'external_image_host' => 'Solo se pueden poner imágenes con dirección https de los sitios que permite el foro.',
+            'external_image_unavailable' => 'No se ha podido traer la imagen de ese sitio. Comprueba que la dirección es la de la imagen, no la de su página.',
+            'external_image_too_large' => 'La imagen pesa más de lo que permite el foro.',
         ],
     ],
 
     'editor' => [
         'image_attribute' => 'imagen',
+        'external_image_attribute' => 'dirección de la imagen',
     ],
 
     'publications' => [

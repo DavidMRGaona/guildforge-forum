@@ -19,8 +19,8 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 
 /**
  * Turns what the editor sent into a post body: the document checked against the schema, its
- * mentions pointing at accounts that may be mentioned, its quotes at posts the author may read,
- * and its plain text derived from it. Anything wrong is refused as it came.
+ * images from other sites allowed, its mentions pointing at accounts that may be mentioned, its
+ * quotes at posts the author may read, and its plain text derived from it. Anything wrong is refused as it came.
  */
 final readonly class PostBodyFactory
 {
@@ -31,14 +31,19 @@ final readonly class PostBodyFactory
         private PostRepositoryInterface $posts,
         private DiscussionRepositoryInterface $discussions,
         private ForumAccessInterface $access,
+        private ExternalImageRules $externalImages,
     ) {}
 
     /**
+     * @param  PostBody|null  $previous  what the post said before, when it is an edit: images from other sites it already had are kept without checking them again
+     *
      * @throws InvalidDocumentException
      */
-    public function fromInput(mixed $raw, Authenticatable $author): PostBody
+    public function fromInput(mixed $raw, Authenticatable $author, ?PostBody $previous = null): PostBody
     {
         $document = $this->schema->validate($raw);
+
+        $this->externalImages->assertAllowed($document, $author, $previous);
 
         $mentioned = $document->mentionedAccountIds();
         if (array_diff($mentioned, $this->accounts->mentionable($mentioned)) !== []) {

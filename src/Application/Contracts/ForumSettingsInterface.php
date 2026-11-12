@@ -57,4 +57,12 @@ interface ForumSettingsInterface
 
     /** Who may have characters and write as them */
     public function characterAccess(): CharacterAccessMode;
+
+    /**
+     * The sites images may be taken from (each with its subdomains), as host names in
+     * lowercase; none turns images from other sites off.
+     *
+     * @return list<string>
+     */
+    public function externalImageHosts(): array;
 }

@@ -98,4 +98,23 @@ final class ForumSettingsTest extends TestCase
         config(['modules.settings.forum' => ['announced_categories' => 'todas']]);
         $this->assertSame([], (new ForumSettings)->announcedCategoryIds());
     }
+
+    public function test_images_from_other_sites_come_from_imgur_by_default(): void
+    {
+        config(['modules.settings.forum' => []]);
+
+        $this->assertSame(['imgur.com'], (new ForumSettings)->externalImageHosts());
+    }
+
+    public function test_the_image_sites_keep_only_host_names(): void
+    {
+        config(['modules.settings.forum' => ['external_image_hosts' => [' Imgur.com ', 'https://postimg.cc', '*.ibb.co', '127.0.0.1', 'localhost', 'i.ibb.co', 42, 'imgur.com']]]);
+        $this->assertSame(['imgur.com', 'i.ibb.co'], (new ForumSettings)->externalImageHosts());
+
+        // An empty list turns them off; anything that is not a list gives the default
+        config(['modules.settings.forum' => ['external_image_hosts' => []]]);
+        $this->assertSame([], (new ForumSettings)->externalImageHosts());
+        config(['modules.settings.forum' => ['external_image_hosts' => 'imgur.com']]);
+        $this->assertSame(['imgur.com'], (new ForumSettings)->externalImageHosts());
+    }
 }

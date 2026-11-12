@@ -7,6 +7,7 @@ namespace Modules\Forum\Application\Content;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
+use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 
 /**
  * A post document that passed the schema, exactly as it came, with the attributes of its nodes
@@ -51,13 +52,41 @@ final readonly class PostDocument
     }
 
     /**
-     * Stored paths of the images, as uploaded.
+     * Stored files of the images, each once: uploads and the forum copies of images from other
+     * sites.
      *
      * @return list<string>
      */
     public function imagePaths(): array
     {
-        return $this->distinct((new ImageNode)->name(), 'src');
+        $paths = [];
+        foreach ($this->attributesOf((new ImageNode)->name()) as $attributes) {
+            $path = ImageNode::storedPath($attributes);
+            if ($path !== null) {
+                $paths[$path] = true;
+            }
+        }
+
+        return array_map(strval(...), array_keys($paths));
+    }
+
+    /**
+     * The images from other sites, each address once with the copy the document names.
+     *
+     * @return list<array{url: string, path: string}>
+     */
+    public function externalImages(): array
+    {
+        $images = [];
+        foreach ($this->attributesOf((new ImageNode)->name()) as $attributes) {
+            $url = ImageNode::remoteUrl($attributes);
+            $path = ImageNode::storedPath($attributes);
+            if ($url instanceof RemoteUrl && $path !== null) {
+                $images[$url->value.' '.$path] = ['url' => $url->value, 'path' => $path];
+            }
+        }
+
+        return array_values($images);
     }
 
     /**

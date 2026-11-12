@@ -9,6 +9,7 @@ use App\Application\Services\ImageOptimizationServiceInterface;
 use finfo;
 use Modules\Forum\Application\Contracts\CharacterPortraitStorageInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Images\ImageMetadataStripper;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Exceptions\InvalidCharacterException;
 use RuntimeException;
@@ -27,6 +28,7 @@ final readonly class CharacterPortraitUploader
         private ImageOptimizationServiceInterface $optimizer,
         private CharacterPortraitStorageInterface $storage,
         private ForumSettingsInterface $settings,
+        private ImageMetadataStripper $stripper,
     ) {}
 
     /**
@@ -48,8 +50,12 @@ final readonly class CharacterPortraitUploader
             'format' => null,
         ]));
 
-        // Whatever the optimizer returned must still be the same kind of image
-        return $this->storage->store($this->detect($optimized) === $type ? $optimized : $contents, $type->extension());
+        // Whatever the optimizer returned must still be the same kind of image, and it keeps
+        // nothing about where or with what the photo was taken
+        $stored = $this->stripper->strip($this->detect($optimized) === $type ? $optimized : $contents, $type)
+            ?? throw InvalidCharacterException::because(InvalidCharacterException::PORTRAIT, 'portrait', 'The image could not be read');
+
+        return $this->storage->store($stored, $type->extension());
     }
 
     private function detect(string $contents): ?PostImageType

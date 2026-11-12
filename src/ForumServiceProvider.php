@@ -42,6 +42,7 @@ use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
+use Modules\Forum\Application\Contracts\HostResolverInterface;
 use Modules\Forum\Application\Contracts\MentionCandidatesInterface;
 use Modules\Forum\Application\Contracts\MentionTextsInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
@@ -49,6 +50,7 @@ use Modules\Forum\Application\Contracts\PostLikesInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
+use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
@@ -70,6 +72,7 @@ use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\ExternalImageCopyRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
@@ -81,6 +84,8 @@ use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
+use Modules\Forum\Infrastructure\Fetching\DnsHostResolver;
+use Modules\Forum\Infrastructure\Fetching\GuardedRemoteFetcher;
 use Modules\Forum\Infrastructure\Listeners\ForgetAnonymizedAccount;
 use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
 use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
@@ -98,6 +103,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCateg
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCharacterRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiceRollRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentExternalImageCopyRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
@@ -141,7 +147,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * Permission names, stored by the loader as "forum:<name>".
      */
-    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'characters.use'];
+    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'posts.external_images', 'characters.use'];
 
     /**
      * Container tags for the post document's extra node and mark types: a feature that adds a
@@ -191,6 +197,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(MentionTextsInterface::class, EloquentMentionTexts::class);
         $this->app->bind(MentionCandidatesInterface::class, EloquentMentionCandidates::class);
         $this->app->bind(PostImageStorageInterface::class, CloudinaryPostImageStorage::class);
+        $this->app->bind(ExternalImageCopyRepositoryInterface::class, EloquentExternalImageCopyRepository::class);
+        $this->app->bind(HostResolverInterface::class, DnsHostResolver::class);
+        $this->app->bind(RemoteFetcherInterface::class, static fn (Application $app): GuardedRemoteFetcher => new GuardedRemoteFetcher($app->make(HostResolverInterface::class)));
         $this->app->bind(PostRateLimiterInterface::class, SettingsPostRateLimiter::class);
         $this->app->bind(PostLinksInterface::class, DiscussionPostLinks::class);
         $this->app->bind(ForumUrlsInterface::class, RouteForumUrls::class);
@@ -447,7 +456,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     {
         foreach ([$post->getOriginal('body'), $post->getAttribute('body')] as $body) {
             $json = json_encode($body, JSON_UNESCAPED_SLASHES);
-            if (is_string($json) && str_contains($json, ImageNode::FOLDER)) {
+            if (is_string($json) && (str_contains($json, ImageNode::FOLDER) || str_contains($json, ImageNode::EXTERNAL_FOLDER))) {
                 return true;
             }
         }

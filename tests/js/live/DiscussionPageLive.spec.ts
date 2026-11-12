@@ -71,6 +71,8 @@ function props(nextUrl: string | null): Record<string, unknown> {
             uploadUrl: null,
             maxImages: 10,
             imageTypes: [],
+            externalImageUrl: null,
+            externalImageHosts: [],
         },
         readUrl: null,
         moderation: null,

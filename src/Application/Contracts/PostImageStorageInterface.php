@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Application\Contracts;
 
+use Modules\Forum\Application\Content\Nodes\ImageNode;
 use RuntimeException;
 
 /**
- * Where post images are kept: the site's image storage, under the folder the forum's media
+ * Where post images are kept: the site's image storage, under the folders the forum's media
  * source claims.
  */
 interface PostImageStorageInterface
@@ -16,10 +17,11 @@ interface PostImageStorageInterface
      * Stores an image already checked and returns its stored path, the value image nodes hold.
      *
      * @param  string  $extension  jpg, png, webp or gif
+     * @param  string  $folder  ImageNode::FOLDER for uploads, ImageNode::EXTERNAL_FOLDER for copies of images from other sites
      *
      * @throws RuntimeException when it could not be stored
      */
-    public function store(string $contents, string $extension): string;
+    public function store(string $contents, string $extension, string $folder = ImageNode::FOLDER): string;
 
     /** The delivery URL of a stored path, or null when it cannot be built */
     public function url(string $path): ?string;

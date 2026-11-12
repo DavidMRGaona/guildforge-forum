@@ -22,7 +22,7 @@ final class PermissionsTest extends ModuleTestCase
     {
         $names = array_map(static fn (PermissionDTO $permission): string => $permission->name, $this->permissions());
 
-        $this->assertSame(['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'characters.use'], $names);
+        $this->assertSame(['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'posts.external_images', 'characters.use'], $names);
     }
 
     public function test_every_permission_is_labelled_and_described_in_spanish(): void

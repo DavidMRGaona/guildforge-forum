@@ -17,6 +17,7 @@ use Modules\Forum\Application\Services\PostingService;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostId;
 
@@ -36,6 +37,7 @@ final class PostController extends Controller
         private readonly TimezoneServiceInterface $timezone,
         private readonly ForumModeration $moderation,
         private readonly PostBodyFactory $bodies,
+        private readonly PostRepositoryInterface $posts,
     ) {}
 
     public function store(Request $request, string $discussion): JsonResponse
@@ -67,7 +69,8 @@ final class PostController extends Controller
 
             // Someone else's post is edited only by its moderators, and the edit is logged; it
             // keeps speaking as it did (nobody chooses someone else's character)
-            $edited = $this->moderation->editPost($user, $id, $this->bodies->fromInput($document, $user));
+            // (images from other sites it already had are kept without the moderator's permission)
+            $edited = $this->moderation->editPost($user, $id, $this->bodies->fromInput($document, $user, $this->posts->find($id)?->body()));
 
             return response()->json(['post' => $this->present($edited, $user)]);
         });

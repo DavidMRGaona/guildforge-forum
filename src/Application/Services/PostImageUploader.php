@@ -7,8 +7,10 @@ namespace Modules\Forum\Application\Services;
 use App\Application\DTOs\ImageOptimizationSettingsDTO;
 use App\Application\Services\ImageOptimizationServiceInterface;
 use finfo;
+use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
+use Modules\Forum\Application\Images\ImageMetadataStripper;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use RuntimeException;
@@ -16,8 +18,8 @@ use RuntimeException;
 /**
  * Stores an image someone adds to a post, in the format it came, which must be one the forum
  * settings allow (never SVG), resized to the settings' longest side (animated ones keep their
- * bytes). The type is read from the bytes, not from the file name. The request has already
- * checked the size.
+ * bytes) and without its metadata (camera, place, comments). The type is read from the bytes,
+ * not from the file name. The caller has already checked the size.
  */
 final readonly class PostImageUploader
 {
@@ -28,15 +30,17 @@ final readonly class PostImageUploader
         private ImageOptimizationServiceInterface $optimizer,
         private PostImageStorageInterface $storage,
         private ForumSettingsInterface $settings,
+        private ImageMetadataStripper $stripper,
     ) {}
 
     /**
+     * @param  string  $folder  ImageNode::FOLDER for uploads, ImageNode::EXTERNAL_FOLDER for copies of images from other sites
      * @return array{path: string, url: string|null}
      *
-     * @throws InvalidDocumentException when the bytes are not an allowed image
+     * @throws InvalidDocumentException when the bytes are not an allowed image, or one whose metadata cannot be taken out
      * @throws RuntimeException when the image could not be stored
      */
-    public function upload(string $contents): array
+    public function upload(string $contents, string $folder = ImageNode::FOLDER): array
     {
         $type = $this->typeOf($contents);
         $side = $this->settings->imageMaxDimension();
@@ -49,8 +53,9 @@ final readonly class PostImageUploader
         ]));
 
         // Whatever the optimizer returned must still be the same kind of image
-        $stored = $this->detect($optimized) === $type ? $optimized : $contents;
-        $path = $this->storage->store($stored, $type->extension());
+        $stored = $this->stripper->strip($this->detect($optimized) === $type ? $optimized : $contents, $type)
+            ?? throw InvalidDocumentException::because(InvalidDocumentException::INVALID_IMAGE, '', 'The image could not be read');
+        $path = $this->storage->store($stored, $type->extension(), $folder);
 
         return ['path' => $path, 'url' => $this->storage->url($path)];
     }

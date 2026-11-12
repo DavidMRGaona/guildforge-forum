@@ -63,6 +63,8 @@ final class ErasedTables
             'forum_dice_rolls',
             'forum_post_redirects',
             'forum_discussion_redirects',
+            // Copies of images from other sites: an address and a stored file, nobody's
+            'forum_external_images',
         ];
     }
 }

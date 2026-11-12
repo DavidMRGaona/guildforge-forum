@@ -7,9 +7,12 @@ import { csrfHeaders, isCsrfFailure } from '@/utils/csrf';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
+    IMAGE_ORIGIN_EXTERNAL,
     IMAGE_ORIGIN_UPLOAD,
     IMAGE_TYPES,
+    isAllowedImageAddress,
     isDocumentEmpty,
+    looksLikeImageFile,
     MAX_IMAGES,
     normalizeHref,
     storedImageUrl,
@@ -19,7 +22,13 @@ import EditorToolbar from '../../editor/EditorToolbar.vue';
 import { createForumExtensions } from '../../editor/extensions';
 import { paragraphsFromText } from '../../editor/extensions/PostQuote';
 import { mentionSuggestion } from '../../editor/mentionSuggestion';
-import type { MentionCandidate, QuoteSource, ToolbarItem, UploadedImage } from '../../editor/types';
+import type {
+    ExternalImage,
+    MentionCandidate,
+    QuoteSource,
+    ToolbarItem,
+    UploadedImage,
+} from '../../editor/types';
 
 /**
  * The forum's post editor. It edits the document the server stores (TipTap JSON checked
@@ -46,6 +55,10 @@ const props = withDefaults(
         maxImages?: number;
         /** Image formats the forum settings allow, as MIME types */
         imageTypes?: string[];
+        /** Where to ask for the forum's copy of an image from another site; null offers none (no permission) */
+        externalImageUrl?: string | null;
+        /** The sites images may come from, each with its subdomains */
+        externalImageHosts?: string[];
         /** Names of the accounts the starting document mentions, by id */
         mentionNames?: Record<string, string>;
         extensions?: AnyExtension[];
@@ -65,6 +78,8 @@ const props = withDefaults(
         uploadUrl: null,
         maxImages: MAX_IMAGES,
         imageTypes: () => [...IMAGE_TYPES],
+        externalImageUrl: null,
+        externalImageHosts: () => [],
         mentionNames: () => ({}),
         extensions: () => [],
         toolbarItems: () => [],
@@ -100,6 +115,12 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const linkOpen = ref(false);
 const linkInput = ref('');
 const linkField = ref<HTMLInputElement | null>(null);
+const externalOpen = ref(false);
+const externalInput = ref('');
+const externalField = ref<HTMLInputElement | null>(null);
+const canTakeExternalImages = computed(
+    () => props.externalImageUrl !== null && props.externalImageHosts.length > 0
+);
 let draftTimer: ReturnType<typeof setTimeout> | null = null;
 
 const editor = useEditor({
@@ -141,7 +162,9 @@ const editor = useEditor({
 
             return false;
         },
-        handlePaste: (_view, event) => uploadFiles(event.clipboardData?.files),
+        handlePaste: (_view, event) =>
+            uploadFiles(event.clipboardData?.files) ||
+            pasteExternalImage(event.clipboardData?.getData('text/plain') ?? ''),
         handleDrop: (_view, event) => uploadFiles((event as DragEvent).dataTransfer?.files),
     },
     onUpdate: ({ editor: current }) => {
@@ -293,6 +316,112 @@ function imageCount(): number {
     return count;
 }
 
+function openExternalImage(): void {
+    externalInput.value = '';
+    externalOpen.value = true;
+    localError.value = null;
+    requestAnimationFrame(() => externalField.value?.focus());
+}
+
+function closeExternalImage(): void {
+    externalOpen.value = false;
+    editor.value?.commands.focus();
+}
+
+function applyExternalImage(): void {
+    if (takeExternalImage(externalInput.value.trim())) {
+        externalOpen.value = false;
+    }
+}
+
+/**
+ * A pasted address of an image file on one of the sites becomes that image; any other text is
+ * pasted as usual (an address becomes a link).
+ */
+function pasteExternalImage(text: string): boolean {
+    const address = text.trim();
+    if (
+        !canTakeExternalImages.value ||
+        /\s/u.test(address) ||
+        !looksLikeImageFile(address) ||
+        !isAllowedImageAddress(address, props.externalImageHosts)
+    ) {
+        return false;
+    }
+
+    takeExternalImage(address);
+
+    return true;
+}
+
+/** Asks the server for its copy of the image; false when the address cannot be taken */
+function takeExternalImage(address: string): boolean {
+    if (!isAllowedImageAddress(address, props.externalImageHosts)) {
+        localError.value = t('forum.editor.errors.external_host', {
+            sites: props.externalImageHosts.join(', '),
+        });
+
+        return false;
+    }
+    if (imageCount() + uploading.value + 1 > props.maxImages) {
+        localError.value = t('forum.editor.errors.too_many_images', { max: props.maxImages });
+
+        return false;
+    }
+
+    void fetchExternalImage(address, props.externalImageUrl as string);
+
+    return true;
+}
+
+async function fetchExternalImage(address: string, url: string): Promise<void> {
+    uploading.value++;
+    status.value = t('forum.editor.externalImage.fetching');
+    localError.value = null;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...csrfHeaders(),
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ url: address }),
+        });
+
+        if (!response.ok) {
+            const answer = (await response.json().catch(() => ({}))) as { message?: string };
+            localError.value = isCsrfFailure(response)
+                ? t('forum.editor.errors.session')
+                : (answer.message ?? t('forum.editor.errors.external_fetch'));
+
+            return;
+        }
+
+        const image = (await response.json()) as ExternalImage;
+        editor.value
+            ?.chain()
+            .focus()
+            .insertContent({
+                type: 'image',
+                attrs: {
+                    origin: IMAGE_ORIGIN_EXTERNAL,
+                    src: image.url,
+                    path: image.path,
+                    alt: null,
+                },
+            })
+            .run();
+        status.value = t('forum.editor.externalImage.fetched');
+    } catch {
+        localError.value = t('forum.editor.errors.external_fetch');
+    } finally {
+        uploading.value--;
+    }
+}
+
 /** Uploads the images among the files; true when it took them (so a paste or drop stops there) */
 function uploadFiles(files: FileList | null | undefined): boolean {
     const images = Array.from(files ?? []).filter((file) => props.imageTypes.includes(file.type));
@@ -341,7 +470,7 @@ async function upload(file: File, url: string): Promise<void> {
             .focus()
             .insertContent({
                 type: 'image',
-                attrs: { origin: IMAGE_ORIGIN_UPLOAD, src: image.path, alt: null },
+                attrs: { origin: IMAGE_ORIGIN_UPLOAD, src: image.path, path: null, alt: null },
             })
             .run();
         status.value = t('forum.editor.images.uploaded');
@@ -365,10 +494,45 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             :editor="editor"
             :items="toolbarItems"
             :can-upload-images="uploadUrl !== null"
+            :can-take-external-images="canTakeExternalImages"
             :disabled="disabled"
             @link="openLink"
             @image="chooseImage"
+            @external-image="openExternalImage"
         />
+
+        <form
+            v-if="externalOpen"
+            class="border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"
+            @submit.prevent="applyExternalImage"
+            @keydown.escape.prevent="closeExternalImage"
+        >
+            <label
+                for="forum-editor-external-image"
+                class="text-base-secondary w-full text-sm sm:w-auto"
+                >{{ t('forum.editor.externalImage.label') }}</label
+            >
+            <input
+                id="forum-editor-external-image"
+                ref="externalField"
+                v-model="externalInput"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                :placeholder="t('forum.editor.externalImage.placeholder')"
+                aria-describedby="forum-editor-external-image-hint"
+                class="bg-page border-default text-base-primary w-full min-w-0 rounded-md border px-2 py-1 text-sm sm:w-auto sm:flex-1"
+            />
+            <BaseButton type="submit" size="sm">{{
+                t('forum.editor.externalImage.apply')
+            }}</BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="closeExternalImage">{{
+                t('forum.editor.externalImage.cancel')
+            }}</BaseButton>
+            <p id="forum-editor-external-image-hint" class="text-base-muted w-full text-xs">
+                {{ t('forum.editor.externalImage.hint', { sites: externalImageHosts.join(', ') }) }}
+            </p>
+        </form>
 
         <form
             v-if="linkOpen"

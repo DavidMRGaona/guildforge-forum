@@ -7,6 +7,7 @@ use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Http\Controllers\CategoryController;
 use Modules\Forum\Http\Controllers\CharacterController;
 use Modules\Forum\Http\Controllers\DiscussionController;
+use Modules\Forum\Http\Controllers\ExternalImageController;
 use Modules\Forum\Http\Controllers\FollowsController;
 use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
@@ -145,6 +146,10 @@ Route::prefix('foro')
             Route::post('imagenes', [PostImageController::class, 'store'])
                 ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
                 ->name('images.store');
+            // The forum's copy of an image from another site: fetched by the server, like an upload
+            Route::post('imagenes/externas', [ExternalImageController::class, 'store'])
+                ->middleware('throttle:'.ForumServiceProvider::IMAGE_UPLOADS_LIMITER)
+                ->name('images.external');
         });
 
         // Likes, follows, characters and the forum's preferences, all JSON

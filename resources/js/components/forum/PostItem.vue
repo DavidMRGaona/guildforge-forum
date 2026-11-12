@@ -419,6 +419,8 @@ async function remove(): Promise<void> {
                     :upload-url="editor.uploadUrl"
                     :max-images="editor.maxImages"
                     :image-types="editor.imageTypes"
+                    :external-image-url="editor.externalImageUrl"
+                    :external-image-hosts="editor.externalImageHosts"
                     :mention-names="mentionNames"
                     :submit-label="t('forum.posts.saveEdit')"
                     :submitting="saving"

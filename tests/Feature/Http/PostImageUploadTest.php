@@ -76,6 +76,22 @@ final class PostImageUploadTest extends ModuleTestCase
         $this->assertStringEndsWith('.gif', $path);
     }
 
+    public function test_uploads_lose_what_they_say_about_where_they_were_taken(): void
+    {
+        $plain = UploadedFile::fake()->image('foto.jpg', 30, 20);
+        $bytes = (string) file_get_contents($plain->getPathname());
+        $comment = 'GPS-SECRET-40.4168N';
+        $tagged = substr($bytes, 0, 2)."\xFF\xFE".pack('n', strlen($comment) + 2).$comment.substr($bytes, 2);
+
+        $path = $this->actingAs($this->uploader())
+            ->post('/foro/imagenes', ['image' => UploadedFile::fake()->createWithContent('foto.jpg', $tagged)], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->json('path');
+
+        $this->assertIsString($path);
+        $this->assertStringNotContainsString($comment, (string) Storage::disk('images')->get($path));
+    }
+
     public function test_svg_files_and_files_that_are_not_images_are_refused(): void
     {
         $user = $this->uploader();

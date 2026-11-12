@@ -14,8 +14,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Post images on the site's image disk (Cloudinary), at forum/posts/<year>/<month>/<uuid>.<ext>:
- * the folder the forum's media source claims, so the media library knows where they come from.
+ * Post images on the site's image disk (Cloudinary), at forum/posts/<year>/<month>/<uuid>.<ext>
+ * (uploads) or forum/external/… (copies of images from other sites): the folders the forum's
+ * media source claims, so the media library knows where they come from.
  * Files are never deleted here: an image stays in use while any version of a post shows it,
  * and the media library removes the ones nobody uses.
  */
@@ -25,13 +26,16 @@ final class CloudinaryPostImageStorage implements PostImageStorageInterface
 
     private const array EXTENSIONS = ['jpg', 'png', 'webp', 'gif'];
 
-    public function store(string $contents, string $extension): string
+    public function store(string $contents, string $extension, string $folder = ImageNode::FOLDER): string
     {
         if (! in_array($extension, self::EXTENSIONS, true)) {
             throw new RuntimeException("Post images are JPEG, PNG, WebP or GIF ('{$extension}' given).");
         }
+        if (! in_array($folder, [ImageNode::FOLDER, ImageNode::EXTERNAL_FOLDER], true)) {
+            throw new RuntimeException("Post images go to the forum's folders ('{$folder}' given).");
+        }
 
-        $path = ImageNode::FOLDER.CarbonImmutable::now()->format('Y/m').'/'.Str::uuid()->toString().'.'.$extension;
+        $path = $folder.CarbonImmutable::now()->format('Y/m').'/'.Str::uuid()->toString().'.'.$extension;
 
         if (Storage::disk(self::DISK)->put($path, $contents) === false) {
             throw new RuntimeException('The image could not be stored.');

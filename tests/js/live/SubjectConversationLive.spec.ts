@@ -64,6 +64,8 @@ function aConversation(
             uploadUrl: null,
             maxImages: 10,
             imageTypes: ['image/png'],
+            externalImageUrl: null,
+            externalImageHosts: [],
         },
         ...overrides,
     };

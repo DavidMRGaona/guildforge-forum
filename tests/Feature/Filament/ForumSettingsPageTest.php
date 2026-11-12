@@ -102,6 +102,31 @@ final class ForumSettingsPageTest extends ModuleTestCase
             ->assertHasErrors(['data.discussions_per_page', 'data.posts_per_page', 'data.posts_per_minute', 'data.images_per_post', 'data.image_types']);
     }
 
+    public function test_the_image_sites_start_with_imgur_and_save_as_host_names(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->assertSet('data.external_image_hosts', ['imgur.com'])
+            ->set('data.external_image_hosts', ['Imgur.com', 'postimg.cc', 'imgur.com'])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(['imgur.com', 'postimg.cc'], app(ForumSettingsInterface::class)->externalImageHosts());
+    }
+
+    public function test_image_sites_that_are_not_host_names_are_refused(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        foreach (['https://imgur.com', '*.imgur.com', '127.0.0.1', 'imgur.com/a', 'localhost'] as $entry) {
+            Livewire::test(ForumSettingsPage::class)
+                ->set('data.external_image_hosts', ['imgur.com', $entry])
+                ->call('save')
+                ->assertHasErrors(['data.external_image_hosts']);
+        }
+    }
+
     public function test_saving_is_refused_without_the_permission(): void
     {
         $this->actingAs($this->userWith([self::MANAGE]));

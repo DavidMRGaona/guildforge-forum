@@ -226,7 +226,8 @@ final readonly class ForumModeration
         $own = $this->categories->find($discussion->categoryId());
 
         return [
-            ...($own instanceof Category ? [$own] : []),
+            // Its own one too, unless it is hidden for want of its module: nothing new goes there
+            ...($own instanceof Category && $this->policy->isAvailable($own) ? [$own] : []),
             ...array_values(array_filter(
                 $this->categories->all(),
                 fn (Category $category): bool => ! $category->id()->equals($discussion->categoryId()) && $this->isMoveTarget($moderator, $category),
@@ -261,11 +262,12 @@ final readonly class ForumModeration
         }
 
         $title = $this->checkedTitle($title);
-        if (! $categoryId->equals($discussion->categoryId())) {
-            $target = $this->categories->find($categoryId);
-            if (! $target instanceof Category || ! $this->isMoveTarget($moderator, $target)) {
-                throw ModerationRefusedException::moveTarget($categoryId->value);
-            }
+        $target = $this->categories->find($categoryId);
+        $allowed = $target instanceof Category && ($categoryId->equals($discussion->categoryId())
+            ? $this->policy->isAvailable($target)
+            : $this->isMoveTarget($moderator, $target));
+        if (! $allowed) {
+            throw ModerationRefusedException::moveTarget($categoryId->value);
         }
         $this->checkedReason($reason);
 
@@ -633,7 +635,10 @@ final readonly class ForumModeration
      */
     private function assertMergeTarget(Authenticatable $moderator, Discussion $absorbed, Discussion $target): void
     {
-        if ($target->id()->equals($absorbed->id()) || ! $this->access->canModerate($moderator, $target)) {
+        // Never into a discussion hidden for want of its category's module
+        $category = $this->categories->find($target->categoryId());
+        if ($target->id()->equals($absorbed->id()) || ! $this->access->canModerate($moderator, $target)
+            || ! $category instanceof Category || ! $this->policy->isAvailable($category)) {
             throw ModerationRefusedException::mergeTarget($target->id()->value);
         }
 

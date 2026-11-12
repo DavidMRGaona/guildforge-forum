@@ -154,6 +154,39 @@ final class ModuleAwareForumTest extends ModuleTestCase
         app(ForumModeration::class)->move($moderator, $discussion->id(), $this->space->id());
     }
 
+    public function test_nothing_is_split_off_into_nor_merged_into_what_is_hidden(): void
+    {
+        $moderator = $this->forumModerator();
+        $this->aReply($this->spaceDiscussion, '2026-11-10 12:10:00');
+        [$plain] = $this->aDiscussion($this->general, '2026-11-10 13:00:00', title: 'Para unir');
+        $moderation = app(ForumModeration::class);
+
+        // Split off a hidden discussion only into what everyone may see
+        $this->assertSame(['General'], array_map(static fn (Category $category): string => $category->name(), $moderation->splitCategories($moderator, $this->spaceDiscussion)));
+        try {
+            $moderation->split($moderator, $this->spaceDiscussion->id(), [2], 'Tema aparte', $this->space->id());
+            $this->fail('Posts were split off into a hidden category.');
+        } catch (ModerationRefusedException $exception) {
+            $this->assertSame('move_target', $exception->reason);
+        }
+
+        foreach ([
+            fn () => $moderation->merge($moderator, $plain->id(), $this->spaceDiscussion->id()),
+            fn () => $moderation->mergeTarget($moderator, $plain, (int) $this->spaceDiscussion->number()),
+        ] as $action) {
+            try {
+                $action();
+                $this->fail('A discussion was merged into a hidden one.');
+            } catch (ModerationRefusedException $exception) {
+                $this->assertSame('merge_target', $exception->reason);
+            }
+        }
+
+        // What is hidden may still be taken out of it
+        $moved = $moderation->split($moderator, $this->spaceDiscussion->id(), [2], 'Tema aparte', $this->general->id());
+        $this->assertTrue($moved->categoryId()->equals($this->general->id()));
+    }
+
     public function test_enabling_and_disabling_game_tables_shows_and_hides_what_was_there(): void
     {
         $registry = app(PublicationSourceRegistryInterface::class);

@@ -32,6 +32,8 @@ function aPost(number: number): ForumPost {
         moderationUrl: null,
         reportUrl: null,
         likes: { count: 0, liked: false, names: [], others: 0, canLike: false, url: null },
+        character: null,
+        characterId: null,
     };
 }
 

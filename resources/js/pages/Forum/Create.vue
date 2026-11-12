@@ -273,6 +273,8 @@ async function submit(document: JSONContent): Promise<void> {
                     :upload-url="editor.uploadUrl"
                     :max-images="editor.maxImages"
                     :image-types="editor.imageTypes"
+                    :external-image-url="editor.externalImageUrl"
+                    :external-image-hosts="editor.externalImageHosts"
                     :submit-label="t('forum.create.submit')"
                     :submitting="sending"
                     :error="postError"

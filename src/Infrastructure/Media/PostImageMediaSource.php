@@ -18,7 +18,8 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
 
 /**
- * The images of forum posts (forum/posts/). A file is in use while any post shows it in its
+ * The images of forum posts: uploads (forum/posts/) and the forum's copies of images from other
+ * sites (forum/external/). A file is in use while any post shows it in its
  * current body or in one of its earlier versions, whatever the post's status: hidden, pending
  * and deleted posts keep their body for moderators. Posts have no panel page, so no edit link.
  */
@@ -51,7 +52,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 
     public function folders(): array
     {
-        return [ImageNode::FOLDER];
+        return [ImageNode::FOLDER, ImageNode::EXTERNAL_FOLDER];
     }
 
     public function excludedSubfolders(): array
@@ -149,9 +150,10 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
                 continue;
             }
             foreach ($this->renderer->attributesOf($document, [$image])[$image] ?? [] as $attributes) {
-                $src = $attributes['src'] ?? null;
-                if (is_string($src) && str_starts_with($src, ImageNode::FOLDER)) {
-                    $paths[$src] = true;
+                /** @var array<string, mixed> $attributes */
+                $path = ImageNode::storedPath($attributes);
+                if ($path !== null) {
+                    $paths[$path] = true;
                 }
             }
         }

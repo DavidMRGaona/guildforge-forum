@@ -110,8 +110,8 @@ final readonly class PostingService
         $discussion = $this->ownPostDiscussion($author, $postId);
         $this->assertCanPost($author, $discussion);
 
-        $body = $this->bodies->fromInput($document, $author);
         $post = $this->posts->findOrFail($postId);
+        $body = $this->bodies->fromInput($document, $author, $post->body());
         $category = $this->categories->find($discussion->categoryId());
         if (! $category instanceof Category) {
             throw PostNotFoundException::withId($postId->value);

@@ -61,6 +61,18 @@ final class InvalidDocumentException extends DomainException
 
     public const string UNKNOWN_ROLL = 'unknown_roll';
 
+    /** An image from another site, from someone without forum:posts.external_images */
+    public const string EXTERNAL_IMAGE_NOT_ALLOWED = 'external_image_not_allowed';
+
+    /** An image address that is not https on a site of the forum settings */
+    public const string EXTERNAL_IMAGE_HOST = 'external_image_host';
+
+    /** An image the server could not fetch from the other site */
+    public const string EXTERNAL_IMAGE_UNAVAILABLE = 'external_image_unavailable';
+
+    /** An image from another site heavier than uploads may be */
+    public const string EXTERNAL_IMAGE_TOO_LARGE = 'external_image_too_large';
+
     private function __construct(
         public readonly string $reason,
         public readonly string $path,

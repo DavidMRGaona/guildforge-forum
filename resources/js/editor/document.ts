@@ -11,8 +11,45 @@ import { MAX_EXPRESSION_LENGTH, MAX_REASON_LENGTH } from './rollText';
 export const FORUM_IMAGE_PATTERN =
     /^forum\/posts\/\d{4}\/\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/;
 
+/** Stored path of the forum's copy of an image from another site (ImageNode::EXTERNAL_PATH_PATTERN) */
+export const EXTERNAL_IMAGE_PATTERN =
+    /^forum\/external\/\d{4}\/\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/;
+
 /** The origin of an image uploaded to the forum (ImageNode::ORIGIN_UPLOAD) */
 export const IMAGE_ORIGIN_UPLOAD = 'upload';
+
+/** The origin of an image from another site, shown from the forum's copy (ImageNode::ORIGIN_EXTERNAL) */
+export const IMAGE_ORIGIN_EXTERNAL = 'external';
+
+/**
+ * An address images may be fetched from, as the server reads it (RemoteUrl): https on the
+ * default port, a host name with a top-level domain, plain URL characters and no fragment.
+ */
+const REMOTE_URL_PATTERN =
+    /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?)(?::443)?(\/[A-Za-z0-9\-._~:/?[\]@!$&'()*+,;=%]*)?$/;
+
+const MAX_REMOTE_URL_LENGTH = 2048;
+
+/** The host of an address images may be fetched from, or null when it is not one */
+export function remoteImageHost(address: string): string | null {
+    if (address.length > MAX_REMOTE_URL_LENGTH) {
+        return null;
+    }
+
+    return REMOTE_URL_PATTERN.exec(address)?.[1] ?? null;
+}
+
+/** Whether the address is https on one of the sites (each with its subdomains) */
+export function isAllowedImageAddress(address: string, hosts: readonly string[]): boolean {
+    const host = remoteImageHost(address);
+
+    return host !== null && hosts.some((site) => host === site || host.endsWith(`.${site}`));
+}
+
+/** Whether the address names an image file (so pasting it means the image, not a link) */
+export function looksLikeImageFile(address: string): boolean {
+    return /\.(png|jpe?g|gif|webp)(\?[^#]*)?$/i.test(address);
+}
 
 /** Image formats the forum may allow (PostImageType); the settings say which it does */
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
@@ -106,14 +143,7 @@ export function isDocumentEmpty(document: JSONContent | null | undefined): boole
  */
 export function sanitizeContent(node: JSONContent): JSONContent | null {
     if (node.type === 'image') {
-        const src = node.attrs?.['src'];
-
-        return typeof src === 'string' && FORUM_IMAGE_PATTERN.test(src)
-            ? {
-                  type: 'image',
-                  attrs: { origin: IMAGE_ORIGIN_UPLOAD, src, alt: node.attrs?.['alt'] ?? null },
-              }
-            : null;
+        return sanitizeImage(node);
     }
 
     // A roll that is pasted or converted is a new one: its expression and reason, never an id or a result
@@ -178,12 +208,46 @@ export function sanitizeContent(node: JSONContent): JSONContent | null {
 }
 
 /**
- * The URL to show a stored image while writing. The server renders posts with its own
- * delivery URL; this one only has to show the same file.
+ * An image as the server takes it: an upload of the forum, or an image from another site with
+ * its https address and the forum's copy. Anything else (an image of another site pasted as
+ * is, which readers' browsers would ask that site for) is dropped.
+ */
+function sanitizeImage(node: JSONContent): JSONContent | null {
+    const src: unknown = node.attrs?.['src'];
+    const path: unknown = node.attrs?.['path'];
+    const alt: unknown = node.attrs?.['alt'];
+    const description = typeof alt === 'string' && alt !== '' ? alt : null;
+
+    if (node.attrs?.['origin'] === IMAGE_ORIGIN_EXTERNAL) {
+        return typeof src === 'string' &&
+            remoteImageHost(src) !== null &&
+            typeof path === 'string' &&
+            EXTERNAL_IMAGE_PATTERN.test(path)
+            ? {
+                  type: 'image',
+                  attrs: { origin: IMAGE_ORIGIN_EXTERNAL, src, path, alt: description },
+              }
+            : null;
+    }
+
+    return typeof src === 'string' && FORUM_IMAGE_PATTERN.test(src)
+        ? {
+              type: 'image',
+              attrs: { origin: IMAGE_ORIGIN_UPLOAD, src, path: null, alt: description },
+          }
+        : null;
+}
+
+/**
+ * The URL to show a stored image (an upload or the forum's copy of an image from another site)
+ * while writing. The server renders posts with its own delivery URL; this one only has to show
+ * the same file.
  */
 export function storedImageUrl(
     path: string,
     buildUrl: (publicId: string) => string | null
 ): string | null {
-    return FORUM_IMAGE_PATTERN.test(path) ? buildUrl(path.replace(/\.[a-z]+$/, '')) : null;
+    return FORUM_IMAGE_PATTERN.test(path) || EXTERNAL_IMAGE_PATTERN.test(path)
+        ? buildUrl(path.replace(/\.[a-z]+$/, ''))
+        : null;
 }

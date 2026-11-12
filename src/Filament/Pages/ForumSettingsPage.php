@@ -16,6 +16,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -27,6 +28,7 @@ use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 
 /**
@@ -149,7 +151,33 @@ final class ForumSettingsPage extends Page implements HasForms
                         $this->boundedField('image_max_dimension', ForumSettings::MIN_IMAGE_MAX_DIMENSION, ForumSettings::MAX_IMAGE_MAX_DIMENSION, ForumSettings::DEFAULT_IMAGE_MAX_DIMENSION)
                             ->helperText(__('forum::messages.settings.image_max_dimension_help').' '.__('forum::messages.settings.range_help', ['min' => ForumSettings::MIN_IMAGE_MAX_DIMENSION, 'max' => ForumSettings::MAX_IMAGE_MAX_DIMENSION])),
                         $this->boundedField('images_per_post', ForumSettings::MIN_IMAGES_PER_POST, ForumSettings::MAX_IMAGES_PER_POST, ForumSettings::DEFAULT_IMAGES_PER_POST),
-                        $this->boundedField('image_uploads_per_hour', ForumSettings::MIN_IMAGE_UPLOADS_PER_HOUR, ForumSettings::MAX_IMAGE_UPLOADS_PER_HOUR, ForumSettings::DEFAULT_IMAGE_UPLOADS_PER_HOUR),
+                        $this->boundedField('image_uploads_per_hour', ForumSettings::MIN_IMAGE_UPLOADS_PER_HOUR, ForumSettings::MAX_IMAGE_UPLOADS_PER_HOUR, ForumSettings::DEFAULT_IMAGE_UPLOADS_PER_HOUR)
+                            ->helperText(__('forum::messages.settings.image_uploads_per_hour_help', ['min' => ForumSettings::MIN_IMAGE_UPLOADS_PER_HOUR, 'max' => ForumSettings::MAX_IMAGE_UPLOADS_PER_HOUR])),
+                        TagsInput::make('external_image_hosts')
+                            ->label(__('forum::messages.settings.external_image_hosts'))
+                            ->helperText(__('forum::messages.settings.external_image_hosts_help'))
+                            ->placeholder(__('forum::messages.settings.external_image_hosts_placeholder'))
+                            ->splitKeys([',', ' ', 'Enter'])
+                            ->reorderable(false)
+                            // Kept as typed would let «https://imgur.com» through, which never matches
+                            ->dehydrateStateUsing(static fn (mixed $state): array => is_array($state)
+                                ? array_values(array_unique(array_map(static fn (mixed $host): string => strtolower(trim(is_string($host) ? $host : '')), $state)))
+                                : [])
+                            ->rules([static fn (): Closure => static function (string $attribute, mixed $value, Closure $fail): void {
+                                if (! is_array($value) || count($value) > ForumSettings::MAX_EXTERNAL_IMAGE_HOSTS) {
+                                    $fail(__('forum::messages.settings.external_image_hosts_invalid'));
+
+                                    return;
+                                }
+                                foreach ($value as $host) {
+                                    if (! is_string($host) || ! RemoteUrl::isHostName(strtolower(trim($host)))) {
+                                        $fail(__('forum::messages.settings.external_image_hosts_invalid'));
+
+                                        return;
+                                    }
+                                }
+                            }])
+                            ->default(ForumSettings::DEFAULT_EXTERNAL_IMAGE_HOSTS),
                     ]),
             ])
             ->statePath('data');

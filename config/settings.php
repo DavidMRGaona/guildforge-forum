@@ -24,6 +24,8 @@ return [
     'images_per_post' => 10,
     // Image uploads per person and hour (1–200)
     'image_uploads_per_hour' => 30,
+    // Sites images may be taken from, each with its subdomains (host names; https only). Empty turns it off
+    'external_image_hosts' => ['imgur.com'],
     // Who may have characters and write as them: nobody, everyone (signed in) or permission (forum:characters.use)
     'characters_access' => 'everyone',
     // Categories whose new discussions are announced on the site's channels (ids; only those guests can read)

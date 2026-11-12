@@ -6,6 +6,7 @@ import {
     Dices,
     Heading2,
     Heading3,
+    ImageDown,
     ImagePlus,
     Italic,
     Link,
@@ -29,12 +30,15 @@ const props = defineProps<{
     /** Buttons other features add, after the core ones */
     items: ToolbarItem[];
     canUploadImages: boolean;
+    /** Whether images from other sites may be put in (permission and sites in the settings) */
+    canTakeExternalImages?: boolean;
     disabled: boolean;
 }>();
 
 const emit = defineEmits<{
     link: [];
     image: [];
+    externalImage: [];
 }>();
 
 const { t } = useI18n();
@@ -152,6 +156,16 @@ const buttons = computed<Button[]>(() => {
         });
     }
 
+    if (props.canTakeExternalImages === true) {
+        core.push({
+            id: 'externalImage',
+            label: t('forum.editor.toolbar.external_image'),
+            icon: ImageDown,
+            run: () => emit('externalImage'),
+            isActive: () => false,
+        });
+    }
+
     core.push({
         id: 'ooc',
         label: t('forum.editor.toolbar.ooc'),
@@ -242,6 +256,7 @@ function move(event: KeyboardEvent): void {
                 button.id === 'undo' ||
                 button.id === 'redo' ||
                 button.id === 'image' ||
+                button.id === 'externalImage' ||
                 button.id === 'roll' ||
                 button.id === 'horizontalRule'
                     ? undefined

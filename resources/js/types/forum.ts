@@ -257,6 +257,10 @@ export interface ForumEditorSettings {
     uploadUrl: string | null;
     maxImages: number;
     imageTypes: string[];
+    /** Where to ask for the forum's copy of an image from another site; null without the permission */
+    externalImageUrl: string | null;
+    /** The sites images may come from (each with its subdomains) */
+    externalImageHosts: string[];
 }
 
 /** Why and until when the reader may not write; null unless they are suspended */

@@ -7,6 +7,7 @@ namespace Modules\Forum\Infrastructure\Services;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 
 /**
  * The module settings: release defaults (config/settings.php) with what the panel saved on top.
@@ -56,6 +57,10 @@ final readonly class ForumSettings implements ForumSettingsInterface
     public const int MIN_IMAGE_UPLOADS_PER_HOUR = 1;
 
     public const int MAX_IMAGE_UPLOADS_PER_HOUR = 200;
+
+    public const array DEFAULT_EXTERNAL_IMAGE_HOSTS = ['imgur.com'];
+
+    public const int MAX_EXTERNAL_IMAGE_HOSTS = 30;
 
     public function discussionsPerPage(): int
     {
@@ -131,6 +136,22 @@ final readonly class ForumSettings implements ForumSettingsInterface
 
         // An unknown value turns characters off rather than opening them to everyone
         return is_string($stored) ? (CharacterAccessMode::tryFrom($stored) ?? CharacterAccessMode::Nobody) : CharacterAccessMode::Everyone;
+    }
+
+    public function externalImageHosts(): array
+    {
+        $stored = config('modules.settings.forum.external_image_hosts');
+        if (! is_array($stored)) {
+            return self::DEFAULT_EXTERNAL_IMAGE_HOSTS;
+        }
+
+        // Only host names: a scheme, a wildcard or an address in the settings never matches
+        $hosts = array_filter(
+            array_map(static fn (mixed $host): mixed => is_string($host) ? strtolower(trim($host)) : null, $stored),
+            static fn (mixed $host): bool => is_string($host) && RemoteUrl::isHostName($host),
+        );
+
+        return array_slice(array_values(array_unique($hosts)), 0, self::MAX_EXTERNAL_IMAGE_HOSTS);
     }
 
     private function pageSize(string $key): int

@@ -18,6 +18,10 @@ final class DocumentSchemaTest extends TestCase
 {
     private const string IMAGE = 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.webp';
 
+    private const string COPY = 'forum/external/2026/11/7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f.png';
+
+    private const string REMOTE = 'https://i.imgur.com/AbC123.png';
+
     private const string ACCOUNT = '9d4f6a2e-1b3c-4d5e-8f70-a1b2c3d4e5f6';
 
     private const string POST = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
@@ -66,9 +70,23 @@ final class DocumentSchemaTest extends TestCase
             ['type' => 'codeBlock', 'content' => [self::text('y')]],
             ['type' => 'orderedList', 'content' => [['type' => 'listItem', 'content' => [self::paragraph([self::text('a')])]]]],
             ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => null]],
+            // As the editor writes an upload: every attribute, the copy empty
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'path' => null, 'alt' => null]],
         ]));
 
         $this->assertSame([self::IMAGE], $document->imagePaths());
+    }
+
+    public function test_an_image_from_another_site_keeps_its_address_and_the_forum_copy(): void
+    {
+        $document = DocumentSchema::core()->validate(self::doc([
+            ['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => self::REMOTE, 'path' => self::COPY, 'alt' => 'Mapa']],
+            ['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]],
+            ['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => self::REMOTE, 'path' => self::COPY]],
+        ]));
+
+        $this->assertSame([self::COPY, self::IMAGE], $document->imagePaths());
+        $this->assertSame([['url' => self::REMOTE, 'path' => self::COPY]], $document->externalImages());
     }
 
     public function test_repeated_mentions_images_and_quotes_are_listed_once(): void
@@ -142,7 +160,14 @@ final class DocumentSchemaTest extends TestCase
         yield 'image path climbing up' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'forum/posts/2026/11/../../../users/a.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
         yield 'image with an svg file' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.svg']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
         yield 'image without origin' => [self::doc([['type' => 'image', 'attrs' => ['src' => self::IMAGE]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
-        yield 'image from an origin not yet allowed' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://i.example.com/a.png']]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'image from an unknown origin' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'hotlink', 'src' => self::REMOTE]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'external image without its copy' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => self::REMOTE]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'external image whose copy is an upload' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => self::REMOTE, 'path' => self::IMAGE]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'external image over http' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'http://i.imgur.com/a.png', 'path' => self::COPY]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'external image at an address' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://169.254.169.254/a.png', 'path' => self::COPY]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'external image written loosely' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://I.IMGUR.com/AbC123.png', 'path' => self::COPY]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
+        yield 'upload with a copy path' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'path' => self::COPY]]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
+        yield 'upload stored as an external copy' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::COPY]]]), InvalidDocumentException::INVALID_IMAGE, 'content.0'];
         yield 'image alt too long' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'alt' => str_repeat('a', 301)]]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
         yield 'image with a title' => [self::doc([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE, 'title' => 'x']]]), InvalidDocumentException::INVALID_ATTRIBUTE, 'content.0'];
         yield 'image inside a paragraph' => [self::doc([self::paragraph([['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::IMAGE]]])]), InvalidDocumentException::NOT_ALLOWED_HERE, 'content.0.content.0'];

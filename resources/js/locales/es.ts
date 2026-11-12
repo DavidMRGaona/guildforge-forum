@@ -432,6 +432,7 @@ export default {
                 link: 'Enlace',
                 horizontal_rule: 'Separador',
                 image: 'Imagen',
+                external_image: 'Imagen de otro sitio',
                 roll: 'Tirada de dados',
                 ooc: 'Aparte fuera de personaje',
                 undo: 'Deshacer',
@@ -443,6 +444,15 @@ export default {
                 apply: 'Aplicar',
                 remove: 'Quitar enlace',
                 cancel: 'Cancelar',
+            },
+            externalImage: {
+                label: 'Dirección de la imagen',
+                placeholder: 'https://i.imgur.com/…',
+                apply: 'Añadir',
+                cancel: 'Cancelar',
+                hint: 'Pega la dirección de la imagen, no la de su página. Sitios admitidos: {sites}. El foro guarda una copia y quien lee nunca contacta con el otro sitio.',
+                fetching: 'Trayendo la imagen…',
+                fetched: 'Imagen añadida',
             },
             images: {
                 uploading: 'Subiendo la imagen…',
@@ -473,6 +483,9 @@ export default {
                 upload: 'No se ha podido subir la imagen. Inténtalo de nuevo.',
                 session: 'Tu sesión ha caducado. Recarga la página para seguir.',
                 too_many_images: 'Un mensaje puede llevar {max} imágenes como mucho.',
+                external_host:
+                    'Solo se pueden poner imágenes con dirección https de estos sitios: {sites}.',
+                external_fetch: 'No se ha podido traer la imagen. Inténtalo de nuevo.',
             },
         },
     },

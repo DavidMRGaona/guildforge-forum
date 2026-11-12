@@ -91,6 +91,8 @@ defineExpose({
             :upload-url="reply.uploadUrl"
             :max-images="reply.maxImages"
             :image-types="reply.imageTypes"
+            :external-image-url="reply.externalImageUrl"
+            :external-image-hosts="reply.externalImageHosts"
             :submit-label="submitLabel"
             :submitting="sending"
             :error="error"

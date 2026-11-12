@@ -27,6 +27,15 @@ export interface QuoteSource {
     text?: string;
 }
 
+/** What the endpoint for images from other sites answers (ExternalImageController) */
+export interface ExternalImage {
+    /** The address, as the image node keeps it */
+    url: string;
+    /** The forum's copy */
+    path: string;
+    previewUrl: string | null;
+}
+
 /** What the image upload endpoint answers (PostImageController) */
 export interface UploadedImage {
     path: string;

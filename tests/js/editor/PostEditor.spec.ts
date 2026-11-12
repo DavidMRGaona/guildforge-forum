@@ -196,9 +196,80 @@ describe('PostEditor', () => {
         );
         expect((wrapper.vm as unknown as Exposed).getDocument()?.content).toContainEqual({
             type: 'image',
-            attrs: { origin: 'upload', src: IMAGE, alt: null },
+            attrs: { origin: 'upload', src: IMAGE, path: null, alt: null },
         });
         vi.unstubAllGlobals();
+    });
+
+    it('asks the server for its copy of an image from another site and shows the copy', async () => {
+        const remote = 'https://i.imgur.com/AbC123.png';
+        const copy = 'forum/external/2026/11/7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f.png';
+        const fetch = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ url: remote, path: copy, previewUrl: null }), {
+                status: 201,
+            })
+        );
+        vi.stubGlobal('fetch', fetch);
+        const wrapper = mountEditor({
+            modelValue: TEXT,
+            externalImageUrl: '/foro/imagenes/externas',
+            externalImageHosts: ['imgur.com'],
+        });
+        await settle();
+
+        await wrapper.find('[data-toolbar-item="externalImage"]').trigger('click');
+        await wrapper.find('#forum-editor-external-image').setValue(`  ${remote} `);
+        await (
+            wrapper.find('#forum-editor-external-image').element as HTMLInputElement
+        ).form?.requestSubmit();
+        await settle();
+
+        expect(fetch).toHaveBeenCalledWith(
+            '/foro/imagenes/externas',
+            expect.objectContaining({ method: 'POST', body: JSON.stringify({ url: remote }) })
+        );
+        expect((wrapper.vm as unknown as Exposed).getDocument()?.content).toContainEqual({
+            type: 'image',
+            attrs: { origin: 'external', src: remote, path: copy, alt: null },
+        });
+        expect(wrapper.find('.forum-editor__content').html()).not.toContain(` src="${remote}"`);
+        vi.unstubAllGlobals();
+    });
+
+    it('says which sites images may come from instead of asking for another one', async () => {
+        const fetch = vi.fn();
+        vi.stubGlobal('fetch', fetch);
+        const wrapper = mountEditor({
+            modelValue: TEXT,
+            externalImageUrl: '/foro/imagenes/externas',
+            externalImageHosts: ['imgur.com'],
+        });
+        await settle();
+
+        await wrapper.find('[data-toolbar-item="externalImage"]').trigger('click');
+        await wrapper
+            .find('#forum-editor-external-image')
+            .setValue('https://tracker.example.com/p.png');
+        await (
+            wrapper.find('#forum-editor-external-image').element as HTMLInputElement
+        ).form?.requestSubmit();
+        await settle();
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(wrapper.find('[role="alert"]').text()).toContain('imgur.com');
+        vi.unstubAllGlobals();
+    });
+
+    it('offers no images from other sites without the permission or without sites', async () => {
+        const without = mountEditor({ externalImageUrl: null, externalImageHosts: ['imgur.com'] });
+        const empty = mountEditor({
+            externalImageUrl: '/foro/imagenes/externas',
+            externalImageHosts: [],
+        });
+        await settle();
+
+        expect(without.find('[data-toolbar-item="externalImage"]').exists()).toBe(false);
+        expect(empty.find('[data-toolbar-item="externalImage"]').exists()).toBe(false);
     });
 
     it('shows the server message when an upload is refused', async () => {

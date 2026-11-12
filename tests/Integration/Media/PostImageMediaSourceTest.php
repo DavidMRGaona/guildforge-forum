@@ -29,6 +29,8 @@ final class PostImageMediaSourceTest extends ModuleTestCase
 
     private const string UNUSED = 'forum/posts/2026/11/2d6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5c.jpg';
 
+    private const string COPY = 'forum/external/2026/11/3e6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5d.png';
+
     protected ?string $moduleName = 'forum';
 
     protected bool $autoEnableModule = true;
@@ -45,7 +47,7 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $source = app(MediaSourceRegistryInterface::class)->source(PostImageMediaSource::TYPE);
 
         $this->assertInstanceOf(PostImageMediaSource::class, $source);
-        $this->assertSame(['forum/posts/'], $source->folders());
+        $this->assertSame(['forum/posts/', 'forum/external/'], $source->folders());
         $this->assertFalse($source->hidden());
     }
 
@@ -71,6 +73,19 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->assertTrue($this->source()->usesFile($this->fileId(self::MAP)));
         $this->assertTrue($this->source()->usesFile($this->fileId(self::PORTRAIT)));
         $this->assertFalse($this->source()->usesFile($this->fileId(self::UNUSED)));
+    }
+
+    public function test_the_copy_of_an_image_from_another_site_is_used_while_a_post_shows_it(): void
+    {
+        [, $post] = $this->aDiscussion($this->aCategory());
+        $external = new PostBody([
+            'type' => 'doc',
+            'content' => [['type' => 'image', 'attrs' => ['origin' => 'external', 'src' => 'https://i.imgur.com/AbC123.png', 'path' => self::COPY]]],
+        ], '');
+        $this->writer()->editPost($post->id(), $external, null, new DateTimeImmutable('2026-11-10 18:40:00'));
+
+        $this->assertTrue($this->source()->usesFile($this->fileId(self::COPY)));
+        $this->assertSame([self::COPY], array_map(static fn ($usage): string => $usage->storedPath, $this->source()->usagesFor($post->id()->value)));
     }
 
     public function test_deleting_the_discussion_frees_its_images(): void

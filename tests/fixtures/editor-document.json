@@ -183,7 +183,17 @@
             "attrs": {
                 "origin": "upload",
                 "src": "forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.webp",
+                "path": null,
                 "alt": "Mapa"
+            }
+        },
+        {
+            "type": "image",
+            "attrs": {
+                "origin": "external",
+                "src": "https://i.imgur.com/AbC123.png",
+                "path": "forum/external/2026/11/7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f.png",
+                "alt": "Dragón"
             }
         },
         {

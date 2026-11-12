@@ -5,6 +5,8 @@ import { createForumExtensions } from '../../../resources/js/editor/extensions';
 import fixture from '../../fixtures/editor-document.json';
 
 const IMAGE = 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.webp';
+const REMOTE = 'https://i.imgur.com/AbC123.png';
+const COPY = 'forum/external/2026/11/7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f.png';
 const ACCOUNT = '9d4f6a2e-1b3c-4d5e-8f70-a1b2c3d4e5f6';
 const POST = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
 
@@ -44,6 +46,7 @@ describe('the editor document', () => {
                 '<pre><code class="language-php">echo 1;</code></pre>' +
                 '<hr>' +
                 `<img data-path="${IMAGE}" alt="Mapa">` +
+                `<img data-origin="external" data-src="${REMOTE}" data-path="${COPY}" alt="Dragón">` +
                 '<div data-forum-roll data-expression="2d6+3" data-reason="Ataque"></div>' +
                 '<aside data-ooc><p>Vuelvo luego</p></aside>' +
                 '<p>Fin</p>'
@@ -109,5 +112,36 @@ describe('the editor document', () => {
         expect(html).toContain('@Ana');
         expect(html).toContain(`data-path="${IMAGE}"`);
         expect(html).toContain(`src="https://cdn.example.com/${IMAGE}"`);
+    });
+
+    it('shows an image from another site from the forum copy, never from that site', () => {
+        const html = makeEditor({
+            type: 'doc',
+            content: [
+                {
+                    type: 'image',
+                    attrs: { origin: 'external', src: REMOTE, path: COPY, alt: 'Dragón' },
+                },
+            ],
+        }).getHTML();
+
+        expect(html).toContain(`src="https://cdn.example.com/${COPY}"`);
+        expect(html).toContain(`data-src="${REMOTE}"`);
+        expect(html).not.toContain(` src="${REMOTE}"`);
+    });
+
+    it('leaves out images from other sites that do not name the forum copy', () => {
+        const json = makeEditor(
+            `<img data-origin="external" data-src="http://i.imgur.com/a.png" data-path="${COPY}">` +
+                `<img data-origin="external" data-src="${REMOTE}" data-path="${IMAGE}">` +
+                `<img data-origin="external" data-src="${REMOTE}">` +
+                `<img src="${REMOTE}">` +
+                '<p>Fin</p>'
+        ).getJSON();
+
+        expect(json).toEqual({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Fin' }] }],
+        });
     });
 });

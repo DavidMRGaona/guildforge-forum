@@ -27,7 +27,7 @@ final class MentionCandidatesController extends Controller
 
     public function index(Request $request, string $discussion): JsonResponse
     {
-        return $this->respond(function () use ($request, $discussion): JsonResponse {
+        return $this->respond($this->orMergedAnswer($request, $discussion, function () use ($request, $discussion): JsonResponse {
             $user = $request->user();
             abort_unless($user instanceof Authenticatable, 401);
 
@@ -39,6 +39,6 @@ final class MentionCandidatesController extends Controller
                 'name' => $account->name,
                 'avatarUrl' => $account->avatarUrl,
             ], $this->posting->mentionCandidates($user, DiscussionId::fromString($discussion), $query))]);
-        });
+        }));
     }
 }

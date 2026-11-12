@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
 import { describeNumbers } from '../../composables/useSplitSelection';
 import type { ForumDiscussionModeration } from '../../types/forum';
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const reportMerged = useMergedDiscussion();
 const dialogOpen = ref(false);
 const busy = ref(false);
 const error = ref<string | null>(null);
@@ -47,6 +49,7 @@ async function split(fields: ModerationDialogFields): Promise<void> {
     busy.value = false;
 
     if (!answer.ok || answer.data === null) {
+        reportMerged(answer.mergedInto);
         error.value = answer.message ?? t('forum.moderation.errors.generic');
 
         return;

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
 import type { ForumMergeTarget } from '../../types/forum';
 
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const reportMerged = useMergedDiscussion();
 const dialog = ref<HTMLDialogElement | null>(null);
 const typed = ref('');
 const reason = ref('');
@@ -71,6 +73,7 @@ async function lookup(): Promise<void> {
         'GET'
     );
     looking.value = false;
+    reportMerged(answer.mergedInto);
     target.value = answer.ok ? (answer.data?.discussion ?? null) : null;
     lookupError.value = answer.ok ? null : (answer.message ?? t('forum.moderation.errors.generic'));
 }

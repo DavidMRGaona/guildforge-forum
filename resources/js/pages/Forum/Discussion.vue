@@ -15,6 +15,7 @@ import ReplyBox from '../../components/forum/ReplyBox.vue';
 import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
 import SplitPosts from '../../components/moderation/SplitPosts.vue';
 import { useNewPosts } from '../../composables/useNewPosts';
+import { provideMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { useReadTracker } from '../../composables/useReadTracker';
 import { useSplitSelection } from '../../composables/useSplitSelection';
 import { pollNewPosts } from '../../live/transports';
@@ -68,6 +69,8 @@ const tracker = useReadTracker({
             window.history.replaceState(window.history.state, '', url);
         }
     },
+    // A mark refused because the discussion was merged shows the way to where it went
+    onMerged: (target) => live.markMerged(target),
 });
 
 // New posts after the last one, while the page is open: only where the end of the discussion
@@ -77,6 +80,8 @@ const live = useNewPosts({
     transport: pollNewPosts(props.discussion.id),
     enabled: isLastPage,
 });
+// Following, mentioning or moderating from this page also learns that it was merged
+provideMergedDiscussion((target) => live.markMerged(target));
 const allMentionNames = computed(() => ({ ...props.mentionNames, ...live.mentionNames.value }));
 
 // Posts in their order, each run of moved ones in its place (posts awaiting approval last)

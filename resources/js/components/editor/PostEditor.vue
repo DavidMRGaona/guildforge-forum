@@ -17,6 +17,7 @@ import {
     normalizeHref,
     storedImageUrl,
 } from '../../editor/document';
+import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { postDraft } from '../../editor/draft';
 import EditorToolbar from '../../editor/EditorToolbar.vue';
 import { createForumExtensions } from '../../editor/extensions';
@@ -96,6 +97,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const reportMerged = useMergedDiscussion();
 
 const DRAFT_DELAY_MS = 600;
 
@@ -138,6 +140,7 @@ const editor = useEditor({
                       url: props.mentionsUrl,
                       onPick: (candidate: MentionCandidate) =>
                           names.set(candidate.id, candidate.name),
+                      onMerged: (target) => reportMerged(target),
                   }),
         extra: props.extensions,
     }),

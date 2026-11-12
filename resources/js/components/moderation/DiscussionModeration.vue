@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
 import type { ForumConversation, ForumDiscussionModeration } from '../../types/forum';
 import MergeDialog from './MergeDialog.vue';
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const reportMerged = useMergedDiscussion();
 const pending = ref<Action | null>(null);
 const dialogOpen = ref(false);
 const busy = ref(false);
@@ -152,6 +154,7 @@ async function merge(fields: { target: string; reason: string }): Promise<void> 
     busy.value = false;
 
     if (!answer.ok || answer.data === null) {
+        reportMerged(answer.mergedInto);
         mergeError.value = answer.message ?? t('forum.moderation.errors.generic');
 
         return;
@@ -180,6 +183,7 @@ async function run(action: Action, fields: ModerationDialogFields): Promise<void
     busy.value = false;
 
     if (!answer.ok) {
+        reportMerged(answer.mergedInto);
         const message = answer.message ?? t('forum.moderation.errors.generic');
         if (dialogOpen.value) {
             error.value = message;

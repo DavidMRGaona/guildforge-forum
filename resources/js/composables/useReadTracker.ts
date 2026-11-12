@@ -1,5 +1,7 @@
 import { onBeforeUnmount, onMounted, type Ref } from 'vue';
 import { csrfHeaders } from '@/utils/csrf';
+import { mergedTarget } from '../forum/api';
+import type { ForumMergedInto } from '../types/forum';
 
 export interface ReadTrackerOptions {
     /** Where the page reports the highest post it showed; null for guests (nothing is kept) */
@@ -12,6 +14,8 @@ export interface ReadTrackerOptions {
     onTopPost?: (url: string) => void;
     /** Waits this long before reporting, so scrolling past posts sends one request */
     delayMs?: number;
+    /** Hears that the discussion was merged into another and where it went; nothing more is sent */
+    onMerged?: (target: ForumMergedInto) => void;
 }
 
 /**
@@ -26,6 +30,8 @@ export function useReadTracker(options: ReadTrackerOptions): {
     const delay = options.delayMs ?? 1200;
     let highestSeen = options.lastReadNumber ?? 0;
     let reported = highestSeen;
+    // The discussion was merged into another: there is nothing left to mark here
+    let merged = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let observer: IntersectionObserver | null = null;
     const visible = new Map<Element, number>();
@@ -36,7 +42,7 @@ export function useReadTracker(options: ReadTrackerOptions): {
             clearTimeout(timer);
             timer = null;
         }
-        if (options.readUrl === null || highestSeen <= reported) {
+        if (options.readUrl === null || merged || highestSeen <= reported) {
             return;
         }
 
@@ -53,10 +59,24 @@ export function useReadTracker(options: ReadTrackerOptions): {
                 ...csrfHeaders(),
             },
             body: JSON.stringify({ number }),
-        }).catch(() => {
-            // Not kept this time: the next post seen reports it again
-            reported = Math.min(reported, number - 1);
-        });
+        })
+            .then(async (response) => {
+                if (response.status !== 410) {
+                    return;
+                }
+                const target = mergedTarget(
+                    response.status,
+                    await response.json().catch(() => null)
+                );
+                if (target !== null) {
+                    merged = true;
+                    options.onMerged?.(target);
+                }
+            })
+            .catch(() => {
+                // Not kept this time: the next post seen reports it again
+                reported = Math.min(reported, number - 1);
+            });
     }
 
     function schedule(): void {

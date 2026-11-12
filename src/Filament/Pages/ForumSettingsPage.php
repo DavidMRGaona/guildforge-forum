@@ -182,7 +182,7 @@ final class ForumSettingsPage extends Page implements HasForms
                             ->default(ForumSettings::DEFAULT_EXTERNAL_IMAGE_HOSTS),
                     ]),
                 Section::make(__('forum::messages.settings.embeds'))
-                    ->description(__('forum::messages.settings.embeds_help'))
+                    ->description(__('forum::messages.settings.embeds_help').' '.__('forum::messages.settings.embed_cookie_category_help'))
                     ->schema([
                         CheckboxList::make('embed_services')
                             ->label(__('forum::messages.settings.embed_services'))
@@ -196,11 +196,10 @@ final class ForumSettingsPage extends Page implements HasForms
                             }])
                             ->columns(4)
                             ->default(array_keys(self::embedServiceOptions())),
-                        Grid::make(['default' => 1, 'sm' => 2, 'xl' => 4])
+                        Grid::make(['default' => 1, 'sm' => 2, '2xl' => 4])
                             ->schema(array_map(
                                 static fn (string $key, string $label): TextInput => TextInput::make("embed_cookie_categories.{$key}")
                                     ->label(__('forum::messages.settings.embed_cookie_category', ['service' => $label]))
-                                    ->helperText(__('forum::messages.settings.embed_cookie_category_help'))
                                     ->required()
                                     ->maxLength(40)
                                     ->regex(ForumSettings::COOKIE_CATEGORY_PATTERN)

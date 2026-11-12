@@ -14,6 +14,7 @@ use Illuminate\Testing\TestResponse;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
+use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\RemoteFetchException;
@@ -163,6 +164,17 @@ final class EmbedEndpointsTest extends ModuleTestCase
         $this->embed('https://www.youtube.com/@rolero')->assertUnprocessable()->assertJsonPath('reason', 'unknown_embed');
         $this->embed('http://vimeo.com/76979871')->assertUnprocessable()->assertJsonPath('reason', 'unknown_embed');
         $this->embed('no es un enlace')->assertUnprocessable()->assertJsonPath('reason', 'unknown_embed');
+
+        $this->assertSame([], $this->fetcher->fetched);
+    }
+
+    public function test_whoever_may_not_act_in_the_forum_cannot_make_the_server_fetch(): void
+    {
+        $moderator = $this->anAccount('forum:forum.moderate');
+        app(SuspensionService::class)->suspend($moderator, $this->author->id, 'Insultos', null);
+
+        $this->embed('https://youtu.be/'.self::VIDEO)->assertForbidden();
+        $this->postJson('/foro/incrustaciones', ['url' => 'https://youtu.be/'.self::VIDEO])->assertForbidden();
 
         $this->assertSame([], $this->fetcher->fetched);
     }

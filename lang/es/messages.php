@@ -63,7 +63,7 @@ return [
         'embed_services_help' => 'Al quitar uno, los mensajes que ya lo incrustan siguen mostrando su tarjeta, sin cargar su contenido.',
         'embed_services_invalid' => 'Elige solo entre los servicios de la lista.',
         'embed_cookie_category' => 'Categoría de cookies de :service',
-        'embed_cookie_category_help' => 'El identificador de la categoría en el banner de cookies, como marketing.',
+        'embed_cookie_category_help' => 'Cada servicio carga su contenido sin pedirlo a quien ya aceptó su categoría de cookies: escribe el identificador de la categoría en el banner de cookies, como marketing.',
         'embed_cookie_category_invalid' => 'Escribe el identificador de una categoría: minúsculas, cifras, guiones y guiones bajos.',
         'range_help' => 'De :min a :max.',
         'saved' => 'Ajustes guardados',
@@ -500,6 +500,7 @@ return [
     'editor' => [
         'image_attribute' => 'imagen',
         'external_image_attribute' => 'dirección de la imagen',
+        'embed_attribute' => 'enlace de la publicación',
     ],
 
     'publications' => [

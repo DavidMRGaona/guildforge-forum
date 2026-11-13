@@ -44,7 +44,7 @@ final class ModuleBootsTest extends ModuleTestCase
         // The site notifications and the props of the subject-discussion slot came with 3.54,
         // the seeders run with the module's provider in 3.55.4, the menu badges in 3.56 and the
         // frame-src origins of the embedded players in 3.57
-        $this->assertSame('^3.58.0', $manifest['requires']['core']);
+        $this->assertSame('^3.60.0', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }
 

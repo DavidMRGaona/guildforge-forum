@@ -37,6 +37,8 @@ Para escribir hace falta una cuenta con la sesión iniciada. Quien está suspend
 - **Borrar**: puedes borrar tus propios mensajes. Su texto desaparece para todos y en su lugar queda «Mensaje borrado». No se puede deshacer, y los mensajes no se editan.
 - Si te quedas solo en una conversación, no puedes escribir hasta que añadas a alguien.
 
+Mientras tienes abierta la última página de una conversación, los mensajes nuevos aparecen solos, sin recargar, y cuentan como leídos si la estás viendo. Si el sitio tiene activadas las novedades al momento, llegan en cuanto se envían, y un mensaje borrado u oculto cambia en su sitio. Si no, la página mira de vez en cuando si hay algo nuevo.
+
 ## Bloquear a alguien
 
 Junto al nombre de cada persona de la conversación hay un botón para **bloquearla**. Desde ese momento esa persona:

@@ -309,12 +309,14 @@ Canales (`ForumChannels`, `registerRealtimeChannels()`), todos privados y conced
 |-------|---------------|---------|
 | `forum.discussion.{id}` | quien puede leer el tema (`ForumAccessInterface::canRead`: un tema oculto, su moderación; uno pendiente, su autor y su moderación; alguien suspendido mientras lee, igual que la página) | `post.created` {number}, `post.changed` {number}, `discussion.changed`; susurro `typing` {user} |
 | `forum.category.{id}` | quien ve la categoría (`CategoryAccessPolicy::canView`) | `discussion.activity` {discussion, number}, solo de temas visibles para cualquiera que lea la categoría |
+| `forum.conversation.{id}` | quien está en la conversación (`ConversationAccess::canRead`; nadie más, tampoco la moderación) | `entry.created` {number} (mensaje o nota de quien entra o sale), `entry.changed` {number} (borrado por su autor u oculto por la moderación) |
 | `forum.account.{id}` | la propia cuenta | `pulse.changed` |
 
 Qué se publica (`ForumLiveSignalsInterface`, a través de `RealtimePublisherInterface`, después del commit; sin difusión no se publica ni se encola nada):
 - Un mensaje que recibe número (respuesta, tema nuevo, aprobación): `post.created` en su tema, `discussion.activity` en su categoría y, desde `SignalFollowersJob` (en cola, en lotes de 200), `pulse.changed` a quien sigue el tema, su categoría o la categoría madre y puede leerlo ahora, salvo su autor.
 - Edición, borrado, moderación de un mensaje, «me gusta» y tirada revelada: `post.changed`. Cerrar, renombrar, mover, ocultar, unir, separar o borrar el tema: `discussion.changed` (en una unión, en los dos).
 - Llegar al final de un tema, marcar como leído y cambiar lo que se sigue: `pulse.changed` a la propia cuenta.
+- Conversaciones (forum#89): cada entrada nueva publica `entry.created` en su canal y `pulse.changed` a quien está en ella salvo quien la escribe; leerla hasta el final, `pulse.changed` a la propia cuenta. `GET /foro/conversaciones/{id}/novedades?despues=<n>[&cambiados=…]` (con sesión, 60 por minuto, 404 para quien no está) devuelve las entradas como las pinta la página; la página las marca como leídas si está a la vista.
 
 En la web, `live/channels.ts` (`useChannelFeed`, `useChannelFeeds`) envuelve `useRealtimeChannel` del core y solo se suscribe mientras un transporte lo tiene abierto (en un tema, solo en su última página). `liveNewPosts` pide lo posterior al último mensaje que tiene la página y los `cambiados` que tiene; `livePulse` pide el resumen con una pausa mínima de 10 s entre preguntas (el menú y una lista comparten el límite de 20 por minuto). Una lista escucha las categorías de sus filas (`categoryId`), cinco como mucho; con más sigue por consulta. Cada vez que el canal pasa a estar en directo, el transporte pregunta una vez para ponerse al día.
 

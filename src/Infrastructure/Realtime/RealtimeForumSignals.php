@@ -7,11 +7,13 @@ namespace Modules\Forum\Infrastructure\Realtime;
 use App\Application\Realtime\Services\RealtimeConfigurationInterface;
 use App\Application\Realtime\Services\RealtimePublisherInterface;
 use Illuminate\Support\Facades\Log;
+use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Realtime\ForumChannels;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\ConversationId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
 use Modules\Forum\Infrastructure\Jobs\SignalFollowersJob;
@@ -29,6 +31,7 @@ final readonly class RealtimeForumSignals implements ForumLiveSignalsInterface
         private RealtimePublisherInterface $publisher,
         private RealtimeConfigurationInterface $configuration,
         private DiscussionRepositoryInterface $discussions,
+        private ConversationParticipantsInterface $participants,
     ) {}
 
     public function postPublished(Post $post): void
@@ -68,6 +71,25 @@ final readonly class RealtimeForumSignals implements ForumLiveSignalsInterface
     public function discussionChanged(DiscussionId $discussionId): void
     {
         $this->quietly(fn () => $this->publisher->publish(ForumChannels::discussion($discussionId->value), ForumChannels::DISCUSSION_CHANGED));
+    }
+
+    public function conversationEntryAdded(ConversationId $conversationId, int $number, ?string $authorId): void
+    {
+        $this->quietly(function () use ($conversationId, $number, $authorId): void {
+            $this->publisher->publish(ForumChannels::conversation($conversationId->value), ForumChannels::ENTRY_CREATED, ['number' => $number]);
+
+            // At most ten people: each menu asks for its own count
+            foreach ($this->participants->of($conversationId) as $accountId) {
+                if ($accountId !== $authorId) {
+                    $this->publisher->publish(ForumChannels::account($accountId), ForumChannels::PULSE_CHANGED);
+                }
+            }
+        });
+    }
+
+    public function conversationEntryChanged(ConversationId $conversationId, int $number): void
+    {
+        $this->quietly(fn () => $this->publisher->publish(ForumChannels::conversation($conversationId->value), ForumChannels::ENTRY_CHANGED, ['number' => $number]));
     }
 
     public function pulseChanged(string $accountId): void

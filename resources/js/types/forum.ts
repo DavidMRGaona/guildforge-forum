@@ -577,6 +577,13 @@ export interface ForumConversationEntry {
     reportUrl: string | null;
 }
 
+/** What an open conversation asks for: the entries after its last one and those that changed */
+export interface ForumConversationUpdates {
+    entries: ForumConversationEntry[];
+    highestNumber: number;
+    more: boolean;
+}
+
 /** A reported private message as moderation reads it: the copy taken when it was reported */
 export interface ForumConversationReport {
     id: string;

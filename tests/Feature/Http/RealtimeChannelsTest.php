@@ -14,6 +14,7 @@ use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Tests\Support\BuildsConversations;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,7 @@ use Tests\Support\Time\UsesUtcStorage;
  */
 final class RealtimeChannelsTest extends ModuleTestCase
 {
+    use BuildsConversations;
     use BuildsForumContent;
     use EnablesRealtime;
     use UsesUtcStorage;
@@ -172,6 +174,30 @@ final class RealtimeChannelsTest extends ModuleTestCase
         $this->subscribe($this->reader, 'forum.account.'.strtolower((string) $this->reader->id))->assertOk();
         $this->subscribe($this->reader, 'forum.account.'.strtoupper((string) $this->reader->id))->assertForbidden();
         $this->subscribe($this->reader, 'forum.account.'.strtolower((string) $other->id))->assertForbidden();
+    }
+
+    public function test_only_whoever_is_in_the_conversation_listens_to_it(): void
+    {
+        $luis = UserModel::factory()->create();
+        $conversation = $this->aConversation($this->reader, $luis);
+        $channel = 'forum.conversation.'.$conversation->id()->value;
+
+        $this->subscribe($this->reader, $channel)->assertOk();
+        $this->subscribe($luis, $channel)->assertOk();
+        // Nobody else, whatever they may do in the forum
+        $this->subscribe($this->anAccount('forum:forum.moderate'), $channel)->assertForbidden();
+        $this->subscribe(UserModel::factory()->create(), $channel)->assertForbidden();
+        $this->subscribe($this->reader, 'forum.conversation.11111111-1111-4111-8111-111111111111')->assertForbidden();
+        $this->subscribe($this->reader, 'forum.conversation.'.strtoupper($conversation->id()->value))->assertForbidden();
+    }
+
+    public function test_leaving_the_conversation_stops_the_listening(): void
+    {
+        $luis = UserModel::factory()->create();
+        $conversation = $this->aConversation($this->reader, $luis);
+        $this->conversations()->leave($luis, $conversation->id());
+
+        $this->subscribe($luis, 'forum.conversation.'.$conversation->id()->value)->assertForbidden();
     }
 
     public function test_a_guest_never_listens(): void

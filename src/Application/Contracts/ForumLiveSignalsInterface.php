@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Contracts;
 
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\ValueObjects\ConversationId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 
 /**
@@ -25,6 +26,15 @@ interface ForumLiveSignalsInterface
 
     /** The discussion changed as a whole (closed, renamed, moved, hidden, merged, split, deleted) */
     public function discussionChanged(DiscussionId $discussionId): void;
+
+    /**
+     * A conversation got an entry (a message, the note of someone added or gone): its open pages,
+     * and the menu of everyone in it but whoever wrote it.
+     */
+    public function conversationEntryAdded(ConversationId $conversationId, int $number, ?string $authorId): void;
+
+    /** An entry of a conversation changed (deleted by its author, hidden by moderation) */
+    public function conversationEntryChanged(ConversationId $conversationId, int $number): void;
 
     /** What the forum's menu counts for the person changed (their reads or follows) */
     public function pulseChanged(string $accountId): void;

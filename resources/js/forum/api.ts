@@ -132,6 +132,17 @@ export function discussionUpdatesUrl(
     return changed.length === 0 ? url : `${url}&cambiados=${changed.join(',')}`;
 }
 
+/** The entries of a conversation after the given one, and those it was told changed */
+export function conversationUpdatesUrl(
+    conversationId: string,
+    after: number,
+    changed: number[] = []
+): string {
+    const url = `/foro/conversaciones/${encodeURIComponent(conversationId)}/novedades?despues=${after}`;
+
+    return changed.length === 0 ? url : `${url}&cambiados=${changed.join(',')}`;
+}
+
 /** What changed in the forum for the signed-in person, and the last post of the discussions given */
 export function forumUpdatesUrl(discussionIds: string[] = []): string {
     return discussionIds.length === 0

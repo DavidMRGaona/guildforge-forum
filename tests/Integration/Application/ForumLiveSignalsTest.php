@@ -22,9 +22,11 @@ use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\CategoryFollowOrigin;
 use Modules\Forum\Domain\Enums\FollowLevel;
+use Modules\Forum\Domain\Repositories\ConversationRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Infrastructure\Jobs\SignalFollowersJob;
+use Modules\Forum\Tests\Support\BuildsConversations;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\RecordingRealtimePublisher;
 use Tests\Support\Modules\ModuleTestCase;
@@ -37,6 +39,7 @@ use Tests\Support\Time\UsesUtcStorage;
  */
 final class ForumLiveSignalsTest extends ModuleTestCase
 {
+    use BuildsConversations;
     use BuildsForumContent;
     use EnablesRealtime;
     use UsesUtcStorage;
@@ -213,6 +216,58 @@ final class ForumLiveSignalsTest extends ModuleTestCase
 
         app(FollowService::class)->setLevel($reader, $discussion->id(), FollowLevel::Following);
         self::assertCount(2, array_filter($this->realtime->messages, static fn (array $message): bool => $message['channel'] === $own));
+    }
+
+    public function test_a_private_message_tells_its_conversation_and_the_others_in_it(): void
+    {
+        $ana = UserModel::factory()->create();
+        $luis = UserModel::factory()->create();
+        $conversation = $this->aConversation($ana, $luis);
+        $channel = 'forum.conversation.'.$conversation->id()->value;
+        $this->realtime->forget();
+
+        $this->conversations()->reply($luis, $conversation->id(), $this->messageDocument('¿A qué hora?'));
+
+        self::assertSame([['event' => 'entry.created', 'payload' => ['number' => 2]]], $this->realtime->on($channel));
+        self::assertSame(['forum.account.'.$this->id($ana)], $this->realtime->channelsOf('pulse.changed'));
+    }
+
+    public function test_adding_leaving_and_deleting_in_a_conversation(): void
+    {
+        $ana = UserModel::factory()->create();
+        $luis = UserModel::factory()->create();
+        $eva = UserModel::factory()->create();
+        $conversation = $this->aConversation($ana, $luis);
+        $channel = 'forum.conversation.'.$conversation->id()->value;
+        $first = app(ConversationRepositoryInterface::class)->entries($conversation->id(), 1, 1)[0];
+        $this->realtime->forget();
+
+        $this->conversations()->add($ana, $conversation->id(), $this->id($eva));
+        self::assertContains('forum.account.'.$this->id($eva), $this->realtime->channelsOf('pulse.changed'));
+        self::assertNotContains('forum.account.'.$this->id($ana), $this->realtime->channelsOf('pulse.changed'));
+
+        $this->conversations()->leave($luis, $conversation->id());
+        $this->conversations()->deleteOwn($ana, $first->id());
+
+        self::assertSame([
+            ['event' => 'entry.created', 'payload' => ['number' => 2]],
+            ['event' => 'entry.created', 'payload' => ['number' => 3]],
+            ['event' => 'entry.changed', 'payload' => ['number' => 1]],
+        ], $this->realtime->on($channel));
+    }
+
+    public function test_reading_a_conversation_to_its_end_changes_ones_own_pulse_once(): void
+    {
+        $ana = UserModel::factory()->create();
+        $luis = UserModel::factory()->create();
+        $conversation = $this->aConversation($ana, $luis);
+        $own = 'forum.account.'.$this->id($luis);
+        $this->realtime->forget();
+
+        $this->conversations()->markRead($luis, $conversation->id(), 1);
+        $this->conversations()->markRead($luis, $conversation->id(), 1);
+
+        self::assertCount(1, array_filter($this->realtime->messages, static fn (array $message): bool => $message['channel'] === $own));
     }
 
     public function test_with_real_time_off_nothing_is_sent_nor_queued(): void

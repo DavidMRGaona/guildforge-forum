@@ -9,6 +9,7 @@ use App\Application\Seo\Services\SeoMetadataFactoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,6 +23,7 @@ use Modules\Forum\Application\Conversations\ConversationService;
 use Modules\Forum\Application\Queries\ConversationListQueryInterface;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Domain\ConversationRules;
+use Modules\Forum\Domain\Entities\ConversationMessage;
 use Modules\Forum\Domain\Exceptions\ConversationNotFoundException;
 use Modules\Forum\Domain\Exceptions\ConversationRefusedException;
 use Modules\Forum\Domain\Repositories\ConversationRepositoryInterface;
@@ -33,8 +35,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * The pages of private conversations (/foro/conversaciones): the person's list, a new one and
- * one conversation; and their JSON actions: finding people, starting, adding someone, leaving and
- * marking read. Pages are never indexed. A conversation the person is not in answers 404, for
+ * one conversation; and their JSON actions: finding people, starting, adding someone, leaving,
+ * marking read and what changed while a conversation is open. Pages are never indexed. A conversation the person is not in answers 404, for
  * everyone, whatever permissions they hold.
  */
 final class ConversationController extends Controller
@@ -192,6 +194,53 @@ final class ConversationController extends Controller
             'reportReasons' => ConversationPresenter::reportReasons(),
             'seo' => $this->seoFor($found->title()->value),
         ]);
+    }
+
+    /**
+     * The entries after the number the page has, and those it was told changed (up to 50 each),
+     * as the page shows them; 204 when there are none. Never marks anything read: the page says
+     * what it showed.
+     */
+    public function updates(Request $request, string $conversation): JsonResponse|HttpResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'despues' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'cambiados' => ['sometimes', 'string', 'regex:/^[1-9][0-9]{0,9}(,[1-9][0-9]{0,9}){0,'.(self::ENTRIES_PER_PAGE - 1).'}$/'],
+        ]);
+        $id = ConversationId::fromString(strtolower($conversation));
+
+        try {
+            $found = $this->service->readable($user, $id);
+        } catch (ConversationNotFoundException $exception) {
+            throw new NotFoundHttpException(message: $exception->getMessage(), previous: $exception);
+        }
+
+        $after = (int) $validated['despues'];
+        $highest = $found->lastNumber();
+        $entries = [];
+        $changed = isset($validated['cambiados']) ? array_map(intval(...), explode(',', (string) $validated['cambiados'])) : [];
+        // One at a time: the numbers a page holds, never a range a forged request could stretch
+        foreach (array_unique(array_filter($changed, static fn (int $number): bool => $number <= $after)) as $number) {
+            array_push($entries, ...$this->conversations->entries($id, $number, $number));
+        }
+        if ($highest > $after) {
+            array_push($entries, ...$this->conversations->entries($id, $after + 1, min($highest, $after + self::ENTRIES_PER_PAGE)));
+        }
+
+        if ($entries === []) {
+            return response()->noContent()->header('Cache-Control', 'private, no-store');
+        }
+
+        usort($entries, static fn (ConversationMessage $a, ConversationMessage $b): int => $a->number() <=> $b->number());
+
+        return response()
+            ->json([
+                'entries' => $this->presenter->entries($entries, $user, $this->reports->mayReportIn($user, $id)),
+                'highestNumber' => $highest,
+                'more' => $highest > $after + self::ENTRIES_PER_PAGE,
+            ])
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function read(Request $request, string $conversation): JsonResponse

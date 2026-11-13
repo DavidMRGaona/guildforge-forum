@@ -10,6 +10,7 @@ import type { RealtimeFeed } from './transport';
 export const DISCUSSION_EVENTS = ['post.created', 'post.changed', 'discussion.changed'] as const;
 export const CATEGORY_EVENTS = ['discussion.activity'] as const;
 export const ACCOUNT_EVENTS = ['pulse.changed'] as const;
+export const CONVERSATION_EVENTS = ['entry.created', 'entry.changed'] as const;
 
 /** The most categories a list listens to at once; one showing more keeps asking at its pace */
 export const MAX_CATEGORY_CHANNELS = 5;
@@ -17,6 +18,7 @@ export const MAX_CATEGORY_CHANNELS = 5;
 export const discussionChannel = (id: string): string => `forum.discussion.${id.toLowerCase()}`;
 export const categoryChannel = (id: string): string => `forum.category.${id.toLowerCase()}`;
 export const accountChannel = (id: string): string => `forum.account.${id.toLowerCase()}`;
+export const conversationChannel = (id: string): string => `forum.conversation.${id.toLowerCase()}`;
 
 export interface ChannelFeed extends RealtimeFeed {
     /** Sends a client event to the others on the channel; false when it is not live */

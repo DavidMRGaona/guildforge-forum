@@ -15,6 +15,9 @@ namespace Modules\Forum\Application\Realtime;
  *   whisper `typing` {user} among themselves, which never goes through the application.
  * - A category: `discussion.activity` {discussion, number}, a post published in a discussion of
  *   it that anyone reading the category may see.
+ * - A private conversation (forum#89): `entry.created` {number} (a message, or the note of
+ *   someone added or gone) and `entry.changed` {number} (deleted by its author, hidden by
+ *   moderation). Only the people in it listen.
  * - An account: `pulse.changed`, something changed what the forum's menu shows that person.
  */
 final class ForumChannels
@@ -24,6 +27,12 @@ final class ForumChannels
     public const string CATEGORY = 'forum.category.{category}';
 
     public const string ACCOUNT = 'forum.account.{account}';
+
+    public const string CONVERSATION = 'forum.conversation.{conversation}';
+
+    public const string ENTRY_CREATED = 'entry.created';
+
+    public const string ENTRY_CHANGED = 'entry.changed';
 
     public const string POST_CREATED = 'post.created';
 
@@ -43,6 +52,11 @@ final class ForumChannels
     public static function category(string $categoryId): string
     {
         return 'forum.category.'.strtolower($categoryId);
+    }
+
+    public static function conversation(string $conversationId): string
+    {
+        return 'forum.conversation.'.strtolower($conversationId);
     }
 
     public static function account(string $accountId): string

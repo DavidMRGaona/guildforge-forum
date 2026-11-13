@@ -1,5 +1,10 @@
-import { discussionUpdatesUrl, forumUpdatesUrl, sendJson } from '../forum/api';
-import type { ForumNewPosts, ForumPulse } from '../types/forum';
+import {
+    conversationUpdatesUrl,
+    discussionUpdatesUrl,
+    forumUpdatesUrl,
+    sendJson,
+} from '../forum/api';
+import type { ForumConversationUpdates, ForumNewPosts, ForumPulse } from '../types/forum';
 import type { RealtimePayload } from '@/composables/useRealtimeChannel';
 import {
     pollingTransport,
@@ -146,5 +151,52 @@ export function livePulse(
         minGapMs: PULSE_MIN_GAP_MS,
         request: () => sendJson<ForumPulse>(forumUpdatesUrl(watching()), 'GET'),
         onMessage: (event, payload) => options.wants?.(event, payload) ?? true,
+    });
+}
+
+/**
+ * New and changed entries of a private conversation (forum#89) through its real-time channel,
+ * and by consultation whenever the channel is not live. Only the people in it may listen or ask.
+ */
+export function liveConversation(
+    conversationId: string,
+    feed: RealtimeFeed,
+    intervalMs: number = POSTS_INTERVAL_MS
+): LiveTransport<ForumConversationUpdates> {
+    const changed = new Set<number>();
+
+    return realtimeTransport<ForumConversationUpdates>({
+        intervalMs,
+        feed,
+        request: async (context) => {
+            const asked = [...changed].slice(0, MAX_CHANGED_POSTS);
+            for (const number of asked) {
+                changed.delete(number);
+            }
+
+            const answer = await sendJson<ForumConversationUpdates>(
+                conversationUpdatesUrl(conversationId, context.cursor(), asked),
+                'GET'
+            );
+            if (!answer.ok) {
+                for (const number of asked) {
+                    changed.add(number);
+                }
+            }
+
+            return answer;
+        },
+        onMessage: (event, payload, context) => {
+            const number = postNumber(payload);
+            if (event === 'entry.created') {
+                return number === null || number > context.cursor();
+            }
+            if (number === null || !(context.holds?.(number) ?? false)) {
+                return false;
+            }
+            changed.add(number);
+
+            return true;
+        },
     });
 }

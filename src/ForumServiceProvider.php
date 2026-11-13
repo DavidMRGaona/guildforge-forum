@@ -146,6 +146,7 @@ use Modules\Forum\Infrastructure\Queries\EloquentMovedPostsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentSearchHitsQuery;
 use Modules\Forum\Infrastructure\Realtime\AccountRealtimeChannel;
 use Modules\Forum\Infrastructure\Realtime\CategoryRealtimeChannel;
+use Modules\Forum\Infrastructure\Realtime\ConversationRealtimeChannel;
 use Modules\Forum\Infrastructure\Realtime\DiscussionRealtimeChannel;
 use Modules\Forum\Infrastructure\Realtime\RealtimeForumSignals;
 use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
@@ -352,14 +353,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * The real-time channels (core#493): a discussion's, a category's and each person's own, each
+     * The real-time channels (core#493): a discussion's, a category's, a conversation's and each person's own, each
      * granted by the same access rules as the page it feeds.
      *
      * @return list<class-string<RealtimeChannelInterface>>
      */
     public function registerRealtimeChannels(): array
     {
-        return [DiscussionRealtimeChannel::class, CategoryRealtimeChannel::class, AccountRealtimeChannel::class];
+        return [DiscussionRealtimeChannel::class, CategoryRealtimeChannel::class, ConversationRealtimeChannel::class, AccountRealtimeChannel::class];
     }
 
     /**

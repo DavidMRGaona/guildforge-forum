@@ -13,6 +13,7 @@ import SuspendDialog from '../moderation/SuspendDialog.vue';
 import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
+import { quoteFits } from '../../editor/extensions/PostQuote';
 import { sendJson } from '../../forum/api';
 import { useEmbeds } from '../../composables/useEmbeds';
 import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
@@ -267,12 +268,16 @@ const showsLikes = computed(
 );
 
 function quote(): void {
+    // The post's stored text, not what is drawn: rolls, asides and embeds add labels and buttons
+    // («Tirada», each die, «Cargar contenido») the server would not find in the post
+    const whole = (props.post.quoteText ?? '').trim();
     const selection = window.getSelection();
     const selected =
         selection && !selection.isCollapsed && body.value?.contains(selection.anchorNode)
-            ? selection.toString()
+            ? selection.toString().trim()
             : '';
-    const text = (selected.trim() !== '' ? selected : (body.value?.innerText ?? '')).trim();
+    // A selection that takes in any of those labels would be refused: the whole post instead
+    const text = selected !== '' && quoteFits(whole, selected) ? selected : whole;
     if (text !== '') {
         emit('quote', { postId: props.post.id, text });
     }

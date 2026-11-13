@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
-import { Flag, Link2, Pencil, Quote, Trash2 } from '@lucide/vue';
+import { Link } from '@inertiajs/vue3';
+import { Flag, Link2, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import LikeButton from './LikeButton.vue';
@@ -551,7 +552,8 @@ async function remove(): Promise<void> {
                 (((canQuote || post.canEdit || post.canDelete || showsLikes) &&
                     post.html !== null) ||
                     moderationItems.length > 0 ||
-                    (post.reportUrl !== null && !reported))
+                    (post.reportUrl !== null && !reported) ||
+                    Boolean(post.messageUrl))
             "
             class="flex flex-wrap items-center justify-end gap-1 border-t border-default px-2 py-1"
         >
@@ -568,6 +570,25 @@ async function remove(): Promise<void> {
                 :busy="moderationBusy"
                 @select="selectModeration"
             />
+            <Link
+                v-if="post.messageUrl"
+                :href="post.messageUrl"
+                class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
+                :aria-label="
+                    t('forum.posts.writePrivatelyTo', {
+                        name: post.authorName ?? t('forum.posts.deletedAccount'),
+                    })
+                "
+                :title="
+                    t('forum.posts.writePrivatelyTo', {
+                        name: post.authorName ?? t('forum.posts.deletedAccount'),
+                    })
+                "
+                data-testid="post-write-privately"
+            >
+                <Mail class="h-4 w-4" aria-hidden="true" />
+                <span class="max-sm:sr-only">{{ t('forum.posts.writePrivately') }}</span>
+            </Link>
             <button
                 v-if="post.reportUrl && !reported"
                 type="button"

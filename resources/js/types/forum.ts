@@ -149,6 +149,11 @@ export interface ForumPost {
     moderationUrl: string | null;
     /** Where to report it; null for its author, guests and whoever is suspended */
     reportUrl: string | null;
+    /**
+     * Where to start a private conversation with its author; null when the reader could not
+     * (no session, a suspension, their own post, or an author who takes no messages from them)
+     */
+    messageUrl?: string | null;
     /** Who it speaks as, when the reader may see that character; null out of character */
     character: ForumPostCharacter | null;
     /** The character its editor starts from, only for posts the reader may edit */

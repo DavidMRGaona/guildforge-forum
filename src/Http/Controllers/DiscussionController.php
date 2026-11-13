@@ -40,6 +40,7 @@ use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 use Modules\Forum\Http\Presenters\ModerationProps;
+use Modules\Forum\Http\Presenters\PrivateMessageLinks;
 use Modules\Forum\Http\Requests\StoreDiscussionRequest;
 
 /**
@@ -65,6 +66,7 @@ final class DiscussionController extends Controller
         private readonly CategoryRepositoryInterface $categories,
         private readonly SuspensionService $suspensionService,
         private readonly ModerationProps $moderationProps,
+        private readonly PrivateMessageLinks $messageLinks,
         private readonly CharacterPresenter $characters,
         private readonly ForumRedirects $redirects,
     ) {}
@@ -116,7 +118,7 @@ final class DiscussionController extends Controller
         $seo['canonicalUrl'] = $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
 
         $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
-        $conversation['posts'] = $this->moderationProps->withReportLinks($conversation['posts'], $user);
+        $conversation['posts'] = $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($conversation['posts'], $user), $user);
 
         return Inertia::render('Forum/Discussion', [
             ...$conversation,

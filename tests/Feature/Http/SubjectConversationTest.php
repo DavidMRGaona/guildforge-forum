@@ -18,6 +18,7 @@ use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Entities\SubjectDiscussion;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
@@ -116,6 +117,18 @@ final class SubjectConversationTest extends ModuleTestCase
             ->assertJsonPath('conversation.posts.4.likes.count', 0)
             ->assertJsonPath('conversation.posts.4.likes.canLike', false);
         self::assertStringContainsString('Mensaje 8', (string) $response->json('conversation.posts.4.html'));
+    }
+
+    public function test_posts_offer_to_write_privately_to_their_author_when_the_reader_may(): void
+    {
+        [$discussion] = $this->aSubjectDiscussion('table-1', $this->public);
+        $author = $this->anAccount();
+        app(ForumWriter::class)->reply($discussion->id(), PostId::generate(), strtolower($author->id), self::aBody('Me apunto'), new DateTimeImmutable('2026-11-10 10:05:00'), false);
+        $url = route('forum.conversations.create', ['para' => strtolower($author->id)]);
+
+        $this->getJson('/foro/fichas/game-table/table-1')->assertOk()->assertJsonPath('conversation.posts.0.messageUrl', null);
+        $this->actingAs($author)->getJson('/foro/fichas/game-table/table-1')->assertJsonPath('conversation.posts.0.messageUrl', null);
+        $this->actingAs($this->anAccount())->getJson('/foro/fichas/game-table/table-1')->assertJsonPath('conversation.posts.0.messageUrl', $url);
     }
 
     public function test_earlier_posts_load_in_batches_and_never_the_opening_one(): void

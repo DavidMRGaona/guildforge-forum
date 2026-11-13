@@ -343,6 +343,7 @@ Conversaciones privadas entre personas con sesión (forum#18). Solo las leen qui
 - **Bloqueos**: en un solo sentido y silenciosos. Quien está bloqueado no escribe en ninguna conversación donde esté quien le bloqueó (ni añade a nadie a ella), ni empieza una con esa persona, ni la añade, y el selector no se la ofrece. Las respuestas dicen «No puedes escribir en esta conversación» sin nombrar a nadie.
 - **Denuncias**: guardan una copia en texto plano del mensaje y de los tres anteriores y posteriores, con los ids de los autores (los nombres se leen al pintar). Solo quien modera todo el foro las ve y las resuelve, en `/foro/moderacion` y en la pestaña **Mensajes privados** del panel: ocultar el mensaje o sin acción. La copia sobrevive al borrado del mensaje y de la conversación.
 - **Búsqueda**: nunca se indexan. No hay fuente de búsqueda para ellas ni observador sobre sus modelos.
+- **Desde el foro** (forum#88): cada mensaje presentado lleva `messageUrl` (`PrivateMessageLinks`), la página nueva con `?para=<autor>`, solo cuando quien lee podría empezar la conversación (`ConversationAccess::writableAmong()`: con sesión, sin suspensión, no es suyo, el autor admite mensajes y no le ha bloqueado). Si no, no hay acción, sea cual sea el motivo. Lo llevan la página del tema, las novedades y la conversación de las fichas.
 - **Pulso**: `GET /foro/novedades` devuelve también `unreadConversations`, que el enlace **Foro** del menú suma a su marca.
 
 ### Rutas (con sesión)

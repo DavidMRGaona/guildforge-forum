@@ -16,6 +16,7 @@ use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 use Modules\Forum\Http\Presenters\ModerationProps;
+use Modules\Forum\Http\Presenters\PrivateMessageLinks;
 
 /**
  * The conversation of a record, for the `subject-discussion` slot of its page
@@ -31,6 +32,7 @@ final class SubjectConversationController extends Controller
         private readonly ForumUrlsInterface $urls,
         private readonly EngagementPresenter $engagement,
         private readonly ModerationProps $moderationProps,
+        private readonly PrivateMessageLinks $messageLinks,
     ) {}
 
     public function show(Request $request, string $type, string $id): JsonResponse
@@ -67,7 +69,7 @@ final class SubjectConversationController extends Controller
                 'isClosed' => $discussion->status() === DiscussionStatus::Closed,
                 'closedReason' => $conversation->closedReason?->value,
             ],
-            'posts' => $this->moderationProps->withReportLinks($this->engagement->withLikes($posts, $conversation->posts, $discussion, $user), $user),
+            'posts' => $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->engagement->withLikes($posts, $conversation->posts, $discussion, $user), $user), $user),
             'mentionNames' => $mentionNames,
             'olderCount' => $conversation->olderCount,
             'olderNext' => min(SubjectConversationReader::EARLIER, $conversation->olderCount),

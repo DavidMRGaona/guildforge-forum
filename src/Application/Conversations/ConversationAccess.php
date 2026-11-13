@@ -111,6 +111,43 @@ final readonly class ConversationAccess
     }
 
     /**
+     * Those of the accounts the reader could start a conversation with now: the reader has a
+     * session and may take part, and each account is someone else who may take part and did not
+     * block the reader. One answer for every reason, so a block reads like any other account
+     * that takes no messages. Fails closed: nobody when anything cannot be read.
+     *
+     * @param  list<string>  $accountIds
+     * @return list<string> lowercase
+     */
+    public function writableAmong(?Authenticatable $reader, array $accountIds): array
+    {
+        $readerId = ForumBrowser::accountId($reader);
+        if ($readerId === null || $accountIds === []) {
+            return [];
+        }
+
+        try {
+            if (! $this->mayTakePart($readerId)) {
+                return [];
+            }
+
+            $candidates = [];
+            foreach ($accountIds as $accountId) {
+                $id = strtolower($accountId);
+                if ($id !== $readerId && ! isset($candidates[$id]) && $this->mayTakePart($id)) {
+                    $candidates[$id] = true;
+                }
+            }
+
+            return array_values(array_diff(array_keys($candidates), $this->blocks->blockersOf($readerId, array_keys($candidates))));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+    /**
      * Whether the person may not reach the account at all: it blocked them.
      */
     public function isBlockedBy(string $accountId, string $byAccountId): bool

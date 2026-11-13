@@ -125,7 +125,7 @@ return [
     'categories' => [
         'navigation' => 'Categorías del foro',
         'model' => 'categoría',
-        'plural' => 'categorías',
+        'plural' => 'Categorías del foro',
         'list_help' => 'Arrastra las filas para cambiar el orden. Las subcategorías aparecen bajo su categoría.',
         'system_badge' => 'Del sistema',
         'unavailable_badge' => 'Sin el módulo que la alimenta',

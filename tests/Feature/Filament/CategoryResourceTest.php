@@ -69,6 +69,13 @@ final class CategoryResourceTest extends ModuleTestCase
         $this->assertNull(CategoryResource::getNavigationParentItem());
     }
 
+    public function test_the_list_title_and_breadcrumb_start_with_a_capital(): void
+    {
+        // Filament shows the plural as the page title and the breadcrumb as it is written
+        $this->assertSame('Categorías del foro', CategoryResource::getPluralModelLabel());
+        $this->assertSame('categoría', CategoryResource::getModelLabel());
+    }
+
     public function test_only_category_managers_open_the_list(): void
     {
         $this->actingAs($this->userWith(['forum:settings.manage']));

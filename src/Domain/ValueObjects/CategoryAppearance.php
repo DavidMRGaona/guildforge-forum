@@ -19,7 +19,7 @@ final readonly class CategoryAppearance
      */
     public function __construct(?string $color, public ?CategoryIcon $icon)
     {
-        if ($color !== null && preg_match('/^#[0-9a-fA-F]{6}$/', $color) !== 1) {
+        if ($color !== null && preg_match('/^#[0-9a-fA-F]{6}\z/', $color) !== 1) {
             throw InvalidCategoryException::invalidColor($color);
         }
 

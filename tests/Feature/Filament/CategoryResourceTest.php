@@ -222,6 +222,21 @@ final class CategoryResourceTest extends ModuleTestCase
             ->fillForm(['name' => 'Otra', 'slug' => 'Con Espacios', 'view_kind' => 'everyone', 'write_kind' => 'signed_in'])
             ->call('create')
             ->assertHasFormErrors(['slug']);
+
+        Livewire::test(CreateCategory::class)
+            ->fillForm(['name' => 'Otra', 'slug' => "otra\n", 'view_kind' => 'everyone', 'write_kind' => 'signed_in'])
+            ->call('create')
+            ->assertHasFormErrors(['slug']);
+    }
+
+    public function test_a_color_refuses_a_final_newline(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(CreateCategory::class)
+            ->fillForm(['name' => 'Otra', 'slug' => 'otra', 'color' => "#aa3300\n", 'view_kind' => 'everyone', 'write_kind' => 'signed_in'])
+            ->call('create')
+            ->assertHasFormErrors(['color']);
     }
 
     public function test_editing_keeps_the_system_key(): void

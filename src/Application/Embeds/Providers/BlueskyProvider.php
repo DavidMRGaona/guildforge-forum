@@ -16,7 +16,7 @@ final class BlueskyProvider extends AbstractEmbedProvider
 {
     public const string DID = 'did';
 
-    public const string DID_PATTERN = '/^did:(plc:[a-z2-7]{24}|web:[a-z0-9.-]{1,200})$/';
+    public const string DID_PATTERN = '/^did:(plc:[a-z2-7]{24}|web:[a-z0-9.-]{1,200})\z/';
 
     public function key(): string
     {

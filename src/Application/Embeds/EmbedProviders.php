@@ -34,7 +34,7 @@ final readonly class EmbedProviders
     {
         $byKey = [];
         foreach ($providers as $provider) {
-            if (preg_match('/^[a-z]{1,20}$/', $provider->key()) !== 1 || isset($byKey[$provider->key()])) {
+            if (preg_match('/^[a-z]{1,20}\z/', $provider->key()) !== 1 || isset($byKey[$provider->key()])) {
                 throw new LogicException("The embed service key '{$provider->key()}' is taken or not lowercase letters.");
             }
             $byKey[$provider->key()] = $provider;

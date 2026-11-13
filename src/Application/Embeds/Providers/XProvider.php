@@ -52,7 +52,7 @@ final class XProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '/^\d{1,20}$/';
+        return '/^\d{1,20}\z/';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

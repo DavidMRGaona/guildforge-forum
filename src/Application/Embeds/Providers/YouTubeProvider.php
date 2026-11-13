@@ -57,7 +57,7 @@ final class YouTubeProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '/^[A-Za-z0-9_-]{11}$/';
+        return '/^[A-Za-z0-9_-]{11}\z/';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

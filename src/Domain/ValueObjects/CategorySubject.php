@@ -23,7 +23,7 @@ final readonly class CategorySubject
         public string $type,
         string $id,
     ) {
-        if (strlen($type) > self::MAX_LENGTH || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $type) !== 1) {
+        if (strlen($type) > self::MAX_LENGTH || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\z/', $type) !== 1) {
             throw InvalidCategoryException::invalidSubject($type, $id);
         }
 

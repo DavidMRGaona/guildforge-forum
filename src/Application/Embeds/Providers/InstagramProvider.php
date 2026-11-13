@@ -46,7 +46,7 @@ final class InstagramProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '#^(p|reel)/[A-Za-z0-9_-]{5,40}$#';
+        return '#^(p|reel)/[A-Za-z0-9_-]{5,40}\z#';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

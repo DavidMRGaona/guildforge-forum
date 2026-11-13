@@ -25,7 +25,7 @@ final readonly class DiscussionTopic
         public string $key,
         string $label,
     ) {
-        if (preg_match('/^[a-z0-9._-]{1,64}$/', $key) !== 1) {
+        if (preg_match('/^[a-z0-9._-]{1,64}\z/', $key) !== 1) {
             throw InvalidDiscussionException::invalidTopic($key);
         }
 

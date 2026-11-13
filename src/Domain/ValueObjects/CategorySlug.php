@@ -15,7 +15,7 @@ final readonly class CategorySlug implements Stringable
 {
     public const int MAX_LENGTH = 64;
 
-    private const string PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
+    private const string PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*\z/';
 
     /**
      * @throws InvalidCategoryException

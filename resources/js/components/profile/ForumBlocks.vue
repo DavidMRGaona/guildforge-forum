@@ -74,7 +74,7 @@ onMounted(() => {
         <p v-else-if="blocks.length === 0" class="text-sm text-base-muted">
             {{ t('forum.conversations.blocks.profileEmpty') }}
         </p>
-        <ul v-else class="divide-y divide-default rounded-lg border border-default">
+        <ul v-else class="divide-y divide-[var(--color-border)] rounded-lg border border-default">
             <li
                 v-for="block in blocks"
                 :key="block.id"

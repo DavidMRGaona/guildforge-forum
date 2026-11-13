@@ -173,7 +173,7 @@ function remove(person: ForumPerson): void {
 
         <ul
             v-if="shown.length > 0"
-            class="divide-y divide-default overflow-hidden rounded-md border border-default"
+            class="divide-y divide-[var(--color-border)] overflow-hidden rounded-md border border-default"
             :aria-label="t('forum.conversations.people.results')"
         >
             <li v-for="person in shown" :key="person.id">

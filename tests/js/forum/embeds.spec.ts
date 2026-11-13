@@ -59,6 +59,9 @@ describe('embedded posts', () => {
         );
         expect(iframe?.getAttribute('referrerpolicy')).toBe('strict-origin');
         expect(iframe?.getAttribute('title')).toBe('Publicación de YouTube');
+        // Fullscreen comes from `allow` alone: with `allowfullscreen` too, browsers warn
+        expect(iframe?.getAttribute('allow')).toContain('fullscreen');
+        expect(iframe?.hasAttribute('allowfullscreen')).toBe(false);
         expect(element.querySelector('[data-embed-load]')).toBeNull();
         // The link to the post stays
         expect(element.querySelector('.forum-embed__link')).not.toBeNull();

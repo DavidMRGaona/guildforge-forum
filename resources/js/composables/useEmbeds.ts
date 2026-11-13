@@ -57,8 +57,8 @@ export function loadEmbed(figure: HTMLElement): HTMLIFrameElement | null {
         'referrerpolicy',
         REFERRER_POLICIES.has(referrer) ? referrer : 'no-referrer'
     );
+    // Fullscreen through `allow` only: with `allowfullscreen` as well, browsers warn
     iframe.setAttribute('allow', 'encrypted-media; picture-in-picture; fullscreen');
-    iframe.setAttribute('allowfullscreen', '');
     iframe.setAttribute('loading', 'lazy');
     frame.appendChild(iframe);
 

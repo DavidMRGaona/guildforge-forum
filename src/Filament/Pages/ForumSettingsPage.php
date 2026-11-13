@@ -149,7 +149,9 @@ final class ForumSettingsPage extends Page implements HasForms
                                     $fail(__('forum::messages.settings.image_types_invalid'));
                                 }
                             }])
-                            ->columns(4)
+                            // At 1024 px the settings cluster leaves the form narrow: two columns
+                            // until the form is wide enough for four
+                            ->columns(['default' => 2, 'xl' => 4])
                             ->default(array_keys(self::imageTypeOptions())),
                         $this->boundedField('image_max_kilobytes', ForumSettings::MIN_IMAGE_MAX_KILOBYTES, ForumSettings::MAX_IMAGE_MAX_KILOBYTES, ForumSettings::DEFAULT_IMAGE_MAX_KILOBYTES),
                         $this->boundedField('image_max_dimension', ForumSettings::MIN_IMAGE_MAX_DIMENSION, ForumSettings::MAX_IMAGE_MAX_DIMENSION, ForumSettings::DEFAULT_IMAGE_MAX_DIMENSION)
@@ -196,7 +198,9 @@ final class ForumSettingsPage extends Page implements HasForms
                                     $fail(__('forum::messages.settings.embed_services_invalid'));
                                 }
                             }])
-                            ->columns(4)
+                            // At 1024 px the settings cluster leaves the form narrow: two columns
+                            // until the form is wide enough for four
+                            ->columns(['default' => 2, 'xl' => 4])
                             ->default(array_keys(self::embedServiceOptions())),
                         Grid::make(['default' => 1, 'sm' => 2, '2xl' => 4])
                             ->schema(array_map(

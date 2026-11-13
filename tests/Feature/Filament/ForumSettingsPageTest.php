@@ -9,6 +9,7 @@ use App\Filament\Pages\KnowledgeBasePage;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Filament\Forms\Components\CheckboxList;
 use Livewire\Livewire;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Domain\Enums\PostImageType;
@@ -87,6 +88,24 @@ final class ForumSettingsPageTest extends ModuleTestCase
         $this->assertSame(3, $settings->postsPerMinute());
         $this->assertSame([PostImageType::Jpeg, PostImageType::Webp], $settings->imageTypes());
         $this->assertSame(1600, $settings->imageMaxDimension());
+    }
+
+    public function test_short_checkbox_lists_use_two_columns_until_the_form_is_wide(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+        $page = Livewire::test(ForumSettingsPage::class)->instance();
+        $this->assertInstanceOf(ForumSettingsPage::class, $page);
+        $lists = array_filter($page->form->getFlatComponents(), static fn (mixed $component): bool => $component instanceof CheckboxList);
+
+        // At 1024 px the settings cluster leaves the form about 270 px: four columns there broke
+        // «JPEG» and «WebP» in two lines
+        foreach (['image_types', 'embed_services'] as $name) {
+            $found = array_values(array_filter($lists, static fn (CheckboxList $list): bool => $list->getName() === $name));
+            $this->assertCount(1, $found, $name);
+            $list = $found[0];
+            $this->assertSame(2, $list->getColumns('default'), $name);
+            $this->assertSame(4, $list->getColumns('xl'), $name);
+        }
     }
 
     public function test_page_sizes_stay_within_bounds(): void

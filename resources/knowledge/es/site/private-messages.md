@@ -5,7 +5,7 @@ summary: Conversaciones privadas de 2 a 10 personas, quién las lee, cómo añad
 category: community
 audience: site
 order: 65
-keywords: [mensajes privados, imágenes en mensajes privados, privado, privados, conversación, conversaciones, mensaje directo, escribir a alguien, bloquear, bloqueo, desbloquear, salir de la conversación, añadir a alguien, denunciar mensaje privado, límite de conversaciones, no puedo escribir]
+keywords: [mensajes privados, escribir a alguien desde un mensaje, imágenes en mensajes privados, privado, privados, conversación, conversaciones, mensaje directo, escribir a alguien, bloquear, bloqueo, desbloquear, salir de la conversación, añadir a alguien, denunciar mensaje privado, límite de conversaciones, no puedo escribir]
 related: [forum.site.overview, forum.site.notices, forum.site.writing]
 ---
 Con los mensajes privados hablas con otras personas de la comunidad sin salir de la web. Una conversación es de 2 a 10 personas y **solo la leen quienes están en ella**: nadie más, tampoco la moderación ni la administración del sitio.
@@ -14,7 +14,11 @@ Con los mensajes privados hablas con otras personas de la comunidad sin salir de
 
 ## Empezar una conversación
 
-En la cabecera del foro, el enlace **Mensajes** lleva a tus conversaciones, con las que tienen mensajes sin leer marcadas. Desde ahí, **Nueva conversación**:
+En la cabecera del foro, el enlace **Mensajes** lleva a tus conversaciones, con las que tienen mensajes sin leer marcadas.
+
+También puedes escribir a alguien desde cualquiera de sus mensajes en el foro: en el pie del mensaje, **Mensaje privado** abre una conversación nueva con esa persona ya elegida. Solo aparece si puedes escribirle.
+
+Desde **Mensajes**, **Nueva conversación**:
 
 1. En **Con quién**, escribe al menos dos letras del nombre y elige a cada persona de la lista. Hasta 9 personas, además de ti.
 2. Ponle un **Título** de 120 caracteres como máximo.

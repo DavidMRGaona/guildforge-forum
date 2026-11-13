@@ -116,7 +116,7 @@ final readonly class PostingService
         if (! $category instanceof Category) {
             throw PostNotFoundException::withId($postId->value);
         }
-        $speaker = $this->speakers->forEdit($author, $post, $category, $speakerGiven, $characterId);
+        $speaker = $this->speakers->forEdit($author, $post, $category, $speakerGiven, $characterId, startsDiscussion: $post->number()?->value === 1 || $discussion->isAwaitingApproval());
 
         return $this->writer->editPost($postId, $body, $this->accountId($author), CarbonImmutable::now(), $speaker);
     }

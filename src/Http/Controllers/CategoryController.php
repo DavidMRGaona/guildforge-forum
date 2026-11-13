@@ -13,6 +13,7 @@ use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\Services\ForumBrowser;
+use Modules\Forum\Http\Presenters\CharacterPresenter;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 
@@ -30,6 +31,7 @@ final class CategoryController extends Controller
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
         private readonly EngagementPresenter $engagement,
+        private readonly CharacterPresenter $characters,
     ) {}
 
     public function show(Request $request, string $category): Response
@@ -50,6 +52,7 @@ final class CategoryController extends Controller
             'canStart' => $canStart,
             'newDiscussionUrl' => route('forum.discussions.create', $access->canStartDiscussions() ? ['categoria' => $access->category->slug()->value] : []),
             'markReadUrl' => $reader === null ? null : route('forum.categories.read', ['category' => $access->category->slug()->value]),
+            'sharedCharactersUrl' => $this->characters->sharedManagerUrl($reader, $access->category),
             'seo' => $this->seo->forPage(new SeoPageDTO(
                 title: $access->category->name(),
                 description: $access->category->description() ?? __('forum::messages.pages.category_description', ['name' => $access->category->name()]),

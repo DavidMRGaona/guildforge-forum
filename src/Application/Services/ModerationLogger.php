@@ -49,18 +49,18 @@ final readonly class ModerationLogger
     }
 
     /**
-     * What moderation did to a person rather than to a discussion (a suspension).
+     * What moderation did to a person rather than to a discussion (a suspension). A shared character has no person: its subject is none and the log names its space.
      *
      * @param  array<string, string|int|bool|null>  $details
      */
-    public function recordForAccount(ModerationAction $action, Authenticatable $moderator, string $subjectUserId, ?string $reason = null, array $details = []): void
+    public function recordForAccount(ModerationAction $action, Authenticatable $moderator, ?string $subjectUserId, ?string $reason = null, array $details = [], ?string $categoryId = null): void
     {
         $this->log->record(new ModerationLogEntry(
             id: (string) Str::uuid7(),
             action: $action,
             moderatorId: ForumBrowser::accountId($moderator),
             subjectUserId: $subjectUserId,
-            categoryId: null,
+            categoryId: $categoryId,
             discussionId: null,
             postId: null,
             reason: $reason,

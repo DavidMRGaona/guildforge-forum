@@ -102,7 +102,7 @@ final readonly class DiscussionStarter
         $title = new DiscussionTitle($this->checkedTitle($input->title));
         $topics = $this->checkedTopics($author, $input->topicKeys);
         $body = $this->bodies->fromInput($input->document, $author);
-        $speaker = $this->speakers->forNewPost($author, $input->characterId, $access->category);
+        $speaker = $this->speakers->forNewPost($author, $input->characterId, $access->category, startsDiscussion: true);
         $this->posting->countDiscussion($author);
         $this->posting->countPost($author);
         $needsApproval = $this->approval->needsApproval($author, $access->category);

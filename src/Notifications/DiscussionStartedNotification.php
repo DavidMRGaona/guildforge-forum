@@ -46,7 +46,7 @@ final class DiscussionStartedNotification extends PostNotification implements Ha
     {
         $notice = $this->notice($notifiable);
 
-        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url, $notice->post->authorId()) : null;
+        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url, $notice->actorId()) : null;
     }
 
     protected function stillHolds(PostNoticeDTO $notice, string $channel): bool
@@ -76,7 +76,7 @@ final class DiscussionStartedNotification extends PostNotification implements Ha
             body: $notice->excerpt === '' ? null : $notice->excerpt,
             icon: 'message-circle',
             groupKey: 'forum.discussions:'.$this->categoryId,
-            actorId: $notice->post->authorId(),
+            actorId: $notice->actorId(),
             groupedTitle: static fn (SiteNotificationGroupDTO $group): string => trans_choice(
                 'forum::messages.notices.discussion.grouped',
                 $group->count,

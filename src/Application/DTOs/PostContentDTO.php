@@ -14,7 +14,8 @@ use Modules\Forum\Domain\Enums\PostStatus;
  * `hiddenReason` is why moderation hid it, only for its author and its moderators. A moderator
  * may edit anyone's post (`canEdit`); only its author deletes it. `character` is who it speaks
  * as, when the reader may see that character (`moderatesCharacter`: the reader may change,
- * retire or delete it).
+ * retire or delete it). `authorHidden`: it speaks as a shared character and the reader is neither
+ * its author nor a moderator of its space, so the account that wrote it is not shown.
  */
 final readonly class PostContentDTO
 {
@@ -31,5 +32,6 @@ final readonly class PostContentDTO
         public ?string $hiddenReason = null,
         public ?Character $character = null,
         public bool $moderatesCharacter = false,
+        public bool $authorHidden = false,
     ) {}
 }

@@ -12,6 +12,7 @@ use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Application\Services\EmailVerificationPolicyInterface;
 use App\Domain\Authorization\Repositories\RoleRepositoryInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
@@ -118,6 +119,26 @@ final class CategoryAccessPolicy
             $parent = $this->parent($parentId);
 
             return $parent instanceof Category && $this->availability->isAvailable($category, $parent);
+        });
+    }
+
+    /**
+     * Whether the user directs the campaign a space belongs to: one of the leaders its publication
+     * source names now, who still reads the space. The rule behind the characters the directors
+     * share (CharacterRules); a space that is not a campaign's, or whose roster cannot be read,
+     * has no directors.
+     */
+    public function leadsSpace(?Authenticatable $user, Category $category): bool
+    {
+        return $this->decide(function () use ($user, $category): bool {
+            $subject = $category->subject();
+
+            return $user instanceof Authenticatable
+                && $subject instanceof CategorySubject
+                && $subject->type === CampaignSpaceSync::TYPE
+                && ! $this->suspensions->isBarred($user)
+                && $this->reads($user, $category)
+                && $this->inRoster($user, $subject, RosterScope::Leaders);
         });
     }
 

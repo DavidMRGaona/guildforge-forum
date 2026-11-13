@@ -8,12 +8,14 @@ use App\Application\Services\TimezoneServiceInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\CharacterPortraitStorageInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Services\CharacterRules;
 use Modules\Forum\Application\Services\CharacterService;
 use Modules\Forum\Application\Services\PostSpeakers;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Http\Requests\SaveCharacterRequest;
@@ -45,7 +47,8 @@ final readonly class CharacterPresenter
             ...$this->basics($character),
             'description' => $character->description(),
             'isRetired' => $character->isRetired(),
-            'actions' => $moderates ? $this->actions($character, owner: false) : null,
+            // A shared character on a post always has posts: it is retired, never deleted
+            'actions' => $moderates ? $this->actions($character, owner: false, deletable: ! $character->isNpc()) : null,
         ];
     }
 
@@ -78,6 +81,68 @@ final readonly class CharacterPresenter
                 'actions' => $this->actions($character, owner: true),
             ], $characters),
             ...$this->form($owner, $categories),
+        ];
+    }
+
+    /**
+     * Where the «PNJ de la campaña» of a space are listed, for whoever directs its campaign or
+     * moderates the space; null for everyone else and for a category that is no campaign's space.
+     */
+    public function sharedManagerUrl(?Authenticatable $user, Category $category): ?string
+    {
+        if (! $user instanceof Authenticatable || $category->subject()?->type !== CampaignSpaceSync::TYPE || ! $this->rules->mayManageSharedIn($user, $category)) {
+            return null;
+        }
+
+        return route('forum.characters.shared.index', ['category' => $category->slug()->value]);
+    }
+
+    /**
+     * The «PNJ de la campaña» manager of a campaign space: its shared characters, retired ones
+     * included, and the limits of the form. For whoever directs the campaign or moderates the space.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ForumActionDeniedException
+     */
+    public function shared(Authenticatable $user, Category $space): array
+    {
+        $characters = $this->service->sharedIn($user, $space);
+        $withPosts = array_flip($this->service->idsWithPosts($characters));
+
+        return [
+            'items' => array_map(fn (Character $character): array => $this->sharedRow($user, $character, isset($withPosts[$character->id()->value])), $characters),
+            ...$this->form($user, []),
+            'createUrl' => $this->rules->mayShareIn($user, $space) ? route('forum.characters.shared.store', ['category' => $space->slug()->value]) : null,
+            'max' => CharacterRules::MAX_SHARED_PER_SPACE,
+        ];
+    }
+
+    /**
+     * One shared character as the manager lists it.
+     *
+     * @return array<string, mixed>
+     */
+    public function sharedItem(Authenticatable $user, Character $character): array
+    {
+        return $this->sharedRow($user, $character, $this->service->idsWithPosts([$character]) !== []);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sharedRow(Authenticatable $user, Character $character, bool $hasPosts): array
+    {
+        $leads = $this->rules->leads($user, $character);
+
+        return [
+            ...$this->basics($character),
+            'description' => $character->description(),
+            'isRetired' => $character->isRetired(),
+            'isRetirementLocked' => $character->isRetirementLocked(),
+            'retiredLabel' => $character->retiredAt() instanceof \DateTimeImmutable ? $this->timezone->format($character->retiredAt()) : null,
+            'hasPosts' => $hasPosts,
+            'actions' => $this->actions($character, owner: $leads, deletable: ! $hasPosts),
         ];
     }
 
@@ -141,7 +206,7 @@ final readonly class CharacterPresenter
     }
 
     /**
-     * @return array{id: string, name: string, initials: string, portraitUrl: string|null}
+     * @return array{id: string, name: string, initials: string, portraitUrl: string|null, isShared: bool}
      */
     public function basics(Character $character): array
     {
@@ -152,6 +217,8 @@ final readonly class CharacterPresenter
             'name' => $character->name(),
             'initials' => $character->initials(),
             'portraitUrl' => $path === null ? null : $this->portraits->url($path),
+            // Shared by the directors of a campaign: no account plays it
+            'isShared' => $character->isNpc(),
         ];
     }
 
@@ -187,7 +254,7 @@ final readonly class CharacterPresenter
     /**
      * @return array<string, string|null>
      */
-    private function actions(Character $character, bool $owner): array
+    private function actions(Character $character, bool $owner, bool $deletable = true): array
     {
         $id = $character->id()->value;
         // Its owner brings back only what they retired; moderation, anything
@@ -197,7 +264,7 @@ final readonly class CharacterPresenter
             'updateUrl' => route('forum.characters.update', ['character' => $id]),
             'retireUrl' => $character->isRetired() && ($owner || $character->isRetirementLocked()) ? null : route('forum.characters.retire', ['character' => $id]),
             'restoreUrl' => $restorable ? route('forum.characters.restore', ['character' => $id]) : null,
-            'deleteUrl' => route('forum.characters.destroy', ['character' => $id]),
+            'deleteUrl' => $deletable ? route('forum.characters.destroy', ['character' => $id]) : null,
         ];
     }
 }

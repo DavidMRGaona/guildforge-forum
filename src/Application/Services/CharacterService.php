@@ -75,6 +75,50 @@ final readonly class CharacterService
     }
 
     /**
+     * The shared characters of a campaign space, retired ones included, by name: for whoever
+     * directs the campaign and whoever moderates the space.
+     *
+     * @return list<Character>
+     *
+     * @throws ForumActionDeniedException unless the person directs or moderates the space
+     */
+    public function sharedIn(Authenticatable $actor, Category $space): array
+    {
+        if (! $this->rules->mayManageSharedIn($actor, $space)) {
+            throw ForumActionDeniedException::because('manage the shared characters of this space');
+        }
+
+        return $this->characters->sharedIn($space->id());
+    }
+
+    /**
+     * A shared character of the campaign space, for whoever directs the campaign.
+     *
+     * @throws ForumActionDeniedException unless the person directs the campaign and characters are on for them
+     * @throws InvalidCharacterException
+     */
+    public function createShared(Authenticatable $director, Category $space, CharacterInputDTO $input): Character
+    {
+        if (! $this->rules->mayShareIn($director, $space)) {
+            throw ForumActionDeniedException::because('share characters in this space');
+        }
+
+        if ($this->characters->countSharedIn($space->id()) >= CharacterRules::MAX_SHARED_PER_SPACE) {
+            throw InvalidCharacterException::because(InvalidCharacterException::TOO_MANY, 'name', 'Too many shared characters for one space.');
+        }
+
+        $now = CarbonImmutable::now();
+        $character = Character::createNpc(CharacterId::generate(), $input->name, $input->description, $space->id(), $now);
+        if ($input->portrait !== null) {
+            $character->changePortrait($this->portraits->upload($input->portrait), $now);
+        }
+
+        $this->characters->save($character);
+
+        return $character;
+    }
+
+    /**
      * Its owner changes all of it; a moderator its name, description and portrait (the category
      * it is tied to stays).
      *
@@ -115,7 +159,8 @@ final readonly class CharacterService
     public function retire(Authenticatable $actor, string $id): Character
     {
         $character = $this->manageable($actor, $id);
-        $character->retire(CarbonImmutable::now(), byModeration: ! $this->rules->owns($actor, $character));
+        // Retired by someone who does not direct its campaign, a shared one stays retired for the directors
+        $character->retire(CarbonImmutable::now(), byModeration: $character->isNpc() ? ! $this->rules->leads($actor, $character) : ! $this->rules->owns($actor, $character));
         $this->saveLogged($actor, $character, ModerationAction::CharacterRetired);
 
         return $character;
@@ -129,7 +174,7 @@ final readonly class CharacterService
     public function restore(Authenticatable $actor, string $id): Character
     {
         $character = $this->manageable($actor, $id);
-        $moderates = $this->rules->moderates($actor, $character);
+        $moderates = $character->isNpc() ? ! $this->rules->leads($actor, $character) : $this->rules->moderates($actor, $character);
         if ($this->rules->owns($actor, $character) && ! $moderates && ! $this->rules->mayHaveCharacters($actor)) {
             throw ForumActionDeniedException::because('bring characters back');
         }
@@ -151,7 +196,8 @@ final readonly class CharacterService
     {
         $character = $this->manageable($actor, $id);
         $hasPosts = $this->characters->hasPosts($character->id());
-        if (! $this->rules->moderates($actor, $character) && $hasPosts) {
+        // A shared one with posts is never deleted: its posts would show who wrote them
+        if (($character->isNpc() || ! $this->rules->moderates($actor, $character)) && $hasPosts) {
             throw InvalidCharacterException::because(InvalidCharacterException::HAS_POSTS, 'character', "Character {$id} has posts: it is retired instead.");
         }
 
@@ -178,7 +224,9 @@ final readonly class CharacterService
      */
     private function logIfModeration(Authenticatable $actor, Character $character, ModerationAction $action, array $details = []): void
     {
-        if ($this->rules->owns($actor, $character)) {
+        // What the directors do with their shared characters is theirs, not moderation's; whoever
+        // moderates without directing the campaign is logged, with its space instead of an owner
+        if ($this->rules->owns($actor, $character) || $this->rules->leads($actor, $character)) {
             return;
         }
 
@@ -186,7 +234,7 @@ final readonly class CharacterService
             'character_id' => $character->id()->value,
             'character_name' => $character->name(),
             ...$details,
-        ]);
+        ], categoryId: $character->categoryId()?->value);
     }
 
     /**

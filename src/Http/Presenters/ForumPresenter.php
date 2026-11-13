@@ -303,8 +303,14 @@ final readonly class ForumPresenter
             self::collectMentions($document, $mentioned);
         }
 
+        // A post that speaks as a shared character shows no account to whoever may not know it
+        $shown = [];
+        foreach ($posts as $index => $post) {
+            $shown[$index] = $post->authorId() !== null && ! $contents[$index]->authorHidden ? $post->authorId() : null;
+        }
+
         $names = $this->names(array_values(array_unique([
-            ...array_filter(array_map(static fn ($post): ?string => $post->authorId(), $posts)),
+            ...array_filter($shown),
             ...array_keys($mentioned),
         ])));
 
@@ -317,9 +323,9 @@ final readonly class ForumPresenter
             $items[] = [
                 'id' => $post->id()->value,
                 'number' => $number,
-                'authorId' => $post->authorId(),
-                'authorName' => $post->authorId() === null ? null : ($names[$post->authorId()] ?? null),
-                'isStarter' => $post->authorId() !== null && $post->authorId() === $discussion->authorId(),
+                'authorId' => $shown[$index],
+                'authorName' => $shown[$index] === null ? null : ($names[$shown[$index]] ?? null),
+                'isStarter' => $shown[$index] !== null && $shown[$index] === $discussion->authorId(),
                 'status' => $post->status()->value,
                 'html' => $content->html,
                 'placeholder' => $content->placeholder,
@@ -383,7 +389,7 @@ final readonly class ForumPresenter
             $lastPost = [
                 'discussionTitle' => $stat->lastDiscussionTitle,
                 'url' => $this->urls->discussionFrom($stat->lastDiscussionNumber, $stat->lastDiscussionTitle, $stat->lastPostNumber),
-                'authorName' => $stat->lastPostAuthorId === null ? null : ($names[$stat->lastPostAuthorId] ?? null),
+                'authorName' => $stat->lastPostSharedName ?? ($stat->lastPostAuthorId === null ? null : ($names[$stat->lastPostAuthorId] ?? null)),
                 'at' => $this->timezone->iso($stat->lastActivityAt),
                 'atLabel' => $this->timezone->format($stat->lastActivityAt),
             ];
@@ -439,7 +445,7 @@ final readonly class ForumPresenter
             'topics' => $this->topics($row->topics),
             'replyCount' => max(0, $row->postCount - 1),
             'lastPost' => [
-                'authorName' => $row->lastPostAuthorId === null ? null : ($names[$row->lastPostAuthorId] ?? null),
+                'authorName' => $row->lastPostSharedName ?? ($row->lastPostAuthorId === null ? null : ($names[$row->lastPostAuthorId] ?? null)),
                 'at' => $this->timezone->iso($row->lastActivityAt),
                 'atLabel' => $this->timezone->format($row->lastActivityAt),
                 'url' => $row->lastPostNumber === null ? null : $this->urls->discussionFrom($row->number, $row->title, $row->lastPostNumber),

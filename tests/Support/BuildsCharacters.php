@@ -25,4 +25,18 @@ trait BuildsCharacters
 
         return $character;
     }
+
+    /**
+     * A character shared by the directors of the campaign space.
+     */
+    protected function aSharedCharacterIn(Category $space, string $name = 'Mercader', bool $retired = false): Character
+    {
+        $character = Character::createNpc(CharacterId::generate(), $name, 'Vende de todo', $space->id(), new DateTimeImmutable('2026-11-12 09:00:00'));
+        if ($retired) {
+            $character->retire(new DateTimeImmutable('2026-11-12 10:00:00'), byModeration: false);
+        }
+        app(CharacterRepositoryInterface::class)->save($character);
+
+        return $character;
+    }
 }

@@ -37,6 +37,11 @@ final class ModerationRefusedException extends RuntimeException
         return new self('Only numbered posts after the first one, each once, can be split off.', 'split_selection');
     }
 
+    public static function splitSharedCharacter(): self
+    {
+        return new self('A post that speaks as a shared character cannot open a discussion: its author would show.', 'split_shared_character');
+    }
+
     public static function mergeTarget(string $discussionId): self
     {
         return new self("Discussion {$discussionId} cannot take this merge.", 'merge_target');

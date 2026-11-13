@@ -18,6 +18,7 @@ import DiscussionList from '../../components/forum/DiscussionList.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import ForumSearchForm from '../../components/forum/ForumSearchForm.vue';
 import MarkReadButton from '../../components/forum/MarkReadButton.vue';
+import SharedCharacters from '../../components/characters/SharedCharacters.vue';
 import SpaceNotices from '../../components/spaces/SpaceNotices.vue';
 
 const props = defineProps<{
@@ -29,6 +30,8 @@ const props = defineProps<{
     canStart: boolean;
     newDiscussionUrl: string;
     markReadUrl: string | null;
+    /** The PNJ of a campaign's space: only for whoever directs the campaign or moderates the space */
+    sharedCharactersUrl?: string | null;
 }>();
 
 const { t } = useI18n();
@@ -82,6 +85,8 @@ const breadcrumbs = computed(() => [
     </div>
 
     <div class="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <SharedCharacters v-if="sharedCharactersUrl" :url="sharedCharactersUrl" />
+
         <ForumSearchForm
             :action="search.url"
             :category="search.category"

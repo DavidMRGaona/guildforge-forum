@@ -7,7 +7,8 @@ namespace Modules\Forum\Application\Queries;
 use DateTimeImmutable;
 
 /**
- * What a category counts (its own discussions, not its subcategories') and its last post.
+ * What a category counts (its own discussions, not its subcategories') and its last post. A last
+ * post that speaks as a shared character names it (lastPostSharedName) and no account.
  */
 final readonly class CategoryStatsDTO
 {
@@ -19,5 +20,6 @@ final readonly class CategoryStatsDTO
         public ?string $lastDiscussionTitle = null,
         public ?int $lastPostNumber = null,
         public ?string $lastPostAuthorId = null,
+        public ?string $lastPostSharedName = null,
     ) {}
 }

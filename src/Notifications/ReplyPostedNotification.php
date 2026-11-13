@@ -29,7 +29,7 @@ final class ReplyPostedNotification extends PostNotification implements HasMailD
     {
         $notice = $this->notice($notifiable);
 
-        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url, $notice->post->authorId()) : null;
+        return $notice instanceof PostNoticeDTO ? new MailDigestLineDTO($this->title($notice), $notice->url, $notice->actorId()) : null;
     }
 
     protected function stillHolds(PostNoticeDTO $notice, string $channel): bool
@@ -64,7 +64,7 @@ final class ReplyPostedNotification extends PostNotification implements HasMailD
             body: $notice->excerpt === '' ? null : $notice->excerpt,
             icon: 'message-square',
             groupKey: 'forum.replies:'.$notice->discussion->id()->value,
-            actorId: $notice->post->authorId(),
+            actorId: $notice->actorId(),
             groupedTitle: static fn (SiteNotificationGroupDTO $group): string => $group->otherActors === 0
                 ? trans_choice('forum::messages.notices.reply.grouped_same', $group->count, ['author' => $author, 'count' => $group->count, 'discussion' => $title])
                 : trans_choice('forum::messages.notices.reply.grouped', $group->otherActors, ['author' => $author, 'count' => $group->otherActors, 'discussion' => $title]),

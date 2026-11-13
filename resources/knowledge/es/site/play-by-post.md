@@ -6,7 +6,7 @@ category: community
 audience: site
 order: 70
 keywords: [partida por foro, jugar por foro, rol por foro, por turnos, mensaje a mensaje, fuera de personaje, aparte, ooc, narrador, director de juego, dm, master, escena]
-related: [forum.site.dice, forum.site.characters, forum.site.writing]
+related: [forum.site.dice, forum.site.characters, forum.site.campaign-spaces, forum.site.writing]
 ---
 Una partida por foro se juega por turnos, mensaje a mensaje, en un tema: el narrador describe la escena y cada jugador contesta cuando puede. El foro trae tres herramientas pensadas para eso.
 
@@ -32,6 +32,8 @@ Las tiradas se hacen en el servidor y nadie puede elegir el resultado. Mira la g
 ## Personajes
 
 Si el sitio lo permite, puedes escribir como tus personajes, con su nombre y su retrato. Mira la guía de personajes.
+
+Si diriges una campaña, además puedes hablar con los **PNJ de la campaña**, comunes a toda la dirección, desde el espacio de esa campaña. El mensaje muestra al PNJ y no dice a la plantilla qué persona lo escribe. Mira la guía del espacio de una campaña.
 
 ## Consejos
 

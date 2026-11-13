@@ -91,15 +91,31 @@
     background-color: var(--color-primary-950);
 }
 
+/*
+ * A quoted post: who wrote it, then the text. Module sheets sit below the typography plugin, so
+ * what .prose also sets is marked important: its border colour (a logical property, which beats
+ * a physical one), the paragraph margins and the quotation marks it draws around the first and
+ * last paragraph, which would wrap «… escribió:» together with the text.
+ */
 .forum-quote {
-    border-left-color: var(--color-primary-500);
+    border-inline-start-color: var(--color-primary-500) !important;
+}
+
+.forum-quote p::before,
+.forum-quote p::after {
+    content: none !important;
 }
 
 .forum-quote__source {
-    margin-bottom: 0.25rem;
+    margin-top: 0 !important;
+    margin-bottom: 0.25rem !important;
     font-size: 0.875rem;
     font-style: normal;
     font-weight: 600;
+}
+
+.forum-quote__source + p {
+    margin-top: 0 !important;
 }
 
 .forum-image img {

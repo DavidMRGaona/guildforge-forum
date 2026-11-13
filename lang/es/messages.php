@@ -435,6 +435,23 @@ return [
         'total' => 'Total',
         'unresolved' => 'Sin resultado',
         'summary' => ':expression :reason = :total',
+        'hidden' => [
+            'label' => 'Tirada oculta:',
+            'speaker_rolls' => 'Tirada oculta de :name:',
+            'text' => 'Tirada oculta: :roll',
+            'withheld' => 'El resultado está oculto.',
+            'badge' => 'Oculta',
+            'seen_by' => 'Solo ven el resultado quien tiró y la moderación.',
+            'seen_by_campaign' => 'Solo ven el resultado quien tiró, la dirección de la campaña y la moderación.',
+            'reveal' => 'Revelar',
+            'revealed' => 'Tirada oculta, ya revelada.',
+            'revealed_by' => 'Tirada oculta, revelada por :name el :date.',
+            'errors' => [
+                'not_hidden' => 'Esta tirada no es oculta.',
+                'already_revealed' => 'Esta tirada ya estaba revelada.',
+                'removed' => 'Esta tirada ya no está en el mensaje.',
+            ],
+        ],
         'errors' => [
             'empty' => 'La tirada está vacía.',
             'syntax' => 'No se entiende la expresión.',

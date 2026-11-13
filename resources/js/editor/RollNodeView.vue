@@ -10,6 +10,9 @@ import { MAX_EXPRESSION_LENGTH, MAX_REASON_LENGTH } from './rollText';
  * here and cannot be: the server throws the dice when the post is published. A roll the post
  * already has (it carries its id) keeps its expression, because that is the throw the server
  * made; another expression is another roll, so the person removes this one and adds a new one.
+ *
+ * «Oculta» asks for a hidden roll: its result is shown only to whoever throws it, moderation and,
+ * in a campaign's space, its direction. It is chosen before throwing; a thrown roll stays as it is.
  */
 const props = defineProps(nodeViewProps);
 
@@ -19,9 +22,24 @@ const id = useId();
 const locked = computed(() => props.node.attrs['rollId'] !== null);
 const expression = computed(() => String(props.node.attrs['expression'] ?? ''));
 const reason = computed(() => String(props.node.attrs['reason'] ?? ''));
+const hidden = computed(() => props.node.attrs['hidden'] === true);
+
+const hint = computed(() => {
+    if (locked.value) {
+        return hidden.value
+            ? t('forum.editor.roll.thrown_hidden_hint')
+            : t('forum.editor.roll.thrown_hint');
+    }
+
+    return hidden.value ? t('forum.editor.roll.hidden_hint') : t('forum.editor.roll.hint');
+});
 
 function setExpression(event: Event): void {
     props.updateAttributes({ expression: (event.target as HTMLInputElement).value });
+}
+
+function setHidden(event: Event): void {
+    props.updateAttributes({ hidden: (event.target as HTMLInputElement).checked });
 }
 
 function setReason(event: Event): void {
@@ -71,6 +89,17 @@ function setReason(event: Event): void {
                 data-roll-reason
                 @input="setReason"
             />
+            <label class="forum-roll__hidden-toggle">
+                <input
+                    type="checkbox"
+                    :checked="hidden"
+                    :disabled="locked"
+                    :aria-describedby="`${id}-hint`"
+                    data-roll-hidden
+                    @change="setHidden"
+                />
+                {{ t('forum.editor.roll.hidden') }}
+            </label>
             <button
                 type="button"
                 class="forum-roll__remove"
@@ -83,7 +112,7 @@ function setReason(event: Event): void {
             </button>
         </div>
         <p :id="`${id}-hint`" class="forum-roll__hint">
-            {{ locked ? t('forum.editor.roll.thrown_hint') : t('forum.editor.roll.hint') }}
+            {{ hint }}
         </p>
     </NodeViewWrapper>
 </template>

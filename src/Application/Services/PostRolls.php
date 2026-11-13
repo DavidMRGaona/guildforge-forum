@@ -32,6 +32,11 @@ use Modules\Forum\Domain\ValueObjects\PostId;
  *
  * A roll that does not read, or that would pass the message's dice budget, is not thrown: it is
  * stored with its error and shown with it, and the rest of the post is published all the same.
+ *
+ * A new roll is hidden when its node asks for it (`hidden`), and whoever writes the body is its
+ * thrower. A roll the post keeps stays as it was thrown, hidden or not, whatever the node says:
+ * a public result cannot be hidden afterwards, nor a hidden one shown but by revealing it. The
+ * plain text stored with the post never holds the result of a roll still secret.
  */
 final readonly class PostRolls
 {
@@ -45,10 +50,11 @@ final readonly class PostRolls
      * Settles the rolls of a body about to be written for the post.
      *
      * @param  bool  $editing  whether the post already exists (its rolls are the ones it may keep)
+     * @param  string|null  $rolledBy  the account writing the body: whoever throws its new rolls
      *
      * @throws InvalidDocumentException when a roll does not belong to the post, or the text gets too long
      */
-    public function settle(PostId $postId, PostBody $body, bool $editing, DateTimeImmutable $at): RolledBody
+    public function settle(PostId $postId, PostBody $body, bool $editing, DateTimeImmutable $at, ?string $rolledBy = null): RolledBody
     {
         $nodes = [];
         $this->collect($body->document, $nodes);
@@ -102,7 +108,7 @@ final readonly class PostRolls
                 continue;
             }
 
-            $roll = $this->throwNew($postId, $position, is_string($attributes['expression'] ?? null) ? $attributes['expression'] : '', $budget, $editing, $at);
+            $roll = $this->throwNew($postId, $position, is_string($attributes['expression'] ?? null) ? $attributes['expression'] : '', $budget, $editing, $at, ($attributes['hidden'] ?? false) === true, $rolledBy);
             $budget += $roll->diceCount;
             $records[] = $roll;
             $current[] = $roll;
@@ -142,22 +148,23 @@ final readonly class PostRolls
         $this->rolls->deleteOfPost($postId);
     }
 
-    private function throwNew(PostId $postId, int $position, string $written, int $budget, bool $addedOnEdit, DateTimeImmutable $at): DiceRoll
+    private function throwNew(PostId $postId, int $position, string $written, int $budget, bool $addedOnEdit, DateTimeImmutable $at, bool $hidden, ?string $rolledBy): DiceRoll
     {
         $id = Str::uuid()->toString();
+        $rolledBy = $rolledBy === null ? null : strtolower($rolledBy);
 
         try {
             $expression = (new Parser)->parse($written);
         } catch (InvalidNotation $exception) {
-            return DiceRoll::refused($id, $postId, $position, trim($written), $exception->reason, $addedOnEdit, $at);
+            return DiceRoll::refused($id, $postId, $position, trim($written), $exception->reason, $addedOnEdit, $at, $hidden, $rolledBy);
         }
 
         $dice = $expression->diceCount();
         if ($budget + $dice > Limits::MAX_DICE_PER_POST) {
-            return DiceRoll::refused($id, $postId, $position, $expression->canonical(), InvalidNotation::TOO_MANY_DICE_IN_POST, $addedOnEdit, $at);
+            return DiceRoll::refused($id, $postId, $position, $expression->canonical(), InvalidNotation::TOO_MANY_DICE_IN_POST, $addedOnEdit, $at, $hidden, $rolledBy);
         }
 
-        return DiceRoll::thrown($id, $postId, $position, $expression->canonical(), $dice, (new Roller($this->numbers))->roll($expression), $addedOnEdit, $at);
+        return DiceRoll::thrown($id, $postId, $position, $expression->canonical(), $dice, (new Roller($this->numbers))->roll($expression), $addedOnEdit, $at, $hidden, $rolledBy);
     }
 
     /**
@@ -195,7 +202,8 @@ final readonly class PostRolls
 
     /**
      * The document with every roll node rewritten to what the server decided: the expression as
-     * it reads, the reason as written and the roll's id. Nothing else changes.
+     * it reads, the reason as written, the roll's id and, for a hidden roll, `hidden` (so the
+     * editor shows it). Nothing else changes.
      *
      * @param  array<array-key, mixed>  $document
      * @param  list<DiceRoll>  $rolls  in document order
@@ -209,6 +217,9 @@ final readonly class PostRolls
                 $roll = $rolls[$next++];
                 $reason = is_array($node['attrs'] ?? null) && is_string($node['attrs']['reason'] ?? null) ? trim($node['attrs']['reason']) : '';
                 $node['attrs'] = ['expression' => $roll->expression, 'reason' => $reason === '' ? null : $reason, 'rollId' => $roll->id];
+                if ($roll->hidden) {
+                    $node['attrs']['hidden'] = true;
+                }
 
                 return $node;
             }

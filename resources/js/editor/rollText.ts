@@ -13,8 +13,11 @@ export const MAX_REASON_LENGTH = 100;
 /** Rolls per post (Domain\Dice\Limits::MAX_ROLLS_PER_POST) */
 export const MAX_ROLLS = 10;
 
-/** What a person types to start a roll on a line of its own */
+/** What a person types to start a roll on a line of its own; «oculta» first makes it hidden */
 const SHORTCUT = /^\/tirada(?:\s+(.*))?$/iu;
+
+/** The word that asks for a hidden roll, right after «/tirada» */
+const HIDDEN_WORD = /^oculta(?:\s+|$)/iu;
 
 /** A group of dice or a number, with whatever modifiers follow it, glued together */
 const TERM =
@@ -29,14 +32,26 @@ export interface RollText {
     reason: string;
 }
 
+/** A roll asked for with `/tirada`: also whether it is hidden */
+export interface RollShortcut extends RollText {
+    hidden: boolean;
+}
+
 /**
  * The text of a paragraph when it is a `/tirada` line, else null. «/tirada» alone gives an
- * empty roll to fill in.
+ * empty roll to fill in; «/tirada oculta 1d20 Sigilo» a hidden one (its result is shown only to
+ * whoever throws it, moderation and a campaign's direction).
  */
-export function rollFromShortcut(paragraph: string): RollText | null {
+export function rollFromShortcut(paragraph: string): RollShortcut | null {
     const match = SHORTCUT.exec(paragraph.trim());
+    if (match === null) {
+        return null;
+    }
 
-    return match === null ? null : splitRollText(match[1] ?? '');
+    const rest = (match[1] ?? '').trim();
+    const hidden = HIDDEN_WORD.test(rest);
+
+    return { ...splitRollText(hidden ? rest.replace(HIDDEN_WORD, '') : rest), hidden };
 }
 
 /**

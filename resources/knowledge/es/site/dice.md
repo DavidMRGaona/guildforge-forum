@@ -1,11 +1,11 @@
 ---
 id: forum.site.dice
 title: Tiradas de dados en un mensaje
-summary: Cómo tirar dados en el foro, con la tabla de expresiones (2d6+3, 4d6kh3, 5d10>=7, 3d6!) y sus límites.
+summary: Cómo tirar dados en el foro, con la tabla de expresiones (2d6+3, 4d6kh3, 5d10>=7, 3d6!), las tiradas ocultas y sus límites.
 category: community
 audience: site
 order: 80
-keywords: [dados, tirada, tirar, d20, d6, 2d6, d%, dF, fate, reserva, éxitos, mantener, descartar, explotar, explosión, ventaja, desventaja, kh, kl, dh, dl, resultado, trampas, aleatorio, expresión]
+keywords: [dados, tirada, tirar, d20, d6, 2d6, d%, dF, fate, reserva, éxitos, mantener, descartar, explotar, explosión, ventaja, desventaja, kh, kl, dh, dl, resultado, trampas, aleatorio, expresión, oculta, ocultas, secreta, pantalla, revelar, dirección]
 related: [forum.site.play-by-post, forum.site.characters, forum.site.writing]
 ---
 Puedes tirar dados dentro de un mensaje. El foro tira los dados al publicar, en el servidor, y guarda el resultado: nadie, tampoco quien escribe, puede elegirlo ni repetir la tirada.
@@ -18,6 +18,16 @@ De dos maneras:
 - En una línea propia, escribe `/tirada 2d6+3 Ataque` y pulsa Intro: `2d6+3` es la expresión y «Ataque» el motivo.
 
 Al publicar, el mensaje muestra la expresión, cada dado, el total y el motivo. En un mensaje en personaje se lee «(nombre) tira».
+
+## Tiradas ocultas
+
+Una tirada oculta es como la que se hace detrás de la pantalla: se tira igual, en el servidor, pero no todo el mundo ve lo que sale.
+
+- **Para hacerla**, marca **Oculta** en la tirada antes de publicar, o escribe `/tirada oculta 1d20+2 Sigilo` y pulsa Intro.
+- **Ven el resultado** quien tira, la moderación y, en el espacio de una campaña, su dirección. El resto lee «Tirada oculta: 1d20+2 Sigilo», con la expresión y el motivo, pero sin los dados ni el total.
+- **El resultado tampoco sale** en los avisos, los correos, la búsqueda, las citas ni la conversación de una ficha.
+- **Para revelarla**, pulsa **Revelar** en la tirada. Pueden hacerlo quien tiró y, en el espacio de una campaña, su dirección. Desde ese momento la ve todo el mundo y la tirada muestra quién la reveló y cuándo. **No se puede volver a ocultar.**
+- Ocultar o no una tirada se elige antes de tirarla: al editar el mensaje, una tirada ya hecha sigue como estaba.
 
 ## Expresiones que entiende
 
@@ -46,7 +56,7 @@ Los dados descartados se ven tachados y marcados como «(descartado)», y los de
 
 ## Al editar un mensaje
 
-Editar nunca repite una tirada: las que siguen en el mensaje conservan lo que salió, y la expresión de una ya hecha queda bloqueada. Si quieres otra tirada, quita la anterior y añade una nueva: se tira una vez y se marca como **Añadida al editar**. Las tiradas quitadas siguen en el historial del mensaje.
+Editar nunca repite una tirada: las que siguen en el mensaje conservan lo que salió, y la expresión de una ya hecha queda bloqueada, igual que la casilla **Oculta**. Si quieres otra tirada, quita la anterior y añade una nueva: se tira una vez y se marca como **Añadida al editar**. Las tiradas quitadas siguen en el historial del mensaje.
 
 ## Si algo no sale bien
 

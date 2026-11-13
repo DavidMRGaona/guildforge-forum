@@ -30,5 +30,11 @@ interface DiceRollRepositoryInterface
      */
     public function findMany(array $ids): array;
 
+    /**
+     * Reveals a hidden roll that is still secret and in its post, recording who and when; false
+     * when there was nothing to reveal (someone else just did, or it was never hidden).
+     */
+    public function markRevealed(string $id, string $accountId, \DateTimeImmutable $at): bool;
+
     public function deleteOfPost(PostId $postId): void;
 }

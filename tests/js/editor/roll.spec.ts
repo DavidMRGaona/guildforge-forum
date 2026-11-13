@@ -44,8 +44,14 @@ describe('the roll node', () => {
         }).getJSON();
 
         expect(json.content).toEqual([
-            { type: 'roll', attrs: { expression: '2d6+3', reason: 'Ataque', rollId: ROLL_ID } },
-            { type: 'roll', attrs: { expression: '1d20', reason: null, rollId: null } },
+            {
+                type: 'roll',
+                attrs: { expression: '2d6+3', reason: 'Ataque', rollId: ROLL_ID, hidden: false },
+            },
+            {
+                type: 'roll',
+                attrs: { expression: '1d20', reason: null, rollId: null, hidden: false },
+            },
         ]);
     });
 
@@ -62,7 +68,30 @@ describe('the roll node', () => {
 
         const pasted = makeEditor(html).getJSON();
         expect(pasted.content).toEqual([
-            { type: 'roll', attrs: { expression: '2d6+3', reason: 'Ataque', rollId: null } },
+            {
+                type: 'roll',
+                attrs: { expression: '2d6+3', reason: 'Ataque', rollId: null, hidden: false },
+            },
+        ]);
+    });
+
+    it('keeps a pasted copy of a hidden roll hidden, and never its id', () => {
+        const html = makeEditor({
+            type: 'doc',
+            content: [
+                {
+                    type: 'roll',
+                    attrs: { expression: '1d20', reason: 'Sigilo', rollId: ROLL_ID, hidden: true },
+                },
+            ],
+        }).getHTML();
+
+        expect(html).not.toContain(ROLL_ID);
+        expect(makeEditor(html).getJSON().content).toEqual([
+            {
+                type: 'roll',
+                attrs: { expression: '1d20', reason: 'Sigilo', rollId: null, hidden: true },
+            },
         ]);
     });
 
@@ -81,6 +110,7 @@ describe('the roll node', () => {
             expression: '',
             reason: null,
             rollId: null,
+            hidden: false,
         });
     });
 
@@ -95,10 +125,29 @@ describe('the roll node', () => {
         expect(current.getJSON().content).toEqual([
             {
                 type: 'roll',
-                attrs: { expression: '2d6+3', reason: 'Ataque con espada', rollId: null },
+                attrs: {
+                    expression: '2d6+3',
+                    reason: 'Ataque con espada',
+                    rollId: null,
+                    hidden: false,
+                },
             },
             { type: 'paragraph' },
         ]);
+    });
+
+    it('turns a /tirada oculta line into a hidden roll on Enter', () => {
+        const current = makeEditor('<p>/tirada oculta 1d20+2 Sigilo</p>');
+        current.commands.focus('end');
+
+        current.view.someProp('handleKeyDown', (handler) =>
+            handler(current.view, new KeyboardEvent('keydown', { key: 'Enter' }))
+        );
+
+        expect(current.getJSON().content?.[0]).toEqual({
+            type: 'roll',
+            attrs: { expression: '1d20+2', reason: 'Sigilo', rollId: null, hidden: true },
+        });
     });
 
     it('does not take Enter on any other line', () => {
@@ -130,7 +179,19 @@ describe('the roll node', () => {
                 type: 'roll',
                 attrs: { expression: '1d20', reason: '', rollId: ROLL_ID, total: 20 },
             })
-        ).toEqual({ type: 'roll', attrs: { expression: '1d20', reason: null, rollId: null } });
+        ).toEqual({
+            type: 'roll',
+            attrs: { expression: '1d20', reason: null, rollId: null, hidden: false },
+        });
+        expect(
+            sanitizeContent({
+                type: 'roll',
+                attrs: { expression: '1d20', reason: null, rollId: ROLL_ID, hidden: true },
+            })
+        ).toEqual({
+            type: 'roll',
+            attrs: { expression: '1d20', reason: null, rollId: null, hidden: true },
+        });
     });
 });
 
@@ -154,8 +215,9 @@ describe('the roll in the post editor', () => {
         await button.trigger('click');
         await flushPromises();
 
-        const inputs = wrapper.findAll('[data-forum-roll] input');
+        const inputs = wrapper.findAll('[data-forum-roll] input[type="text"]');
         expect(inputs).toHaveLength(2);
+        expect(wrapper.find('[data-roll-hidden]').attributes('disabled')).toBeUndefined();
         expect(wrapper.find('[data-roll-expression]').attributes('readonly')).toBeUndefined();
         expect(wrapper.find('[data-forum-roll]').text()).toContain(
             'Se tira en el servidor al publicar'
@@ -173,8 +235,43 @@ describe('the roll in the post editor', () => {
         const document = (wrapper.vm as unknown as Exposed).getDocument();
         expect(document?.content?.[0]).toEqual({
             type: 'roll',
-            attrs: { expression: '2d6+3', reason: 'Ataque', rollId: null },
+            attrs: { expression: '2d6+3', reason: 'Ataque', rollId: null, hidden: false },
         });
+    });
+
+    it('makes a new roll hidden with «Oculta», and says who will see it', async () => {
+        const wrapper = await mountEditor();
+        await wrapper.find('[data-toolbar-item="roll"]').trigger('click');
+        await flushPromises();
+
+        await wrapper.find('[data-roll-expression]').setValue('1d20');
+        await wrapper.find('[data-roll-hidden]').setValue(true);
+
+        const document = (wrapper.vm as unknown as Exposed).getDocument();
+        expect(document?.content?.[0]?.attrs).toEqual({
+            expression: '1d20',
+            reason: null,
+            rollId: null,
+            hidden: true,
+        });
+        expect(wrapper.find('[data-forum-roll]').text()).toContain('Tirada oculta');
+    });
+
+    it('locks «Oculta» once the roll is thrown: a thrown roll stays as it is', async () => {
+        const wrapper = await mountEditor({
+            type: 'doc',
+            content: [
+                {
+                    type: 'roll',
+                    attrs: { expression: '1d20', reason: null, rollId: ROLL_ID, hidden: true },
+                },
+            ],
+        });
+
+        const box = wrapper.find('[data-roll-hidden]');
+        expect(box.attributes('disabled')).toBeDefined();
+        expect((box.element as HTMLInputElement).checked).toBe(true);
+        expect(wrapper.find('[data-forum-roll]').text()).toContain('«Revelar»');
     });
 
     it('locks the expression of a roll the post already has: another expression is another roll', async () => {

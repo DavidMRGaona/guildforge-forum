@@ -449,6 +449,105 @@
     font-weight: 600;
 }
 
+/*
+ * Hidden rolls. Kept from the reader: a dashed edge and only the expression and reason. Seen by
+ * the reader while the rest of the readers do not: a dotted edge, an «Oculta» badge, who else sees
+ * it and, for whoever may, the button that reveals it.
+ */
+.forum-roll--hidden {
+    border-left-style: dashed;
+    border-left-color: var(--color-accent-600);
+}
+
+.forum-roll--secret {
+    border-left-style: dotted;
+    border-left-color: var(--color-accent-600);
+}
+
+.forum-roll__badge--hidden {
+    color: var(--color-accent-800);
+    background-color: var(--color-accent-100);
+}
+
+.forum-roll__secret,
+.forum-roll__revealed {
+    margin-top: 0.375rem !important;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+}
+
+.forum-roll__hidden-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.375rem;
+}
+
+.forum-roll__hidden-bar .forum-roll__secret {
+    margin-top: 0 !important;
+    flex: 1 1 14rem;
+}
+
+.forum-roll__reveal {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.375rem;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-surface);
+}
+
+.forum-roll__reveal:hover {
+    background-color: var(--color-bg-elevated);
+}
+
+.forum-roll__reveal:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+}
+
+.forum-roll__reveal:disabled {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.dark .forum-roll--hidden,
+.dark .forum-roll--secret {
+    border-left-color: var(--color-accent-400);
+}
+
+.dark .forum-roll__badge--hidden {
+    color: var(--color-accent-100);
+    background-color: var(--color-accent-900);
+}
+
+/* While writing: whether a new roll is hidden */
+.forum-roll__hidden-toggle {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.forum-roll__hidden-toggle:has(input:disabled) {
+    cursor: default;
+}
+
+.forum-roll__hidden-toggle input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--color-primary-600);
+}
+
 .dark .forum-roll__die--exploded {
     border-color: var(--color-primary-400);
 }

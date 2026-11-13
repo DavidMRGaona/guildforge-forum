@@ -14,8 +14,9 @@ import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import { quoteFits } from '../../editor/extensions/PostQuote';
-import { sendJson } from '../../forum/api';
+import { revealRollUrl, sendJson } from '../../forum/api';
 import { useEmbeds } from '../../composables/useEmbeds';
+import { useRollReveals } from '../../composables/useRollReveals';
 import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
 
 type PostAction = 'hide' | 'show' | 'approve' | 'reject';
@@ -26,6 +27,9 @@ type CharacterAction = 'retire' | 'delete';
  * discussion; anyone who may reply can quote it (the selected text, or the whole post); anyone
  * signed in who reads it may like it, except its author. Its moderators also edit it, hide or
  * show it (with a reason its author reads) and approve or reject it while it awaits approval.
+ *
+ * A hidden roll the reader may reveal (whoever threw it, a campaign's direction) carries a
+ * «Revelar» button; revealing asks twice, since it cannot be undone.
  *
  * A post written as a character shows the character's portrait and name, and below who plays
  * it. Its author may switch character when editing; whoever moderates the character may
@@ -64,6 +68,38 @@ const confirmDelete = ref(false);
 const body = ref<HTMLElement | null>(null);
 // Embedded posts of other services load only on request or with consent
 useEmbeds(body, () => props.post.html);
+
+// «Revelar» on a hidden roll: confirmed twice, then the page reads the post again
+const { asked: rollToReveal } = useRollReveals(body);
+const revealOpen = computed({
+    get: () => rollToReveal.value !== null,
+    set: (open: boolean) => {
+        if (!open) {
+            rollToReveal.value = null;
+            revealError.value = null;
+        }
+    },
+});
+const revealBusy = ref(false);
+const revealError = ref<string | null>(null);
+
+async function revealRoll(): Promise<void> {
+    const roll = rollToReveal.value;
+    if (roll === null || revealBusy.value) {
+        return;
+    }
+    revealBusy.value = true;
+    revealError.value = null;
+    const answer = await sendJson(revealRollUrl(roll.id), 'POST');
+    revealBusy.value = false;
+    if (answer.ok) {
+        rollToReveal.value = null;
+        emit('changed');
+
+        return;
+    }
+    revealError.value = answer.message ?? t('forum.rolls.revealFailed');
+}
 
 const moderating = ref<PostAction | null>(null);
 const moderationOpen = ref(false);
@@ -662,6 +698,17 @@ async function remove(): Promise<void> {
             :user-id="post.authorId"
             :user-name="post.authorName"
             @suspended="suspended = true"
+        />
+
+        <ModerationDialog
+            v-model="revealOpen"
+            :title="t('forum.rolls.revealTitle')"
+            :message="t('forum.rolls.revealMessage', { roll: rollToReveal?.label ?? '' })"
+            :confirm-label="t('forum.rolls.reveal')"
+            :confirmation="t('forum.rolls.revealConfirmation')"
+            :busy="revealBusy"
+            :error="revealError"
+            @confirm="revealRoll"
         />
 
         <ConfirmDialog

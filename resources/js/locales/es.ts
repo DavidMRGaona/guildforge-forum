@@ -111,6 +111,14 @@ export default {
             markForumRead: 'Marcar todo el foro como leído',
             markCategoryRead: 'Marcar como leída la categoría {name}',
         },
+        rolls: {
+            revealTitle: 'Revelar la tirada',
+            revealMessage:
+                'A partir de ahora, todo el que lea este mensaje verá el resultado de {roll}.',
+            revealConfirmation: 'Entiendo que no se puede volver a ocultar.',
+            reveal: 'Revelar',
+            revealFailed: 'No se ha podido revelar la tirada. Inténtalo de nuevo.',
+        },
         posts: {
             moved: {
                 to: 'Un mensaje movido a | {count} mensajes movidos a',
@@ -516,6 +524,11 @@ export default {
                 hint: 'Se tira en el servidor al publicar, y nadie puede elegir el resultado. Ejemplos: 2d6+3, 4d6kh3, 5d10>=7, 3d6!',
                 thrown_hint:
                     'Ya está tirada y se mostrará como salió. Para tirar otra, quítala y añade una nueva.',
+                hidden: 'Oculta',
+                hidden_hint:
+                    'Tirada oculta: el resultado solo lo verán quien tira, la moderación y, en una campaña, su dirección. Se puede revelar después, pero no volver a ocultar.',
+                thrown_hidden_hint:
+                    'Ya está tirada y es oculta. Para que la vea todo el mundo, usa «Revelar» en el mensaje.',
             },
             mentions: {
                 label: 'Personas que puedes mencionar',

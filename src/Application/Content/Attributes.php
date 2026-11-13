@@ -81,6 +81,22 @@ final class Attributes
     }
 
     /**
+     * An optional true or false.
+     *
+     * @param  array<array-key, mixed>  $attributes
+     *
+     * @throws InvalidDocumentException
+     */
+    public static function optionalBool(array $attributes, string $key, string $path): void
+    {
+        $value = $attributes[$key] ?? null;
+
+        if ($value !== null && ! is_bool($value)) {
+            throw InvalidDocumentException::because(InvalidDocumentException::INVALID_ATTRIBUTE, $path, "'{$key}' is true or false");
+        }
+    }
+
+    /**
      * An optional string of at most the given characters, without control characters.
      *
      * @param  array<array-key, mixed>  $attributes

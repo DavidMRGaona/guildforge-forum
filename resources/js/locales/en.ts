@@ -110,6 +110,14 @@ export default {
             markForumRead: 'Mark the whole forum as read',
             markCategoryRead: 'Mark the category {name} as read',
         },
+        rolls: {
+            revealTitle: 'Reveal the roll',
+            revealMessage:
+                'From now on everyone who reads this post will see the result of {roll}.',
+            revealConfirmation: 'I understand it cannot be hidden again.',
+            reveal: 'Reveal',
+            revealFailed: 'The roll could not be revealed. Try again.',
+        },
         posts: {
             moved: {
                 to: 'One post moved to | {count} posts moved to',
@@ -514,6 +522,11 @@ export default {
                 hint: 'The server throws it when you publish, and no one can choose the result. Examples: 2d6+3, 4d6kh3, 5d10>=7, 3d6!',
                 thrown_hint:
                     'It is already thrown and will show as it came out. To throw another, remove it and add a new one.',
+                hidden: 'Hidden',
+                hidden_hint:
+                    'Hidden roll: only whoever throws it, moderation and, in a campaign, its direction will see the result. It can be revealed later, never hidden again.',
+                thrown_hidden_hint:
+                    'It is already thrown and hidden. For everyone to see it, use «Reveal» on the post.',
             },
             mentions: {
                 label: 'People you can mention',

@@ -18,6 +18,12 @@ interface PostRepositoryInterface
     public function find(PostId $id): ?Post;
 
     /**
+     * Rewrites only the plain text kept with the post (a revealed roll), leaving its document,
+     * dates and edit mark as they are.
+     */
+    public function replacePlainText(PostId $id, string $plainText): void;
+
+    /**
      * @throws PostNotFoundException
      */
     public function findOrFail(PostId $id): Post;

@@ -35,6 +35,10 @@ use Modules\Forum\Domain\ValueObjects\PostId;
  * documents (mentioned names, quoted posts, image addresses) is looked up once for all of
  * them. A quote names its author and links to the original only when the reader may read that
  * post; otherwise it shows as a plain quotation.
+ *
+ * A hidden roll shows its result only to a reader HiddenRolls lets in. Plain text (stored with
+ * the post, and from there in search, mail, notices and quotations) is written for nobody in
+ * particular, so it never holds the result of a roll still secret.
  */
 final readonly class PostRenderer
 {
@@ -49,16 +53,18 @@ final readonly class PostRenderer
         private DiceRollRepositoryInterface $diceRolls,
         private EmbedViews $embedViews,
         private CharacterRepositoryInterface $characters,
+        private HiddenRolls $hiddenRolls,
     ) {}
 
     /**
      * @param  list<PostBody>  $bodies
      * @param  array<int, string|null>  $speakers  by the index of each body: the name of the character it speaks as (rolls say who throws them); missing or null out of character
+     * @param  bool  $offerReveal  whether the page lets the reader reveal hidden rolls (not in old versions)
      * @return list<string> the HTML of each, in the same order
      */
-    public function toHtml(array $bodies, ?Authenticatable $reader, array $speakers = []): array
+    public function toHtml(array $bodies, ?Authenticatable $reader, array $speakers = [], bool $offerReveal = true): array
     {
-        $context = $this->contextFor($bodies, $reader);
+        $context = $this->contextFor($bodies, $reader, $offerReveal);
 
         return array_map(
             fn (PostBody $body, int $index): string => $this->renderer->toHtml($body->document, $context->withSpeaker($speakers[$index] ?? null)),
@@ -81,7 +87,7 @@ final readonly class PostRenderer
 
     /**
      * The plain text of a document whose rolls are settled, results included
-     * («2d6+3 Ataque = 11»).
+     * («2d6+3 Ataque = 11») except those of rolls still hidden («Tirada oculta: 2d6+3 Ataque»).
      *
      * @param  array<string, mixed>  $document
      * @param  list<DiceRoll>  $rolls  the document's rolls
@@ -127,7 +133,7 @@ final readonly class PostRenderer
     /**
      * @param  list<PostBody>  $bodies
      */
-    private function contextFor(array $bodies, ?Authenticatable $reader): RenderContext
+    private function contextFor(array $bodies, ?Authenticatable $reader, bool $offerReveal): RenderContext
     {
         $mention = (new MentionNode)->name();
         $quote = (new PostQuoteNode)->name();
@@ -158,7 +164,7 @@ final readonly class PostRenderer
             accountNames: $this->accounts->namesOf($this->distinct($accountIds)),
             quotes: $this->quoteSources($this->distinct($postIds), $reader),
             imageUrl: fn (string $path): ?string => $this->images->url($path),
-            rolls: $this->rollViews($this->distinct($rollIds)),
+            rolls: $this->rollViews($this->distinct($rollIds), $reader, $offerReveal),
             embeds: $this->embedViews->for($embeds),
         );
     }
@@ -167,14 +173,9 @@ final readonly class PostRenderer
      * @param  list<string>  $rollIds
      * @return array<string, RollView>
      */
-    private function rollViews(array $rollIds): array
+    private function rollViews(array $rollIds, ?Authenticatable $reader, bool $offerReveal): array
     {
-        $views = [];
-        foreach ($this->diceRolls->findMany($rollIds) as $roll) {
-            $views[$roll->id] = RollView::of($roll);
-        }
-
-        return $views;
+        return $rollIds === [] ? [] : $this->hiddenRolls->viewsFor($this->diceRolls->findMany($rollIds), $reader, $offerReveal);
     }
 
     /**

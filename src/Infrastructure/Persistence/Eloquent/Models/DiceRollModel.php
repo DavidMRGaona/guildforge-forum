@@ -21,6 +21,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $added_on_edit
  * @property CarbonImmutable $rolled_at
  * @property CarbonImmutable|null $removed_at
+ * @property bool $is_hidden
+ * @property string|null $rolled_by
+ * @property CarbonImmutable|null $revealed_at
+ * @property string|null $revealed_by
  */
 final class DiceRollModel extends Model
 {
@@ -38,7 +42,7 @@ final class DiceRollModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['post_id', 'position', 'expression', 'dice_count', 'result', 'total', 'error', 'added_on_edit', 'rolled_at', 'removed_at'];
+    protected $fillable = ['post_id', 'position', 'expression', 'dice_count', 'result', 'total', 'error', 'added_on_edit', 'rolled_at', 'removed_at', 'is_hidden', 'rolled_by', 'revealed_at', 'revealed_by'];
 
     /**
      * @return array<string, string>
@@ -53,6 +57,8 @@ final class DiceRollModel extends Model
             'added_on_edit' => 'boolean',
             'rolled_at' => 'immutable_datetime',
             'removed_at' => 'immutable_datetime',
+            'is_hidden' => 'boolean',
+            'revealed_at' => 'immutable_datetime',
         ];
     }
 }

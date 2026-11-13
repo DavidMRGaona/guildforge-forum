@@ -45,9 +45,38 @@ describe('the /tirada shortcut', () => {
         expect(rollFromShortcut('/tirada 2d6+3 Ataque')).toEqual({
             expression: '2d6+3',
             reason: 'Ataque',
+            hidden: false,
         });
-        expect(rollFromShortcut('  /Tirada   d20 ')).toEqual({ expression: 'd20', reason: '' });
-        expect(rollFromShortcut('/tirada')).toEqual({ expression: '', reason: '' });
+        expect(rollFromShortcut('  /Tirada   d20 ')).toEqual({
+            expression: 'd20',
+            reason: '',
+            hidden: false,
+        });
+        expect(rollFromShortcut('/tirada')).toEqual({ expression: '', reason: '', hidden: false });
+    });
+
+    it('reads «oculta» right after /tirada as a hidden roll', () => {
+        expect(rollFromShortcut('/tirada oculta 2d6+3 Ataque')).toEqual({
+            expression: '2d6+3',
+            reason: 'Ataque',
+            hidden: true,
+        });
+        expect(rollFromShortcut('/Tirada Oculta')).toEqual({
+            expression: '',
+            reason: '',
+            hidden: true,
+        });
+        // Anywhere else it is only a word of the reason
+        expect(rollFromShortcut('/tirada 1d6 oculta')).toEqual({
+            expression: '1d6',
+            reason: 'oculta',
+            hidden: false,
+        });
+        expect(rollFromShortcut('/tirada ocultación 1d6')).toEqual({
+            expression: '',
+            reason: 'ocultación 1d6',
+            hidden: false,
+        });
     });
 
     it('leaves any other line alone', () => {

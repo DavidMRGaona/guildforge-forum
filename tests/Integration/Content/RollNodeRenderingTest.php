@@ -84,6 +84,33 @@ final class RollNodeRenderingTest extends ModuleTestCase
         $this->assertSame('1d20 = 14', $this->text('1d20', null, $this->thrown('1d20', [14])));
     }
 
+    public function test_a_withheld_roll_shows_only_its_expression_and_reason(): void
+    {
+        $view = new RollView(self::ID, '2d6+3', null, null, false, hidden: true, withheld: true);
+
+        $html = $this->html('2d6+3', 'Ataque', $view);
+
+        $this->assertStringContainsString('<div class="forum-roll forum-roll--hidden" data-roll-id="'.self::ID.'">', $html);
+        $this->assertStringContainsString('<span class="forum-roll__label">Tirada oculta:</span>', $html);
+        $this->assertStringContainsString('El resultado está oculto.', $html);
+        $this->assertStringNotContainsString('<strong>', $html);
+        $this->assertStringNotContainsString('Sin resultado', $html);
+        $this->assertSame('Tirada oculta: 2d6+3 Ataque', $this->text('2d6+3', 'Ataque', $view));
+    }
+
+    public function test_who_revealed_a_roll_is_escaped(): void
+    {
+        $thrown = $this->thrown('1d6', [5]);
+        $view = (new RollView(self::ID, '1d6', $thrown->result, null, false, hidden: true, revealed: true))
+            ->withRevealer('<img src=x onerror=alert(1)>', '13/11/2026 20:30');
+
+        $html = $this->html('1d6', null, $view);
+
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('revelada por &lt;img src=x onerror=alert(1)&gt; el 13/11/2026 20:30.', $html);
+        $this->assertSame('1d6 = 5', $this->text('1d6', null, $view));
+    }
+
     /**
      * @param  list<int>  $faces
      */

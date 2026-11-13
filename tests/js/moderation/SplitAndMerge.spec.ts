@@ -167,6 +167,18 @@ describe('SplitPosts', () => {
         expect(wrapper.emitted('done')).toHaveLength(1);
     });
 
+    it('keeps its text and buttons clear of a floating button in the bottom left corner', () => {
+        // Cookie consent's button sits fixed at 1rem from the left, 3rem wide: below lg the bar's
+        // content starts after it, from lg the centred column already does
+        const wrapper = mount(SplitPosts, { props: { moderation, numbers: [] } });
+        const content = wrapper.find('[data-testid="split-bar-content"]').classes();
+
+        expect(content).toContain('pl-20');
+        expect(content).toContain('lg:pl-8');
+        expect(content).not.toContain('px-4');
+        expect(content).not.toContain('sm:px-6');
+    });
+
     it('cannot continue with nothing chosen', () => {
         const wrapper = mount(SplitPosts, { props: { moderation, numbers: [] } });
 

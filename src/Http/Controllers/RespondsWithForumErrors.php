@@ -17,6 +17,7 @@ use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\PostingTooFastException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
+use Modules\Forum\Domain\Exceptions\RollRevealException;
 use Modules\Forum\Http\Presenters\MergedDiscussionAnswer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -24,7 +25,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * How the editor's JSON endpoints answer what went wrong: what the person may not read is not
  * found (404), what they may not do is forbidden (403), a document the schema refuses is 422
  * with its reason, posting too fast is 429 with Retry-After, and a post in the wrong state
- * (already deleted) or a discussion in the wrong state (already closed) is 409. An action on a
+ * (already deleted), a discussion in the wrong state (already closed) or a roll with nothing to
+ * reveal is 409. An action on a
  * discussion that was merged into another, from a page left open on it, is 410 with where it went.
  */
 trait RespondsWithForumErrors
@@ -65,6 +67,8 @@ trait RespondsWithForumErrors
             return response()->json(['message' => __('forum::messages.errors.post_state')], 409);
         } catch (InvalidDiscussionException) {
             return response()->json(['message' => __('forum::messages.errors.discussion_state')], 409);
+        } catch (RollRevealException $exception) {
+            return response()->json(['message' => __("forum::messages.dice.hidden.errors.{$exception->reason}"), 'reason' => $exception->reason], 409);
         }
     }
 

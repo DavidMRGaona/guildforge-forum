@@ -24,6 +24,7 @@ use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
 use Modules\Forum\Http\Controllers\ReportController;
 use Modules\Forum\Http\Controllers\SharedCharacterController;
+use Modules\Forum\Http\Controllers\RollController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 
@@ -106,6 +107,11 @@ Route::prefix('foro')
                 ->whereUuid('post')
                 ->middleware('throttle:30,1,forum-edits')
                 ->name('posts.destroy');
+            // Revealing a hidden roll, for good
+            Route::post('tiradas/{roll}/revelar', [RollController::class, 'reveal'])
+                ->whereUuid('roll')
+                ->middleware('throttle:30,1,forum-edits')
+                ->name('rolls.reveal');
             Route::get('mensajes/{post}/versiones', [PostVersionsController::class, 'index'])
                 ->whereUuid('post')
                 ->name('posts.versions');

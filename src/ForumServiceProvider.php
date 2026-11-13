@@ -65,6 +65,7 @@ use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
+use Modules\Forum\Application\Services\HiddenRolls;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
 use Modules\Forum\Domain\Dice\NumberGenerator;
@@ -204,6 +205,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->scoped(PublicationAvailability::class);
         // Suspensions are read once per person and request (or queue job)
         $this->app->scoped(ForumSuspensions::class);
+        // Remembers where each roll's post is for the request (its answers follow the access rules)
+        $this->app->scoped(HiddenRolls::class);
         $this->app->bind(AccountDirectoryInterface::class, EloquentAccountDirectory::class);
         $this->app->bind(AccountEngagementStoreInterface::class, EloquentAccountEngagementStore::class);
         $this->app->bind(MentionTextsInterface::class, EloquentMentionTexts::class);

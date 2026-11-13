@@ -43,6 +43,19 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
         ]);
     }
 
+    public function replacePlainText(PostId $id, string $plainText): void
+    {
+        $model = PostModel::query()->find($id->value);
+        if (! $model instanceof PostModel || $model->plain_text === $plainText) {
+            return;
+        }
+
+        // Saved through the model, so the site search hears about it
+        $model->plain_text = $plainText;
+        $model->timestamps = false;
+        $model->save();
+    }
+
     public function find(PostId $id): ?Post
     {
         $model = PostModel::query()->find($id->value);

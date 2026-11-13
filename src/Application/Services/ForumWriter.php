@@ -95,7 +95,7 @@ final readonly class ForumWriter
                         $discussion->awaitApproval();
                     }
 
-                    $rolled = $this->rolls->settle($firstPostId, $body, editing: false, at: $discussion->createdAt());
+                    $rolled = $this->rolls->settle($firstPostId, $body, editing: false, at: $discussion->createdAt(), rolledBy: $discussion->authorId());
                     $post = $needsApproval
                         ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId)
                         : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId);
@@ -127,7 +127,7 @@ final readonly class ForumWriter
         return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval, $characterId): Post {
             $discussion = $this->lockDiscussion($discussionId);
 
-            $rolled = $this->rolls->settle($postId, $body, editing: false, at: $at);
+            $rolled = $this->rolls->settle($postId, $body, editing: false, at: $at, rolledBy: $authorId);
             $post = $needsApproval
                 ? Post::submitForApproval($postId, $discussionId, $authorId, $rolled->body, $at, $characterId)
                 : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $rolled->body, $at, $characterId);
@@ -228,7 +228,7 @@ final readonly class ForumWriter
             $post = $this->posts->findOrFail($postId);
             $characterId = $speaker instanceof SpeakerChoice && ! $speaker->keep ? $speaker->characterId : $post->characterId();
             // Its rolls first: the ones it already has are kept, new ones are thrown once
-            $rolled = $this->rolls->settle($postId, $body, editing: true, at: $at);
+            $rolled = $this->rolls->settle($postId, $body, editing: true, at: $at, rolledBy: $editorId);
             if ($post->body()->sameDocumentAs($rolled->body) && $post->speaksAs($characterId)) {
                 return $post;
             }

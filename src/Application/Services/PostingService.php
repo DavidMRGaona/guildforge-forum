@@ -166,7 +166,7 @@ final readonly class PostingService
         $characterIds = [...array_map(static fn ($revision): ?CharacterId => $revision->characterId, $revisions), $post->characterId()];
         $characters = $this->characters->findMany(array_values(array_filter($characterIds)));
         $speakers = array_map(static fn (?CharacterId $id): ?string => $id instanceof CharacterId ? ($characters[$id->value] ?? null)?->name() : null, $characterIds);
-        $html = $this->renderer->toHtml($bodies, $moderator, $speakers);
+        $html = $this->renderer->toHtml($bodies, $moderator, $speakers, offerReveal: false);
 
         // Version 1 is the author's; each later one is by whoever made the edit before it
         $writers = [[$post->authorId(), $post->publishedAt() ?? $post->createdAt()]];

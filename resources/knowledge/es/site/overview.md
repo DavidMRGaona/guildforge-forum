@@ -1,11 +1,11 @@
 ---
 id: forum.site.overview
 title: Cómo funciona el foro
-summary: Categorías, seguir temas, mensajes sin leer, novedades sin recargar, el indicador del menú y los mensajes privados.
+summary: Categorías, seguir temas, mensajes sin leer, novedades sin recargar, quién está escribiendo, el indicador del menú y los mensajes privados.
 category: community
 audience: site
 order: 10
-keywords: [foro, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
+keywords: [foro, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, al momento, escribiendo, quién escribe, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
 related: [forum.site.writing, forum.site.notices, forum.site.play-by-post, forum.site.private-messages]
 ---
 El foro de {{site_name}} es el sitio para conversar con el resto de la comunidad. Esta guía explica cómo está organizado y cómo seguir lo que te interesa sin perder el hilo.
@@ -53,9 +53,15 @@ Lo que ves en la pantalla cuenta como leído cuando llegas a ello. Si dejas un t
 
 ## Mensajes nuevos sin recargar
 
-Mientras tienes abierto un tema, el foro mira de vez en cuando si hay mensajes nuevos. Si los hay, aparece un aviso («2 mensajes nuevos») con el botón **Ver**, que los añade al final sin recargar la página ni mover lo que estás leyendo. En las listas, lo que tiene novedades se marca con **Con novedades** y el botón **Actualizar la lista** las pone al día.
+Mientras tienes abierto un tema, los mensajes nuevos llegan solos. Cuando hay alguno, aparece un aviso («2 mensajes nuevos») con el botón **Ver**, que los añade al final sin recargar la página ni mover lo que estás leyendo. En las listas, lo que tiene novedades se marca con **Con novedades** y el botón **Actualizar la lista** las pone al día.
 
-El foro no comprueba nada mientras la pestaña está oculta y se pone al día en cuanto vuelves a ella.
+Si el sitio tiene activadas las novedades al momento:
+
+- Los mensajes llegan en cuanto se publican, y la marca del menú cambia en cuanto hay algo sin leer en lo que sigues.
+- Los cambios en los mensajes que ya ves (una edición, un «me gusta», una tirada revelada o un mensaje que la moderación oculta) se ponen al día en su sitio.
+- En la última página de un tema ves quién está escribiendo una respuesta, por ejemplo «Ana está escribiendo…», y el resto ve cuándo escribes tú. No se guarda nada: solo lo ven quienes tienen el tema abierto en ese momento.
+
+Si no las tiene, o si se corta la conexión, el foro mira de vez en cuando si hay novedades y se pone al día en cuanto vuelve la conexión. No comprueba nada mientras la pestaña está oculta y se pone al día en cuanto vuelves a ella.
 
 ## El indicador del menú
 

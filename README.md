@@ -290,14 +290,35 @@ Un nodo nuevo (por ejemplo, los apartes fuera de personaje) se añade en los dos
 
 Con la página abierta, el foro pregunta por lo nuevo con consultas ligeras (JSON, `Cache-Control: private, no-store`). Se eligió un endpoint propio y no una recarga parcial de Inertia: una recarga vuelve a ejecutar el controlador de la página entera (presentadores, «me gusta», seguimiento), no sirve en las fichas (que no son páginas de Inertia) y no puede responder «nada nuevo» sin cuerpo.
 
-- `GET /foro/temas/{tema}/novedades?despues=<n>` (público, 30 por minuto): los mensajes numerados posteriores al nº `n`, como los pinta la página (máximo 50; `more` dice si quedan). Responde **204** si no hay ninguno, tras una sola lectura del índice `(discussion_id, number)`. Un tema que la persona no puede leer responde 404 igual que uno inexistente. Nunca salen mensajes pendientes de aprobación (no tienen número) ni se toca la marca de leído.
+- `GET /foro/temas/{tema}/novedades?despues=<n>[&cambiados=<n>,<n>…]` (público, 30 por minuto): los mensajes numerados posteriores al nº `n`, como los pinta la página (máximo 50; `more` dice si quedan), y los de `cambiados` (hasta 50 números, solo los que no pasan de `n`), que la página sustituye en su sitio. Cada mensaje se pinta para quien pregunta, con las reglas de la moderación y de las tiradas ocultas. Responde **204** si no hay ninguno, tras una sola lectura del índice `(discussion_id, number)`. Un tema que la persona no puede leer responde 404 igual que uno inexistente. Nunca salen mensajes pendientes de aprobación (no tienen número) ni se toca la marca de leído.
 - `GET /foro/novedades[?temas=<id>,<id>…]` (con sesión, 20 por minuto, hasta 100 ids): `unreadFollowed` (temas seguidos, o de categorías seguidas con actividad en los últimos 90 días, con mensajes sin leer; se cuenta hasta 100) y `discussions` (el último mensaje de los temas pedidos que la persona puede ver; los demás faltan, sin distinguir). Las dos consultas leen por clave primaria, sin recalcular contadores.
 
 En la web (`resources/js/live/`, `composables/`):
 - `poller.ts`: pregunta cada intervalo (con ±10 % de variación), se detiene con la pestaña oculta y pregunta en cuanto vuelve a verse (así, con varias pestañas, solo pregunta la visible), espera el doble tras cada fallo hasta un tope y se detiene del todo con 401, 403 o 404.
-- `transport.ts`: el contrato `LiveTransport` (`connect(contexto, alActualizar)` → `{ stop, refresh }`) y su implementación por consulta, `pollingTransport`. El tiempo real (#17) será otra implementación del mismo contrato: `useNewPosts` y `useForumPulse` y los componentes no cambian.
+- `transport.ts`: el contrato `LiveTransport` (`connect(contexto, alActualizar)` → `{ stop, refresh }`), su implementación por consulta, `pollingTransport`, y `realtimeTransport`, que escucha un canal y vuelve a la consulta mientras el canal no está en directo (ver «Tiempo real»). `useNewPosts` y `useForumPulse` no saben cuál corre.
 - Tema abierto (página del foro, solo en la última página, y ficha, salvo cerrado): cada 20 s; los nuevos se añaden al final y `NewPostsNotice` avisa «N mensajes nuevos» en una región `role="status"` educada que ya existe antes del cambio, sin mover la página ni el foco. La ficha nunca pide el mensaje de apertura. El lector de marcas observa también los mensajes que llegan: **llegar no marca nada como leído**, solo verlos en pantalla, con la regla de continuidad de siempre.
-- Lista: cada 60 s, solo con sesión. `DiscussionList` marca «Con novedades» los temas cuyo último mensaje es posterior al que se pintó y ofrece «Actualizar la lista». El punto del enlace «Foro» del menú (`unreadFollowed`) lo pintará el core con `useMenuBadges` (GuildForge#534), en una entrega aparte.
+- Lista: cada 60 s, solo con sesión. `DiscussionList` marca «Con novedades» los temas cuyo último mensaje es posterior al que se pintó y ofrece «Actualizar la lista». El punto del enlace «Foro» del menú (`unreadFollowed`) lo pinta el core con `useMenuBadges` (GuildForge#534).
+
+## Tiempo real
+
+Con la difusión del core activada (core ≥ 3.61, #493; opcional por instalación) las páginas dejan de preguntar a su ritmo mientras su canal está en directo y solo preguntan cuando un mensaje dice que algo cambió. Por los canales solo viajan ids y números; el contenido se pide por las mismas rutas de «Novedades sin recargar», que vuelven a comprobar el acceso. Sin difusión, o mientras la conexión no está en directo, todo funciona como antes, por consulta.
+
+Canales (`ForumChannels`, `registerRealtimeChannels()`), todos privados y concedidos por la misma regla que la página a la que sirven; fallan cerrados (id que no es un uuid en minúsculas, registro que no existe, comprobación que lanza):
+
+| Canal | Quién escucha | Eventos |
+|-------|---------------|---------|
+| `forum.discussion.{id}` | quien puede leer el tema (`ForumAccessInterface::canRead`: un tema oculto, su moderación; uno pendiente, su autor y su moderación; alguien suspendido mientras lee, igual que la página) | `post.created` {number}, `post.changed` {number}, `discussion.changed`; susurro `typing` {user} |
+| `forum.category.{id}` | quien ve la categoría (`CategoryAccessPolicy::canView`) | `discussion.activity` {discussion, number}, solo de temas visibles para cualquiera que lea la categoría |
+| `forum.account.{id}` | la propia cuenta | `pulse.changed` |
+
+Qué se publica (`ForumLiveSignalsInterface`, a través de `RealtimePublisherInterface`, después del commit; sin difusión no se publica ni se encola nada):
+- Un mensaje que recibe número (respuesta, tema nuevo, aprobación): `post.created` en su tema, `discussion.activity` en su categoría y, desde `SignalFollowersJob` (en cola, en lotes de 200), `pulse.changed` a quien sigue el tema, su categoría o la categoría madre y puede leerlo ahora, salvo su autor.
+- Edición, borrado, moderación de un mensaje, «me gusta» y tirada revelada: `post.changed`. Cerrar, renombrar, mover, ocultar, unir, separar o borrar el tema: `discussion.changed` (en una unión, en los dos).
+- Llegar al final de un tema, marcar como leído y cambiar lo que se sigue: `pulse.changed` a la propia cuenta.
+
+En la web, `live/channels.ts` (`useChannelFeed`, `useChannelFeeds`) envuelve `useRealtimeChannel` del core y solo se suscribe mientras un transporte lo tiene abierto (en un tema, solo en su última página). `liveNewPosts` pide lo posterior al último mensaje que tiene la página y los `cambiados` que tiene; `livePulse` pide el resumen con una pausa mínima de 10 s entre preguntas (el menú y una lista comparten el límite de 20 por minuto). Una lista escucha las categorías de sus filas (`categoryId`), cinco como mucho; con más sigue por consulta. Cada vez que el canal pasa a estar en directo, el transporte pregunta una vez para ponerse al día.
+
+«Escribiendo…» (`useTyping`, `TypingNotice`) va por susurros, que nunca pasan por la aplicación: se envía solo el id propio, como mucho cada 3 s y solo al teclear en el editor; lo que llega se valida (id de cuenta, nunca el propio, como mucho 10 personas) y el nombre sale de lo que la página ya enseña o queda en «Alguien está escribiendo…». Se borra a los 6 s o cuando llega el mensaje de esa persona. No se guarda nada.
 
 ## Búsqueda
 

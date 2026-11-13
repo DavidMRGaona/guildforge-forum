@@ -36,7 +36,8 @@ const { t } = useI18n();
 <template>
     <div class="bg-surface shadow">
         <div
-            class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-end sm:justify-between sm:px-6 lg:px-8"
+            class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8"
+            data-testid="forum-header"
         >
             <div class="min-w-0">
                 <h1 class="text-3xl font-bold tracking-tight text-base-primary">
@@ -45,7 +46,10 @@ const { t } = useI18n();
                 </h1>
                 <p class="mt-2 text-lg text-base-secondary">{{ t('forum.description') }}</p>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div
+                class="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end"
+                data-testid="forum-header-actions"
+            >
                 <Link
                     v-if="conversations"
                     :href="conversations.url"

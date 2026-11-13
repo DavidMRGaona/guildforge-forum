@@ -46,7 +46,10 @@ const breadcrumbs = computed(() => [
     <div class="bg-surface shadow">
         <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <ForumBreadcrumbs :items="breadcrumbs" />
-            <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div
+                class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+                data-testid="forum-header"
+            >
                 <div class="flex min-w-0 gap-3">
                     <CategoryIcon :name="category.icon" :color="category.color" />
                     <div class="min-w-0">
@@ -58,7 +61,10 @@ const breadcrumbs = computed(() => [
                         </p>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div
+                    class="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end"
+                    data-testid="forum-header-actions"
+                >
                     <CategoryFollowButton v-if="category.follow" :follow="category.follow" />
                     <MarkReadButton
                         v-if="markReadUrl"

@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n';
 import { useAuth } from '@/composables/useAuth';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import { useForumPulse } from '../../composables/useForumPulse';
-import { PULSE_INTERVAL_MS, pollPulse } from '../../live/transports';
+import { CATEGORY_EVENTS, categoryChannel, useChannelFeeds } from '../../live/channels';
+import { PULSE_INTERVAL_MS, livePulse } from '../../live/transports';
 import type { ForumDiscussionList } from '../../types/forum';
 import DiscussionListItem from './DiscussionListItem.vue';
 
@@ -25,10 +26,25 @@ const isEmpty = computed(
 const { isAuthenticated } = useAuth();
 const rows = computed(() => [...props.discussions.pinned, ...props.discussions.items]);
 
-// Every minute, for people with a session, the list asks whether any of its discussions moved:
-// the ones that did are marked, and the list is only redrawn when the reader asks
+// For people with a session, the list learns whether any of its discussions moved: through the
+// real-time channels of its categories when there are, every minute otherwise. The ones that
+// moved are marked, and the list is only redrawn when the reader asks
+const categories = useChannelFeeds(
+    () =>
+        rows.value
+            .filter((row) => typeof row.categoryId === 'string' && row.categoryId !== '')
+            .map((row) => categoryChannel(row.categoryId)),
+    CATEGORY_EVENTS
+);
 const pulse = useForumPulse({
-    transport: pollPulse(() => rows.value.map((row) => row.id), PULSE_INTERVAL_MS, false),
+    transport: livePulse(categories, () => rows.value.map((row) => row.id), {
+        intervalMs: PULSE_INTERVAL_MS,
+        immediate: false,
+        // Only a discussion the list shows calls for asking
+        wants: (_event, payload) =>
+            typeof payload.discussion === 'string' &&
+            rows.value.some((row) => row.id === payload.discussion),
+    }),
     enabled: () => isAuthenticated.value && rows.value.length > 0,
 });
 const changedIds = computed(

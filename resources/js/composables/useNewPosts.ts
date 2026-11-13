@@ -15,7 +15,7 @@ import type { ForumMergedInto, ForumNewPosts, ForumPost } from '../types/forum';
 export interface NewPostsOptions {
     /** The posts the page drew */
     posts: MaybeRefOrGetter<ForumPost[]>;
-    /** Where the news come from: consultation today, real time later (same contract) */
+    /** Where the news come from: a real-time channel or consultation (same contract) */
     transport: LiveTransport<ForumNewPosts>;
     /** Whether to follow the discussion: only where its end is on the page */
     enabled?: MaybeRefOrGetter<boolean>;
@@ -108,7 +108,14 @@ export function useNewPosts(options: NewPostsOptions): NewPosts {
             return;
         }
 
-        connection = options.transport.connect({ cursor: () => cursor.value }, receive, markMerged);
+        connection = options.transport.connect(
+            {
+                cursor: () => cursor.value,
+                holds: (number) => posts.value.some((post) => post.number === number),
+            },
+            receive,
+            markMerged
+        );
     }
 
     function disconnect(): void {

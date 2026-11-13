@@ -8,6 +8,7 @@ function row(overrides: Partial<ForumDiscussionRow> = {}): ForumDiscussionRow {
         id: 'd-1',
         number: 42,
         title: 'Mesa del viernes',
+        categoryId: 'category-1',
         url: '/foro/t/42-mesa-del-viernes',
         resumeUrl: null,
         category: { name: 'General', url: '/foro/c/general', color: null },

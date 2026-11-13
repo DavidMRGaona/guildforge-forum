@@ -4,23 +4,30 @@ import { useI18n } from 'vue-i18n';
 import { useAuth } from '@/composables/useAuth';
 import { useMenuBadges } from '@/composables/useMenuBadges';
 import { useForumPulse } from '../../composables/useForumPulse';
-import { PULSE_UNREAD_CAP, pollPulse } from '../../live/transports';
+import { ACCOUNT_EVENTS, accountChannel, useChannelFeed } from '../../live/channels';
+import { PULSE_UNREAD_CAP, livePulse } from '../../live/transports';
 
 /**
- * Lives in the site's `after-header` slot and draws nothing visible. Every minute (while the tab
- * is shown, and only for people with a session) it asks whether the discussions the person
- * follows have posts they did not read, and marks the «Foro» link of the menu through the core's
+ * Lives in the site's `after-header` slot and draws nothing visible. For people with a session it
+ * asks whether the discussions the person follows have posts they did not read: when their own
+ * real-time channel says something changed, or every minute (while the tab is shown) without it, and marks the «Foro» link of the menu through the core's
  * menu badges. The menu draws the dot and reads the text inside the link; this component only
  * announces a change, politely and without moving the focus.
  */
 const MENU_KEY = 'forum:forum.index';
 
 const { t } = useI18n();
-const { isAuthenticated } = useAuth();
+const { isAuthenticated, user } = useAuth();
 const { setBadge, clearBadge } = useMenuBadges();
 
+// The person's own channel says when to ask; without real time it asks every minute
+const own = useChannelFeed(() => {
+    const id = user.value?.id;
+
+    return typeof id === 'string' && id !== '' ? accountChannel(id) : null;
+}, ACCOUNT_EVENTS);
 const { unreadFollowed, unreadConversations } = useForumPulse({
-    transport: pollPulse(),
+    transport: livePulse(own),
     enabled: isAuthenticated,
 });
 

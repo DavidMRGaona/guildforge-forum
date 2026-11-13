@@ -10,6 +10,7 @@ import MovedPostsNotice from '../../components/forum/MovedPostsNotice.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import MergedNotice from '../../components/live/MergedNotice.vue';
 import NewPostsNotice from '../../components/live/NewPostsNotice.vue';
+import TypingNotice from '../../components/live/TypingNotice.vue';
 import PostItem from '../../components/forum/PostItem.vue';
 import ReplyBox from '../../components/forum/ReplyBox.vue';
 import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
@@ -18,7 +19,9 @@ import { useNewPosts } from '../../composables/useNewPosts';
 import { provideMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { useReadTracker } from '../../composables/useReadTracker';
 import { useSplitSelection } from '../../composables/useSplitSelection';
-import { pollNewPosts } from '../../live/transports';
+import { useTyping } from '../../composables/useTyping';
+import { DISCUSSION_EVENTS, discussionChannel, useChannelFeed } from '../../live/channels';
+import { liveNewPosts } from '../../live/transports';
 import { sendJson } from '../../forum/api';
 import type {
     ForumConversation,
@@ -74,15 +77,33 @@ const tracker = useReadTracker({
 });
 
 // New posts after the last one, while the page is open: only where the end of the discussion
-// is on the page (the last one), so what comes in goes right after what the reader has
+// is on the page (the last one), so what comes in goes right after what the reader has. They
+// come through the discussion's real-time channel when there is one, by consultation otherwise
+const channel = useChannelFeed(() => discussionChannel(props.discussion.id), DISCUSSION_EVENTS);
 const live = useNewPosts({
     posts: () => props.posts,
-    transport: pollNewPosts(props.discussion.id),
+    transport: liveNewPosts(props.discussion.id, channel),
     enabled: isLastPage,
 });
 // Following, mentioning or moderating from this page also learns that it was merged
 provideMergedDiscussion((target) => live.markMerged(target));
 const allMentionNames = computed(() => ({ ...props.mentionNames, ...live.mentionNames.value }));
+
+// «Typing…» among the readers of the last page, named only from what the page shows
+const typing = useTyping({
+    channel,
+    selfId: () => user.value?.id ?? null,
+    names: () => {
+        const names: Record<string, string> = { ...allMentionNames.value };
+        for (const post of live.posts.value) {
+            if (post.authorId !== null && post.authorName !== null) {
+                names[post.authorId.toLowerCase()] = post.authorName;
+            }
+        }
+
+        return names;
+    },
+});
 
 // Posts in their order, each run of moved ones in its place (posts awaiting approval last)
 type Entry =
@@ -113,7 +134,11 @@ const choosable = (post: ForumPost): boolean => post.number !== null && post.num
 // The tracker watches the posts that arrive too, and counts them read only once they were seen
 watch(
     () => live.posts.value.length,
-    () => void nextTick(() => tracker.refresh())
+    () => {
+        // Whoever was typing just posted
+        typing.clear(live.posts.value.at(-1)?.authorId ?? null);
+        void nextTick(() => tracker.refresh());
+    }
 );
 
 onMounted(() => {
@@ -348,6 +373,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 </div>
             </template>
             <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
+            <TypingNotice v-if="isLastPage" :people="typing.people.value" />
             <MergedNotice :target="live.mergedInto.value" />
         </div>
 
@@ -394,6 +420,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 :sending="sending"
                 :error="replyError"
                 @submit="send"
+                @typing="isLastPage && typing.notify()"
             >
                 <template v-if="!isLastPage" #intro>
                     <p class="text-sm text-base-secondary">

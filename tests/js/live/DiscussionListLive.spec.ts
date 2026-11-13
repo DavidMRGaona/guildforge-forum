@@ -10,6 +10,7 @@ function row(id: string, lastPostNumber: number): ForumDiscussionRow {
         id,
         number: 42,
         title: `Tema ${id}`,
+        categoryId: 'category-1',
         url: `/foro/t/42-${id}`,
         resumeUrl: null,
         category: null,

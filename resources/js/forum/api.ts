@@ -121,8 +121,15 @@ export function revealRollUrl(rollId: string): string {
 }
 
 /** The posts of a discussion after the number (LiveUpdatesController::posts) */
-export function discussionUpdatesUrl(discussionId: string, after: number): string {
-    return `/foro/temas/${encodeURIComponent(discussionId)}/novedades?despues=${after}`;
+export function discussionUpdatesUrl(
+    discussionId: string,
+    after: number,
+    changed: number[] = []
+): string {
+    const url = `/foro/temas/${encodeURIComponent(discussionId)}/novedades?despues=${after}`;
+
+    // Posts the page holds and was told changed, which come again as the reader sees them now
+    return changed.length === 0 ? url : `${url}&cambiados=${changed.join(',')}`;
 }
 
 /** What changed in the forum for the signed-in person, and the last post of the discussions given */

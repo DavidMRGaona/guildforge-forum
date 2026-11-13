@@ -79,6 +79,8 @@ export interface ForumDiscussionRow {
     id: string;
     number: number;
     title: string;
+    /** Its category, whose real-time channel the list listens to */
+    categoryId: string;
     url: string;
     /** Where reading resumes (first unread post); null when never opened or for guests */
     resumeUrl: string | null;

@@ -26,6 +26,7 @@ use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
@@ -168,6 +169,13 @@ final class SharedCharactersTest extends ModuleTestCase
         $this->actingAs($this->moderator)->postJson("/foro/personajes/{$shared->id()->value}/retirar")->assertOk();
         $this->actingAs($this->director)->postJson("/foro/personajes/{$shared->id()->value}/recuperar")->assertStatus(409)->assertJsonPath('reason', 'locked');
         $this->actingAs($this->moderator)->postJson("/foro/personajes/{$shared->id()->value}/recuperar")->assertOk();
+
+        // What moderation did is logged with the space (a shared character has no owner); what a director did is not
+        $this->actingAs($this->director)->postJson("/foro/personajes/{$shared->id()->value}/retirar")->assertOk();
+        $logged = ModerationLogModel::query()->orderBy('created_at')->get();
+        $this->assertSame(['character_retired', 'character_restored'], $logged->pluck('action')->map(static fn ($action) => $action instanceof \BackedEnum ? $action->value : (string) $action)->all());
+        $this->assertNull($logged->first()?->subject_user_id);
+        $this->assertSame($this->space->id()->value, $logged->first()?->category_id);
     }
 
     public function test_a_space_holds_a_limited_number_of_them_and_only_one_that_belongs_to_a_campaign(): void

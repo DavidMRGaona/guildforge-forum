@@ -138,7 +138,10 @@ function added(character: ForumPostCharacter, boundTo: string | null): void {
             >
                 <option value="">{{ t('forum.characters.outOfCharacter') }}</option>
                 <template v-if="sharedOptions.length > 0">
-                    <optgroup :label="t('forum.characters.shared.ownGroup')">
+                    <optgroup
+                        v-if="ownOptions.length > 0"
+                        :label="t('forum.characters.shared.ownGroup')"
+                    >
                         <option v-for="option in ownOptions" :key="option.id" :value="option.id">
                             {{ option.name }}
                         </option>

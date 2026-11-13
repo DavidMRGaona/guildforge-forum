@@ -224,17 +224,17 @@ final readonly class CharacterService
      */
     private function logIfModeration(Authenticatable $actor, Character $character, ModerationAction $action, array $details = []): void
     {
-        // What the directors do with their shared characters is theirs, not moderation's
-        $ownerId = $character->ownerId();
-        if ($ownerId === null || $this->rules->owns($actor, $character)) {
+        // What the directors do with their shared characters is theirs, not moderation's; whoever
+        // moderates without directing the campaign is logged, with its space instead of an owner
+        if ($this->rules->owns($actor, $character) || $this->rules->leads($actor, $character)) {
             return;
         }
 
-        $this->logger->recordForAccount($action, $actor, $ownerId, details: [
+        $this->logger->recordForAccount($action, $actor, $character->ownerId(), details: [
             'character_id' => $character->id()->value,
             'character_name' => $character->name(),
             ...$details,
-        ]);
+        ], categoryId: $character->categoryId()?->value);
     }
 
     /**

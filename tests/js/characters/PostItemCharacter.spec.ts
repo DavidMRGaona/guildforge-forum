@@ -135,8 +135,7 @@ describe('a post written as a character', () => {
         });
         expect(hidden.find('[data-testid="post-character"]').text()).toContain('Mercader');
         const player = hidden.find('[data-testid="post-character-player"]').text();
-        expect(player).toContain('PNJ');
-        expect(player).toContain('PNJ de la campaña');
+        expect(player).toBe('PNJ de la campaña');
         expect(player).not.toContain('Jane Doe');
         expect(player).not.toContain('Escrito por');
         expect(hidden.text()).not.toContain('Cuenta eliminada');

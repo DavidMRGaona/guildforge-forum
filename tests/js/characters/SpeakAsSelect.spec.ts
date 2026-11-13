@@ -160,6 +160,29 @@ describe('SpeakAsSelect', () => {
         expect(wrapper.emitted('update:modelValue')).toEqual([['mercader']]);
     });
 
+    it('leaves out the group of their own when only shared PNJ can be chosen', () => {
+        const wrapper = mount(SpeakAsSelect, {
+            props: {
+                modelValue: null,
+                picker: aPicker({
+                    items: [
+                        {
+                            id: 'mercader',
+                            name: 'Mercader',
+                            initials: 'M',
+                            portraitUrl: null,
+                            isShared: true,
+                        },
+                    ],
+                }),
+            },
+        });
+
+        expect(wrapper.findAll('optgroup').map((group) => group.attributes('label'))).toEqual([
+            'PNJ de la campaña',
+        ]);
+    });
+
     it('draws no groups when the person has no shared PNJ here', () => {
         const wrapper = mount(SpeakAsSelect, { props: { modelValue: null, picker: aPicker() } });
 

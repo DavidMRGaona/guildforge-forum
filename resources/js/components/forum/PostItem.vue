@@ -375,7 +375,11 @@ async function remove(): Promise<void> {
                             class="shrink-0 rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"
                             data-testid="post-character-shared"
                         >
-                            {{ t('forum.characters.shared.badge') }}
+                            {{
+                                post.authorName === null
+                                    ? t('forum.characters.shared.hiddenAuthor')
+                                    : t('forum.characters.shared.badge')
+                            }}
                         </span>
                         <!-- A shared PNJ names its writer only to whoever may know -->
                         <span
@@ -391,9 +395,7 @@ async function remove(): Promise<void> {
                                       })
                             }}</span
                         >
-                        <span v-else class="min-w-0 truncate">{{
-                            t('forum.characters.shared.hiddenAuthor')
-                        }}</span>
+
                         <span
                             v-if="post.isStarter"
                             class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"

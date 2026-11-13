@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import { FormSelect } from '@/components/form';
 import type { ForumListFilters } from '../../types/forum';
 
 /**
@@ -44,9 +45,15 @@ function visit(next: { show?: Show; topic?: string | null }): void {
     });
 }
 
-function onTopicChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-    visit({ topic: value === '' ? null : value });
+const topicOptions = computed(() =>
+    props.filters.topics.map((topic) => ({ value: topic.key, label: topic.label }))
+);
+
+function onTopicChange(value: string | number | null): void {
+    const topic = value === null || value === '' ? null : String(value);
+    if (topic !== props.filters.topic) {
+        visit({ topic });
+    }
 }
 </script>
 
@@ -76,21 +83,18 @@ function onTopicChange(event: Event): void {
             </button>
         </div>
 
-        <div v-if="filters.topics.length > 0" class="flex items-center gap-2">
+        <div v-if="filters.topics.length > 0" class="flex min-w-0 items-center gap-2">
             <label :for="topicId" class="text-sm font-medium text-base-secondary">
                 {{ t('forum.filters.topic') }}
             </label>
-            <select
+            <FormSelect
                 :id="topicId"
-                class="min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-sm text-base-primary sm:w-56"
-                :value="filters.topic ?? ''"
-                @change="onTopicChange"
-            >
-                <option value="">{{ t('forum.filters.anyTopic') }}</option>
-                <option v-for="topic in filters.topics" :key="topic.key" :value="topic.key">
-                    {{ topic.label }}
-                </option>
-            </select>
+                class="w-full sm:w-56"
+                :model-value="filters.topic ?? ''"
+                :options="topicOptions"
+                :placeholder="t('forum.filters.anyTopic')"
+                @update:model-value="onTopicChange"
+            />
         </div>
     </div>
 </template>

@@ -40,7 +40,12 @@ describe('ReportDialog', () => {
 
         expect(element<HTMLButtonElement>('report-submit').disabled).toBe(true);
 
-        element<HTMLInputElement>('report-reason-spam').click();
+        // The native radio stays, hidden, with the site's circle drawn after it
+        const spam = element<HTMLInputElement>('report-reason-spam');
+        expect(spam.classList.contains('sr-only')).toBe(true);
+        expect(spam.nextElementSibling?.getAttribute('aria-hidden')).toBe('true');
+        expect(spam.closest('label')?.classList.contains('min-h-[44px]')).toBe(true);
+        spam.click();
         const note = element<HTMLTextAreaElement>('report-note');
         note.value = '  Enlaces a una tienda ';
         note.dispatchEvent(new Event('input'));

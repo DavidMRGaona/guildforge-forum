@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { router } from '@inertiajs/vue3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FormSelect } from '@/components/form';
 import DiscussionFilters from '../../../resources/js/components/forum/DiscussionFilters.vue';
 import type { ForumListFilters } from '../../../resources/js/types/forum';
 
@@ -23,7 +24,7 @@ describe('DiscussionFilters', () => {
             props: { filters: { ...FILTERS, topic: 'game-system.x' } },
         });
 
-        await wrapper.findAll('button')[1]?.trigger('click');
+        await wrapper.findAll('[role="group"] button')[1]?.trigger('click');
 
         expect(router.get).toHaveBeenCalledWith(
             '/foro/c/general',
@@ -37,7 +38,7 @@ describe('DiscussionFilters', () => {
             props: { filters: { ...FILTERS, unread: true } },
         });
 
-        const following = wrapper.findAll('button')[2];
+        const following = wrapper.findAll('[role="group"] button')[2];
         expect(following?.text()).toBe('Siguiendo');
         await following?.trigger('click');
 
@@ -54,7 +55,7 @@ describe('DiscussionFilters', () => {
         });
 
         const pressed = wrapper
-            .findAll('button')
+            .findAll('[role="group"] button')
             .map((button) => button.attributes('aria-pressed'));
         expect(pressed).toEqual(['false', 'false', 'true']);
     });
@@ -62,7 +63,11 @@ describe('DiscussionFilters', () => {
     it('filters by tag from the first page', async () => {
         const wrapper = mount(DiscussionFilters, { props: { filters: FILTERS } });
 
-        await wrapper.find('select').setValue('game-system.x');
+        const select = wrapper.getComponent(FormSelect);
+        expect(wrapper.find('select').exists()).toBe(false);
+        expect(select.props('placeholder')).toBe('Todas');
+        expect(select.props('options')).toEqual([{ value: 'game-system.x', label: 'Pathfinder' }]);
+        select.vm.$emit('update:modelValue', 'game-system.x');
 
         expect(router.get).toHaveBeenCalledWith(
             '/foro/c/general',
@@ -71,12 +76,23 @@ describe('DiscussionFilters', () => {
         );
     });
 
+    it('drops the tag when «Todas» is chosen again', () => {
+        const wrapper = mount(DiscussionFilters, {
+            props: { filters: { ...FILTERS, topic: 'game-system.x' } },
+        });
+
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBe('game-system.x');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', '');
+
+        expect(router.get).toHaveBeenCalledWith('/foro/c/general', {}, expect.anything());
+    });
+
     it('offers no unread filter without a session', () => {
         const wrapper = mount(DiscussionFilters, {
             props: { filters: { ...FILTERS, canFilterUnread: false } },
         });
 
         expect(wrapper.find('[role="group"]').exists()).toBe(false);
-        expect(wrapper.find('select').exists()).toBe(true);
+        expect(wrapper.findComponent(FormSelect).exists()).toBe(true);
     });
 });

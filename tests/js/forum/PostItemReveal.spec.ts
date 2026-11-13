@@ -108,7 +108,7 @@ function dialogForm(): HTMLFormElement {
 /** Ticks the box that says it cannot be undone and confirms */
 async function confirm(): Promise<void> {
     const box = revealDialog().querySelector<HTMLInputElement>(
-        '[data-testid="moderation-confirmation"]'
+        '[data-testid="moderation-confirmation"] input'
     );
     if (box === null) {
         throw new Error('No confirmation box');

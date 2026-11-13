@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { router } from '@inertiajs/vue3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FormSelect } from '@/components/form';
 import Discussion from '../../../resources/js/pages/Forum/Discussion.vue';
 import type { ForumPost } from '../../../resources/js/types/forum';
 
@@ -198,7 +199,7 @@ describe('Discussion page, when its discussion is merged into another', () => {
         const wrapper = mount(Discussion, { props: page as never, attachTo: document.body });
         mounted.push(wrapper);
 
-        await wrapper.get('select').setValue('following');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'following');
         await flushPromises();
 
         expect(fetchMock).toHaveBeenCalledWith(

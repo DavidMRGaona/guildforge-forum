@@ -527,6 +527,7 @@ export default {
             shared: {
                 ownGroup: 'Mis personajes',
                 group: 'PNJ de la campaña',
+                option: '{name} · PNJ de la campaña',
                 badge: 'PNJ',
                 writtenBy: 'Escrito por {name}',
                 hiddenAuthor: 'PNJ de la campaña',

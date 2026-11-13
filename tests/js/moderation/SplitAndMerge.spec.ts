@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils';
 import { router } from '@inertiajs/vue3';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
+import { FormSelect } from '@/components/form';
 import MovedPostsNotice from '../../../resources/js/components/forum/MovedPostsNotice.vue';
 import MergeDialog from '../../../resources/js/components/moderation/MergeDialog.vue';
 import SplitPosts from '../../../resources/js/components/moderation/SplitPosts.vue';
@@ -139,13 +140,13 @@ describe('SplitPosts', () => {
         await nextTick();
 
         // Its own category first
-        expect(element<HTMLSelectElement>('moderation-category').value).toBe('c-own');
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBe('c-own');
         expect(document.body.textContent).toContain('n.º 3, 5–6');
         type('moderation-title', 'Otro asunto');
         await nextTick();
         expect(element<HTMLButtonElement>('moderation-submit').disabled).toBe(true);
 
-        element<HTMLInputElement>('moderation-confirmation').click();
+        element('moderation-confirmation').querySelector('input')?.click();
         await nextTick();
         element<HTMLButtonElement>('moderation-submit')
             .closest('form')
@@ -229,7 +230,10 @@ describe('MergeDialog', () => {
         );
         expect(element<HTMLButtonElement>('merge-submit').disabled).toBe(true);
 
-        element<HTMLInputElement>('merge-confirmation').click();
+        expect(
+            document.body.querySelector('[data-testid="merge-confirmation"] input.sr-only')
+        ).not.toBeNull();
+        element('merge-confirmation').querySelector('input')?.click();
         await nextTick();
         element<HTMLButtonElement>('merge-submit')
             .closest('form')

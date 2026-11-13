@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { FormCheckbox, FormSelect } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import type { ForumMoveTarget } from '../../types/forum';
 
@@ -71,6 +72,16 @@ const confirmed = ref(false);
 const uid = Math.random().toString(36).slice(2, 10);
 
 const asksMove = computed(() => props.moveTargets.length > 0);
+const categoryOptions = computed(() =>
+    props.moveTargets.map((target) => ({
+        value: target.id,
+        label: target.parentName ? `${target.parentName} › ${target.name}` : target.name,
+    }))
+);
+
+function chooseCategory(value: string | number | null): void {
+    category.value = value === null ? '' : String(value);
+}
 const titleLength = computed(() => newTitle.value.trim().replace(/\s+/g, ' ').length);
 
 const valid = computed(
@@ -161,24 +172,15 @@ function submit(): void {
                     >
                         {{ categoryLabel ?? t('forum.moderation.fields.category') }}
                     </label>
-                    <select
+                    <FormSelect
                         :id="`moderation-category-${uid}`"
-                        v-model="category"
-                        required
-                        class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary"
+                        class="mt-1"
+                        :model-value="category"
+                        :options="categoryOptions"
+                        :placeholder="t('forum.moderation.fields.categoryPlaceholder')"
                         data-testid="moderation-category"
-                    >
-                        <option value="" disabled>
-                            {{ t('forum.moderation.fields.categoryPlaceholder') }}
-                        </option>
-                        <option v-for="target in moveTargets" :key="target.id" :value="target.id">
-                            {{
-                                target.parentName
-                                    ? `${target.parentName} › ${target.name}`
-                                    : target.name
-                            }}
-                        </option>
-                    </select>
+                        @update:model-value="chooseCategory"
+                    />
                 </div>
 
                 <div v-if="askReason" class="mt-4">
@@ -202,19 +204,14 @@ function submit(): void {
                     </p>
                 </div>
 
-                <label
+                <FormCheckbox
                     v-if="confirmation"
-                    class="mt-4 flex items-start gap-2 text-sm text-base-primary"
+                    v-model="confirmed"
+                    class="mt-2 w-full py-3"
+                    data-testid="moderation-confirmation"
                 >
-                    <input
-                        v-model="confirmed"
-                        type="checkbox"
-                        class="mt-1 h-4 w-4"
-                        required
-                        data-testid="moderation-confirmation"
-                    />
-                    <span>{{ confirmation }}</span>
-                </label>
+                    <span class="text-base-primary">{{ confirmation }}</span>
+                </FormCheckbox>
 
                 <p v-if="error" role="alert" class="mt-3 text-sm text-red-600">{{ error }}</p>
 

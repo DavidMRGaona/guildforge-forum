@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { sendJson } from '../../forum/api';
+import ChoiceMark from '../forms/ChoiceMark.vue';
 
 /**
  * Reporting a post: a reason from a closed list and, if wanted, a note for moderation.
@@ -96,16 +97,18 @@ async function submit(): Promise<void> {
                     <label
                         v-for="option in REASONS"
                         :key="option"
-                        class="mt-2 flex min-h-[44px] items-center gap-2 text-sm text-base-primary"
+                        class="relative mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 text-sm text-base-primary"
                     >
                         <input
                             v-model="reason"
                             type="radio"
+                            class="peer sr-only"
                             :name="`report-reason-${uid}`"
                             :value="option"
                             required
                             :data-testid="`report-reason-${option}`"
                         />
+                        <ChoiceMark type="radio" :checked="reason === option" />
                         {{ t(`forum.reports.reasons.${option}`) }}
                     </label>
                 </fieldset>

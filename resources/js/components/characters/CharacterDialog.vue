@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { FormSelect } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import CharacterAvatar from './CharacterAvatar.vue';
 import { sendForm } from '../../forum/api';
@@ -50,6 +51,17 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const name = ref('');
 const description = ref('');
 const categoryId = ref('');
+
+const categoryOptions = computed(() =>
+    props.form.categories.map((category) => ({
+        value: category.id,
+        label: category.parentName ? `${category.parentName} › ${category.name}` : category.name,
+    }))
+);
+
+function chooseCategory(value: string | number | null): void {
+    categoryId.value = value === null ? '' : String(value);
+}
 const portrait = ref<File | null>(null);
 const preview = ref<string | null>(null);
 const removePortrait = ref(false);
@@ -342,26 +354,17 @@ async function submit(): Promise<void> {
                     >
                         {{ t('forum.characters.form.category') }}
                     </label>
-                    <select
+                    <FormSelect
                         :id="`character-category-${uid}`"
-                        v-model="categoryId"
-                        class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary"
-                        :aria-describedby="`character-category-help-${uid}`"
+                        class="mt-1"
+                        :model-value="categoryId"
+                        :options="categoryOptions"
+                        :placeholder="t('forum.characters.form.anyCategory')"
+                        :described-by="`character-category-help-${uid}`"
+                        :error="fieldErrors.category ?? ''"
                         data-testid="character-category"
-                    >
-                        <option value="">{{ t('forum.characters.form.anyCategory') }}</option>
-                        <option
-                            v-for="category in form.categories"
-                            :key="category.id"
-                            :value="category.id"
-                        >
-                            {{
-                                category.parentName
-                                    ? `${category.parentName} › ${category.name}`
-                                    : category.name
-                            }}
-                        </option>
-                    </select>
+                        @update:model-value="chooseCategory"
+                    />
                     <p :id="`character-category-help-${uid}`" class="mt-1 text-xs text-base-muted">
                         {{ t('forum.characters.form.categoryHelp') }}
                     </p>

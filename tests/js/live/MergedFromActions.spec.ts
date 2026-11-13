@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { router } from '@inertiajs/vue3';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref, type VNode } from 'vue';
+import { FormSelect } from '@/components/form';
 import FollowSelect from '../../../resources/js/components/forum/FollowSelect.vue';
 import DiscussionModeration from '../../../resources/js/components/moderation/DiscussionModeration.vue';
 import MergeDialog from '../../../resources/js/components/moderation/MergeDialog.vue';
@@ -112,11 +113,11 @@ describe('FollowSelect on a merged discussion', () => {
             global: listening(),
         });
 
-        await wrapper.get('select').setValue('following');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'following');
         await flushPromises();
 
         expect(heard).toEqual([MERGED]);
-        expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('normal');
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBe('normal');
         expect(wrapper.get('[role="alert"]').text()).toBe(MESSAGE);
     });
 
@@ -130,7 +131,7 @@ describe('FollowSelect on a merged discussion', () => {
             global: listening(),
         });
 
-        await wrapper.get('select').setValue('following');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'following');
         await flushPromises();
 
         expect(heard).toEqual([]);
@@ -145,7 +146,7 @@ describe('FollowSelect on a merged discussion', () => {
             },
         });
 
-        await wrapper.get('select').setValue('following');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'following');
         await flushPromises();
 
         expect(wrapper.get('[role="alert"]').text()).toBe(MESSAGE);

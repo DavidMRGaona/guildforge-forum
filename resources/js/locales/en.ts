@@ -524,6 +524,7 @@ export default {
             shared: {
                 ownGroup: 'My characters',
                 group: 'Campaign NPCs',
+                option: '{name} · Campaign NPC',
                 badge: 'NPC',
                 writtenBy: 'Written by {name}',
                 hiddenAuthor: 'Campaign NPC',

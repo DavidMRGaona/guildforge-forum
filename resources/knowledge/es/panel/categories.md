@@ -11,7 +11,7 @@ conditions:
   permissions:
     all: ['forum:categories.manage']
 ---
-Las categorías son la estructura del foro. Esta guía explica cómo se gestionan en **Contenido** → **Categorías del foro** y qué decide cada ajuste.
+Las categorías son la estructura del foro. Esta guía explica cómo se gestionan en **Comunicación** → **Categorías del foro** y qué decide cada ajuste.
 
 [[action:filament.admin.resources.forum-categories.index|Abrir las categorías del foro|if=forum:categories.manage]]
 

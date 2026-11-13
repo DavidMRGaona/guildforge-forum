@@ -20,10 +20,12 @@ use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Domain\Entities\DiceRoll;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\AccountId;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -46,6 +48,7 @@ final readonly class PostRenderer
         private PostImageStorageInterface $images,
         private DiceRollRepositoryInterface $diceRolls,
         private EmbedViews $embedViews,
+        private CharacterRepositoryInterface $characters,
     ) {}
 
     /**
@@ -201,11 +204,19 @@ final readonly class PostRenderer
         }
 
         $names = $this->accounts->namesOf($this->distinct(array_map(static fn (array $pair): ?string => $pair[0]->authorId(), $readable)));
+        // A post that speaks as a shared character is quoted under its name, never its author's
+        $shared = [];
+        foreach ($this->characters->findMany(array_values(array_filter(array_map(static fn (array $pair): ?CharacterId => $pair[0]->characterId(), $readable)))) as $character) {
+            if ($character->isNpc()) {
+                $shared[$character->id()->value] = $character->name();
+            }
+        }
 
         $sources = [];
         foreach ($readable as [$post, $discussion]) {
+            $sharedName = $shared[$post->characterId()->value ?? ''] ?? null;
             $sources[$post->id()->value] = new QuoteSource(
-                authorName: $post->authorId() === null ? null : ($names[$post->authorId()] ?? null),
+                authorName: $sharedName ?? ($post->authorId() === null ? null : ($names[$post->authorId()] ?? null)),
                 url: $this->links->urlFor($post, $discussion),
             );
         }

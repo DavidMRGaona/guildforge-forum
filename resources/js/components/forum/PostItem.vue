@@ -148,11 +148,14 @@ const characterItems = computed<ModerationMenuItem[]>(() => {
     if (actions.restoreUrl) {
         items.push({ key: 'character-restore', label: t('forum.characters.moderation.restore') });
     }
-    items.push({
-        key: 'character-delete',
-        label: t('forum.characters.moderation.delete'),
-        danger: true,
-    });
+    // A PNJ with messages (every one on a post) is retired, never deleted
+    if (actions.deleteUrl) {
+        items.push({
+            key: 'character-delete',
+            label: t('forum.characters.moderation.delete'),
+            danger: true,
+        });
+    }
 
     return items;
 });
@@ -367,10 +370,29 @@ async function remove(): Promise<void> {
                         class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
                         data-testid="post-character-player"
                     >
-                        <span class="min-w-0 truncate">{{
-                            t('forum.characters.playedBy', {
-                                name: post.authorName ?? t('forum.posts.deletedAccount'),
-                            })
+                        <span
+                            v-if="post.character.isShared"
+                            class="shrink-0 rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"
+                            data-testid="post-character-shared"
+                        >
+                            {{ t('forum.characters.shared.badge') }}
+                        </span>
+                        <!-- A shared PNJ names its writer only to whoever may know -->
+                        <span
+                            v-if="!post.character.isShared || post.authorName !== null"
+                            class="min-w-0 truncate"
+                            >{{
+                                post.character.isShared
+                                    ? t('forum.characters.shared.writtenBy', {
+                                          name: post.authorName,
+                                      })
+                                    : t('forum.characters.playedBy', {
+                                          name: post.authorName ?? t('forum.posts.deletedAccount'),
+                                      })
+                            }}</span
+                        >
+                        <span v-else class="min-w-0 truncate">{{
+                            t('forum.characters.shared.hiddenAuthor')
                         }}</span>
                         <span
                             v-if="post.isStarter"

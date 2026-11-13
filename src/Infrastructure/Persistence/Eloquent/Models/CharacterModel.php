@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property string $id
- * @property string $owner_id
+ * @property string|null $owner_id
  * @property string $name
  * @property string|null $description
  * @property string|null $portrait_path

@@ -38,6 +38,7 @@ use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Notifications\MentionedNotification;
 use Modules\Forum\Notifications\PostLikedNotification;
 use Modules\Forum\Notifications\ReplyPostedNotification;
+use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeForumAccess;
 use Tests\Support\Modules\ModuleTestCase;
@@ -49,6 +50,7 @@ use Tests\Support\Time\UsesUtcStorage;
  */
 final class PostNoticesTest extends ModuleTestCase
 {
+    use BuildsCharacters;
     use BuildsForumContent;
     use UsesUtcStorage;
 
@@ -109,6 +111,20 @@ final class PostNoticesTest extends ModuleTestCase
         $this->assertSame('Ana ha respondido en «La tumba»', $notice->title);
         $this->assertSame('Nos vemos el viernes', $notice->body);
         $this->assertStringStartsWith('/foro/t/', $notice->url);
+    }
+
+    public function test_a_reply_as_a_shared_character_names_the_character_never_the_account(): void
+    {
+        app(MailPreferenceServiceInterface::class)->update($this->follower, [ForumMailCategories::REPLIES => MailDelivery::Digest]);
+        $shared = $this->aSharedCharacterIn($this->category, 'Mercader');
+
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->author->id), $this->body('Se vende todo'), CarbonImmutable::now(), needsApproval: false, characterId: $shared->id());
+
+        $notice = $this->latest($this->follower);
+        $this->assertSame('Mercader ha respondido en «La tumba»', $notice->title);
+        $this->assertStringNotContainsString('Ana', $notice->title.$notice->body);
+        $line = DB::table('user_mail_digest_items')->where('user_id', $this->follower->id)->sole();
+        $this->assertNull($line->actor_id);
     }
 
     public function test_a_reply_line_of_the_digest_names_who_wrote_and_goes_when_that_account_is_anonymized(): void

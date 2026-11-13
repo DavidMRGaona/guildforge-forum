@@ -23,6 +23,7 @@ use Modules\Forum\Http\Controllers\PostLikesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
 use Modules\Forum\Http\Controllers\ReportController;
+use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 
@@ -179,7 +180,15 @@ Route::prefix('foro')
             Route::get('personajes', [CharacterController::class, 'index'])
                 ->middleware('throttle:60,1,forum-characters')
                 ->name('characters.index');
+            // The shared characters (PNJ) of a campaign's space, for whoever directs the campaign
+            Route::get('c/{category}/pnj', [SharedCharacterController::class, 'index'])
+                ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
+                ->middleware('throttle:60,1,forum-characters')
+                ->name('characters.shared.index');
             Route::middleware('throttle:30,1,forum-characters-write')->group(function (): void {
+                Route::post('c/{category}/pnj', [SharedCharacterController::class, 'store'])
+                    ->where('category', '[a-z0-9]+(?:-[a-z0-9]+)*')
+                    ->name('characters.shared.store');
                 Route::post('personajes', [CharacterController::class, 'store'])->name('characters.store');
                 // Multipart (a portrait may come with it), hence POST
                 Route::post('personajes/{character}', [CharacterController::class, 'update'])

@@ -23,6 +23,11 @@ use Throwable;
  *   suspended in the forum may not. Their owner may always list, retire and delete their own.
  * - A character tied to a category is offered only in it and in its subcategories, and only
  *   whoever reads that category sees it (its posts show their account to anyone else).
+ * - A shared character (a PNJ) belongs to a campaign's space, not to an account: whoever directs
+ *   the campaign (the publication's leaders, asked every time) creates, changes, retires and
+ *   writes as it, and only there; once they stop directing they can do none of it and what they
+ *   wrote stays. Posts speaking as one hide who wrote them from everyone but the space's moderators
+ *   (PostContentPresenter), so one with posts is never deleted, only retired.
  * - Characters are moderated by whoever moderates the whole forum and, for a character tied to
  *   a category, by whoever moderates that category (CategoryAccessPolicy).
  */
@@ -54,6 +59,36 @@ final readonly class CharacterRules
         });
     }
 
+    /** Shared characters a space may hold, retired ones included */
+    public const int MAX_SHARED_PER_SPACE = 30;
+
+    /**
+     * Whether the person may create shared characters in the space: they direct its campaign
+     * and characters are on for them.
+     */
+    public function mayShareIn(?Authenticatable $user, Category $space): bool
+    {
+        return $user instanceof Authenticatable
+            && $this->mayHaveCharacters($user)
+            && $this->decide(fn (): bool => $this->policy->leadsSpace($user, $space));
+    }
+
+    /** Whether the person may list the shared characters of a space: its directors and its moderators */
+    public function mayManageSharedIn(?Authenticatable $user, Category $space): bool
+    {
+        return $this->decide(fn (): bool => $this->policy->leadsSpace($user, $space) || $this->policy->canModerate($user, $space));
+    }
+
+    /** Whether the person directs the campaign the shared character belongs to */
+    public function leads(?Authenticatable $user, Character $character): bool
+    {
+        return $character->isNpc() && $this->decide(function () use ($user, $character): bool {
+            $space = $this->boundCategory($character);
+
+            return $space instanceof Category && $this->policy->leadsSpace($user, $space);
+        });
+    }
+
     public function owns(?Authenticatable $user, Character $character): bool
     {
         return $user instanceof Authenticatable && $character->isOwnedBy((string) ForumBrowser::accountId($user));
@@ -69,7 +104,9 @@ final readonly class CharacterRules
 
             $category = $this->boundCategory($character);
 
-            return $category instanceof Category && $this->policy->canModerate($user, $category);
+            // The directors of a campaign moderate the shared characters of its space
+            return $category instanceof Category
+                && ($this->policy->canModerate($user, $category) || ($character->isNpc() && $this->policy->leadsSpace($user, $category)));
         });
     }
 
@@ -79,7 +116,8 @@ final readonly class CharacterRules
      */
     public function maySee(?Authenticatable $reader, Character $character): bool
     {
-        if (! $character->categoryId() instanceof CategoryId || $this->owns($reader, $character)) {
+        // A post that speaks as a shared character is already read: showing its name tells nothing
+        if ($character->isNpc() || ! $character->categoryId() instanceof CategoryId || $this->owns($reader, $character)) {
             return true;
         }
 
@@ -93,10 +131,17 @@ final readonly class CharacterRules
     /**
      * Whether the person may write as the character in a category: their own, not retired,
      * characters on for them, and tied to no category or to that one (or to its parent) and
-     * still readable to them.
+     * still readable to them. A shared one only in its space, by whoever directs the campaign.
      */
     public function usableIn(Authenticatable $user, Character $character, Category $category): bool
     {
+        if ($character->isNpc()) {
+            return ! $character->isRetired()
+                && $character->categoryId()?->equals($category->id()) === true
+                && $this->mayHaveCharacters($user)
+                && $this->decide(fn (): bool => $this->policy->leadsSpace($user, $category));
+        }
+
         if (! $this->owns($user, $character) || $character->isRetired() || ! $this->mayHaveCharacters($user)) {
             return false;
         }

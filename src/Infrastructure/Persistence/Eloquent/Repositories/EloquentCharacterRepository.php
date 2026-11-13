@@ -86,6 +86,23 @@ final class EloquentCharacterRepository implements CharacterRepositoryInterface
         return $owner === null ? 0 : CharacterModel::query()->where('owner_id', $owner)->count();
     }
 
+    public function sharedIn(CategoryId $space): array
+    {
+        return array_values(CharacterModel::query()
+            ->whereNull('owner_id')
+            ->where('category_id', $space->value)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (CharacterModel $model): Character => $this->toEntity($model))
+            ->all());
+    }
+
+    public function countSharedIn(CategoryId $space): int
+    {
+        return CharacterModel::query()->whereNull('owner_id')->where('category_id', $space->value)->count();
+    }
+
     public function hasPosts(CharacterId $id): bool
     {
         return PostModel::query()->where('character_id', $id->value)->exists()

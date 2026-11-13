@@ -76,6 +76,8 @@ final readonly class PostContentPresenter
                 hiddenReason: $own || $moderates ? $post->hiddenReason() : null,
                 character: $characters[$post->characterId()->value ?? ''] ?? null,
                 moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
+                authorHidden: ! $own && ! $moderates && (($characters[$post->characterId()->value ?? ''] ?? null)?->isNpc() ?? false)
+                    && ! ($moderated[$post->characterId()->value ?? ''] ?? false),
             );
         }, $posts);
     }

@@ -33,6 +33,7 @@ final readonly class DiscussionRowDTO
         public DateTimeImmutable $createdAt,
         public array $topics,
         public ?int $lastReadNumber,
+        public ?string $lastPostSharedName = null,
     ) {}
 
     /**

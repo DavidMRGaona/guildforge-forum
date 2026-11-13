@@ -109,7 +109,7 @@ abstract class PostNotification extends Notification implements HasMailCategory,
             url: $notice->path,
             body: $notice->excerpt === '' ? null : $notice->excerpt,
             icon: $this->icon(),
-            actorId: $notice->post->authorId(),
+            actorId: $notice->actorId(),
         );
     }
 

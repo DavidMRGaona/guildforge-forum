@@ -6,7 +6,7 @@ category: community
 audience: site
 order: 90
 keywords: [personaje, personajes, hablar como, retrato, avatar, nombre del personaje, descripción, retirar, recuperar, borrar personaje, escribir como, rol, interpretar, categoría del personaje]
-related: [forum.site.play-by-post, forum.site.dice, forum.site.writing]
+related: [forum.site.play-by-post, forum.site.campaign-spaces, forum.site.dice, forum.site.writing]
 conditions:
   capabilities: [forum.uses_characters]
 ---
@@ -29,6 +29,10 @@ También puedes crear uno al escribir, con **Nuevo personaje…** en el selector
 Encima del editor (al responder, al abrir un tema o al editar un mensaje tuyo) está el selector **Hablar como**: elige el personaje, o **Fuera de personaje** para escribir con tu nombre. Al responder en un tema, el foro propone el último personaje que usaste en él.
 
 Un mensaje en personaje muestra el retrato y el nombre del personaje, y debajo, «por» tu nombre. Para hablar fuera de personaje dentro de un mensaje en personaje, usa un **Aparte fuera de personaje**.
+
+## PNJ de una campaña
+
+Si diriges una campaña, en su espacio del foro el selector **Hablar como** muestra, en un grupo aparte, los **PNJ de la campaña**: personajes comunes a toda la dirección, que no son de ninguna cuenta. El mensaje muestra al PNJ y solo la dirección y la moderación ven qué persona lo escribió. Se crean y se gestionan desde la cabecera del espacio; mira la guía del espacio de una campaña.
 
 ## Retirar, recuperar y borrar
 

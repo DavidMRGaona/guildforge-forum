@@ -417,6 +417,8 @@ export interface ForumCharacterBasics {
     name: string;
     initials: string;
     portraitUrl: string | null;
+    /** A PNJ shared by the directors of a campaign: no account plays it */
+    isShared?: boolean;
 }
 
 /** What may be done with a character: its owner's and its moderators' addresses */
@@ -426,7 +428,8 @@ export interface ForumCharacterActions {
     retireUrl: string | null;
     /** null unless retired and the viewer may bring it back */
     restoreUrl: string | null;
-    deleteUrl: string;
+    /** null for a PNJ with messages: it is retired, never deleted */
+    deleteUrl: string | null;
 }
 
 /** Who a post speaks as */
@@ -486,9 +489,26 @@ export interface ForumOwnedCharacter extends ForumCharacterBasics {
     retiredLabel: string | null;
     /** Deleting it then retires it */
     hasPosts: boolean;
-    actions: ForumCharacterActions;
+    actions: ForumCharacterActions & { deleteUrl: string };
 }
 
 export interface ForumCharacterProfile extends ForumCharacterForm {
     items: ForumOwnedCharacter[];
+}
+
+/** A PNJ in the manager of a campaign's space */
+export interface ForumSharedCharacter extends ForumCharacterBasics {
+    description: string | null;
+    isRetired: boolean;
+    isRetirementLocked: boolean;
+    retiredLabel: string | null;
+    hasPosts: boolean;
+    actions: ForumCharacterActions;
+}
+
+/** The PNJ of a campaign's space, for whoever directs the campaign or moderates the space */
+export interface ForumSharedCharacters extends ForumCharacterForm {
+    items: ForumSharedCharacter[];
+    /** The most PNJ a space holds */
+    max: number;
 }

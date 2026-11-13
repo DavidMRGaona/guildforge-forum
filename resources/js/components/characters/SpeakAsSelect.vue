@@ -11,7 +11,8 @@ import type {
 } from '../../types/forum';
 
 /**
- * «Hablar como» above the editor: one of the person's characters, or «Fuera de personaje».
+ * «Hablar como» above the editor: one of the person's characters, or «Fuera de personaje». In a
+ * campaign's space, whoever directs the campaign also finds its shared PNJ, in a group of their own.
  * «Nuevo personaje…» creates one without leaving the page and picks it. The server checks the
  * choice again when the post is sent.
  */
@@ -54,6 +55,10 @@ const options = computed<ForumCharacterBasics[]>(() => {
 
     return usable;
 });
+
+/** Shared PNJ go in their own group, below the person's characters */
+const ownOptions = computed(() => options.value.filter((option) => option.isShared !== true));
+const sharedOptions = computed(() => options.value.filter((option) => option.isShared === true));
 
 const chosen = computed(
     () => options.value.find((option) => option.id === props.modelValue) ?? null
@@ -132,9 +137,23 @@ function added(character: ForumPostCharacter, boundTo: string | null): void {
                 @change="change"
             >
                 <option value="">{{ t('forum.characters.outOfCharacter') }}</option>
-                <option v-for="option in options" :key="option.id" :value="option.id">
-                    {{ option.name }}
-                </option>
+                <template v-if="sharedOptions.length > 0">
+                    <optgroup :label="t('forum.characters.shared.ownGroup')">
+                        <option v-for="option in ownOptions" :key="option.id" :value="option.id">
+                            {{ option.name }}
+                        </option>
+                    </optgroup>
+                    <optgroup :label="t('forum.characters.shared.group')">
+                        <option v-for="option in sharedOptions" :key="option.id" :value="option.id">
+                            {{ option.name }}
+                        </option>
+                    </optgroup>
+                </template>
+                <template v-else>
+                    <option v-for="option in options" :key="option.id" :value="option.id">
+                        {{ option.name }}
+                    </option>
+                </template>
                 <option v-if="picker.createUrl" :value="NEW">
                     {{ t('forum.characters.newCharacter') }}
                 </option>

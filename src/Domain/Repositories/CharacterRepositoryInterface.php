@@ -6,6 +6,7 @@ namespace Modules\Forum\Domain\Repositories;
 
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Exceptions\CharacterNotFoundException;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 
@@ -34,6 +35,15 @@ interface CharacterRepositoryInterface
     public function ownedBy(string $accountId): array;
 
     public function countOwnedBy(string $accountId): int;
+
+    /**
+     * The shared characters of a campaign space, retired ones included, by name.
+     *
+     * @return list<Character>
+     */
+    public function sharedIn(CategoryId $space): array;
+
+    public function countSharedIn(CategoryId $space): int;
 
     /** Whether any post (whatever its status) or earlier version of a post speaks as it */
     public function hasPosts(CharacterId $id): bool;

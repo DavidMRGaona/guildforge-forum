@@ -108,4 +108,58 @@ describe('a post written as a character', () => {
 
         expect(wrapper.text()).toContain('Moderar');
     });
+
+    it('shows a shared PNJ with its badge and names who wrote it only when the server says so', () => {
+        const mercader: ForumPostCharacter = {
+            ...arwen,
+            id: 'mercader',
+            name: 'Mercader',
+            initials: 'M',
+            isRetired: false,
+            isShared: true,
+        };
+
+        // Whoever may know: the directors, moderation and the author
+        const known = mounted(aPost(mercader));
+        expect(known.find('[data-testid="post-character-shared"]').text()).toBe('PNJ');
+        expect(known.find('[data-testid="post-character-player"]').text()).toContain(
+            'Escrito por Jane Doe'
+        );
+
+        // Everyone else: the server sends no account
+        const hidden = mounted({
+            ...aPost(mercader),
+            authorId: null,
+            authorName: null,
+            isStarter: false,
+        });
+        expect(hidden.find('[data-testid="post-character"]').text()).toContain('Mercader');
+        const player = hidden.find('[data-testid="post-character-player"]').text();
+        expect(player).toContain('PNJ');
+        expect(player).toContain('PNJ de la campaña');
+        expect(player).not.toContain('Jane Doe');
+        expect(player).not.toContain('Escrito por');
+        expect(hidden.text()).not.toContain('Cuenta eliminada');
+    });
+
+    it('offers a PNJ with posts only retiring, never deleting', async () => {
+        const wrapper = mounted(
+            aPost({
+                ...arwen,
+                isShared: true,
+                isRetired: false,
+                actions: {
+                    updateUrl: '/foro/personajes/arwen',
+                    retireUrl: '/foro/personajes/arwen/retirar',
+                    restoreUrl: null,
+                    deleteUrl: null,
+                },
+            })
+        );
+
+        await wrapper.get('[data-testid="moderation-toggle"]').trigger('click');
+
+        expect(wrapper.find('[data-testid="moderation-character-retire"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="moderation-character-delete"]').exists()).toBe(false);
+    });
 });

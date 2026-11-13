@@ -29,8 +29,10 @@ const props = withDefaults(
         start?: CharacterDialogStart | null;
         /** Whether the category may be chosen (its owner); moderators keep it */
         choosesCategory?: boolean;
+        /** A PNJ shared by a campaign's directors: its own titles */
+        shared?: boolean;
     }>(),
-    { start: null, choosesCategory: true }
+    { start: null, choosesCategory: true, shared: false }
 );
 
 const emit = defineEmits<{
@@ -209,8 +211,16 @@ async function submit(): Promise<void> {
                 <h3 :id="`character-dialog-${uid}`" class="text-lg font-semibold text-base-primary">
                     {{
                         start
-                            ? t('forum.characters.form.editTitle')
-                            : t('forum.characters.form.createTitle')
+                            ? t(
+                                  shared
+                                      ? 'forum.characters.shared.editTitle'
+                                      : 'forum.characters.form.editTitle'
+                              )
+                            : t(
+                                  shared
+                                      ? 'forum.characters.shared.createTitle'
+                                      : 'forum.characters.form.createTitle'
+                              )
                     }}
                 </h3>
 

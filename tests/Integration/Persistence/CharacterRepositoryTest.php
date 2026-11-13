@@ -111,4 +111,23 @@ final class CharacterRepositoryTest extends ModuleTestCase
 
         $this->assertNull($this->characters->findOrFail($character->id())->categoryId());
     }
+
+    public function test_a_shared_character_has_no_owner_and_is_listed_with_its_space(): void
+    {
+        $space = $this->aCategory('espacio');
+        $other = $this->aCategory('otro');
+        $merchant = $this->aSharedCharacterIn($space, 'Mercader');
+        $this->aSharedCharacterIn($space, 'Alguacil', retired: true);
+        $this->aSharedCharacterIn($other, 'De otro espacio');
+        $this->aCharacterOf($this->owner, 'Arwen', boundTo: $space);
+
+        $found = $this->characters->findOrFail($merchant->id());
+        $this->assertTrue($found->isNpc());
+        $this->assertNull($found->ownerId());
+        $this->assertSame($space->id()->value, $found->categoryId()?->value);
+
+        $this->assertSame(['Alguacil', 'Mercader'], array_map(static fn (Character $shared): string => $shared->name(), $this->characters->sharedIn($space->id())));
+        $this->assertSame(2, $this->characters->countSharedIn($space->id()));
+        $this->assertSame(['Arwen'], array_map(static fn (Character $owned): string => $owned->name(), $this->characters->ownedBy($this->owner)));
+    }
 }

@@ -11,7 +11,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 
 /**
- * A character an account writes as: a name, a short description and a portrait (without one,
+ * A character an account writes as (or, when it is shared, the directors of a campaign): a name, a short description and a portrait (without one,
  * its initials show). It belongs to one account for good. Tied to a category, it is offered
  * only there (and in its subcategories) and only whoever reads that category sees it.
  *
@@ -29,14 +29,14 @@ final class Character
 
     private const string PORTRAIT_PATTERN = '#^forum/characters/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)\z#';
 
-    private readonly string $ownerId;
+    private readonly ?string $ownerId;
 
     private string $name;
 
     private ?string $description;
 
     /**
-     * @param  string  $ownerId  the account that writes as it
+     * @param  string|null  $ownerId  the account that writes as it; none for a shared character of a campaign space (see createNpc)
      * @param  string|null  $portraitPath  where its portrait is stored, under PORTRAIT_FOLDER
      * @param  bool  $retirementLocked  moderation retired it: only moderation brings it back
      *
@@ -44,7 +44,7 @@ final class Character
      */
     public function __construct(
         private readonly CharacterId $id,
-        string $ownerId,
+        ?string $ownerId,
         string $name,
         ?string $description,
         private ?string $portraitPath,
@@ -54,8 +54,9 @@ final class Character
         private ?DateTimeImmutable $retiredAt = null,
         private bool $retirementLocked = false,
     ) {
-        $this->ownerId = AccountId::normalize($ownerId)
-            ?? throw InvalidCharacterException::because('owner', 'owner', "'{$ownerId}' is not an account id.");
+        $this->ownerId = $ownerId === null
+            ? null
+            : (AccountId::normalize($ownerId) ?? throw InvalidCharacterException::because('owner', 'owner', "'{$ownerId}' is not an account id."));
         $this->name = $this->checkedName($name);
         $this->description = $this->checkedDescription($description);
         $this->checkPortrait($portraitPath);
@@ -71,6 +72,18 @@ final class Character
     public static function create(CharacterId $id, string $ownerId, string $name, ?string $description, ?CategoryId $categoryId, DateTimeImmutable $at): self
     {
         return new self($id, $ownerId, $name, $description, null, $categoryId, $at, $at);
+    }
+
+    /**
+     * A character shared by the directors of a campaign: it belongs to the campaign's space, not
+     * to an account, so whoever directs the campaign creates, changes and retires it. Posts
+     * speaking as it hide the account that wrote them from everyone but the space's moderators.
+     *
+     * @throws InvalidCharacterException
+     */
+    public static function createNpc(CharacterId $id, string $name, ?string $description, CategoryId $space, DateTimeImmutable $at): self
+    {
+        return new self($id, null, $name, $description, null, $space, $at, $at);
     }
 
     /**
@@ -168,7 +181,13 @@ final class Character
 
     public function isOwnedBy(string $accountId): bool
     {
-        return AccountId::normalize($accountId) === $this->ownerId;
+        return $this->ownerId !== null && AccountId::normalize($accountId) === $this->ownerId;
+    }
+
+    /** Whether it is shared by the directors of a campaign space instead of belonging to an account */
+    public function isNpc(): bool
+    {
+        return $this->ownerId === null;
     }
 
     public function isRetired(): bool
@@ -181,7 +200,7 @@ final class Character
         return $this->id;
     }
 
-    public function ownerId(): string
+    public function ownerId(): ?string
     {
         return $this->ownerId;
     }

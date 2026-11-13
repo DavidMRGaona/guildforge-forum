@@ -11,11 +11,14 @@ use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\PostNoticeDTO;
 use Modules\Forum\Domain\Entities\Category;
+use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PostId;
 
 /**
@@ -35,6 +38,7 @@ final readonly class PostNoticeContext
         private ForumAccessInterface $access,
         private AccountDirectoryInterface $accounts,
         private ForumUrlsInterface $urls,
+        private CharacterRepositoryInterface $characters,
     ) {}
 
     /**
@@ -60,16 +64,20 @@ final readonly class PostNoticeContext
         }
 
         $authorId = $post->authorId();
+        // A post that speaks as a shared character names it, never the account that wrote it
+        $shared = $post->characterId() instanceof CharacterId ? $this->characters->find($post->characterId()) : null;
+        $shared = $shared instanceof Character && $shared->isNpc() ? $shared : null;
 
         return new PostNoticeDTO(
             post: $post,
             discussion: $discussion,
             category: $category,
             recipientId: $recipientId,
-            authorName: $authorId === null ? null : ($this->accounts->namesOf([$authorId])[$authorId] ?? null),
+            authorName: $shared instanceof Character ? $shared->name() : ($authorId === null ? null : ($this->accounts->namesOf([$authorId])[$authorId] ?? null)),
             excerpt: Str::limit(trim((string) preg_replace('/\s+/u', ' ', $post->body()->plainText)), self::EXCERPT_LENGTH),
             path: $this->urls->discussion($discussion, $number),
             url: $this->urls->discussion($discussion, $number, absolute: true),
+            anonymousAuthor: $shared instanceof Character,
         );
     }
 

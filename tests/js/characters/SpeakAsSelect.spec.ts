@@ -127,4 +127,42 @@ describe('SpeakAsSelect', () => {
         // The character chosen before no longer fits
         expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
     });
+
+    it('groups the shared PNJ of a campaign apart from the person’s own characters', async () => {
+        const wrapper = mount(SpeakAsSelect, {
+            props: {
+                modelValue: null,
+                picker: aPicker({
+                    items: [
+                        { id: 'arwen', name: 'Arwen', initials: 'A', portraitUrl: null },
+                        {
+                            id: 'mercader',
+                            name: 'Mercader',
+                            initials: 'M',
+                            portraitUrl: null,
+                            isShared: true,
+                        },
+                    ],
+                }),
+            },
+        });
+
+        const groups = wrapper.findAll('optgroup');
+        expect(groups.map((group) => group.attributes('label'))).toEqual([
+            'Mis personajes',
+            'PNJ de la campaña',
+        ]);
+        expect(groups[0]?.findAll('option').map((option) => option.text())).toEqual(['Arwen']);
+        expect(groups[1]?.findAll('option').map((option) => option.text())).toEqual(['Mercader']);
+
+        await wrapper.find('select').setValue('mercader');
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([['mercader']]);
+    });
+
+    it('draws no groups when the person has no shared PNJ here', () => {
+        const wrapper = mount(SpeakAsSelect, { props: { modelValue: null, picker: aPicker() } });
+
+        expect(wrapper.findAll('optgroup')).toHaveLength(0);
+    });
 });

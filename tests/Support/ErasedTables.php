@@ -45,7 +45,7 @@ final class ErasedTables
             'forum_moderation_log' => ['columns' => ['moderator_id', 'subject_user_id'], 'why' => 'moderation history'],
             'forum_reports' => ['columns' => ['resolved_by'], 'why' => 'reports about posts that stay (the reporter column is erased)'],
             'forum_suspensions' => ['columns' => ['user_id', 'suspended_by', 'lifted_by'], 'why' => 'moderation history'],
-            'forum_characters' => ['columns' => ['owner_id'], 'why' => 'details stripped and retired for good; the name stays on the posts'],
+            'forum_characters' => ['columns' => ['owner_id'], 'why' => 'details stripped and retired for good; the name stays on the posts (a shared character of a campaign space has no owner: nothing to erase)'],
         ];
     }
 

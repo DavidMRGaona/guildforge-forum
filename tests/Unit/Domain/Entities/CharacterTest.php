@@ -7,6 +7,7 @@ namespace Modules\Forum\Tests\Unit\Domain\Entities;
 use DateTimeImmutable;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Exceptions\InvalidCharacterException;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -132,6 +133,19 @@ final class CharacterTest extends TestCase
         $character->stripPersonalDetails(new DateTimeImmutable('2026-11-12 22:04:25'));
 
         $this->assertEquals(new DateTimeImmutable('2026-11-12 09:00:00'), $character->updatedAt());
+    }
+
+    public function test_a_shared_character_belongs_to_a_space_and_to_no_account(): void
+    {
+        $space = CategoryId::generate();
+        $npc = Character::createNpc(CharacterId::generate(), 'Mercader  Gruñón', 'Vende de todo', $space, new DateTimeImmutable);
+
+        $this->assertTrue($npc->isNpc());
+        $this->assertNull($npc->ownerId());
+        $this->assertTrue($npc->categoryId()?->equals($space));
+        $this->assertFalse($npc->isOwnedBy(self::OWNER));
+        $this->assertSame('Mercader Gruñón', $npc->name());
+        $this->assertFalse($this->aCharacter('Arwen')->isNpc());
     }
 
     private function aCharacter(string $name, ?string $description = null): Character

@@ -6,6 +6,7 @@ namespace Modules\Forum\Infrastructure\Queries;
 
 use App\Application\Services\TimezoneServiceInterface;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
@@ -29,8 +30,12 @@ final readonly class EloquentCategoryStatsQuery implements CategoryStatsQueryInt
         $rows = DB::table('forum_categories as c')
             ->leftJoin('forum_posts as p', 'p.id', '=', 'c.last_post_id')
             ->leftJoin('forum_discussions as d', 'd.id', '=', 'p.discussion_id')
+            // Only a shared character (no owner) is read: a personal one never replaces its author
+            ->leftJoin('forum_characters as lc', static function (JoinClause $join): void {
+                $join->on('lc.id', '=', 'p.character_id')->whereNull('lc.owner_id');
+            })
             ->whereIn('c.id', $categoryIds)
-            ->get(['c.id', 'c.discussion_count', 'c.post_count', 'c.last_activity_at', 'd.id as discussion_id', 'd.number as discussion_number', 'd.title', 'd.is_hidden', 'p.number', 'p.author_id']);
+            ->get(['c.id', 'c.discussion_count', 'c.post_count', 'c.last_activity_at', 'd.id as discussion_id', 'd.number as discussion_number', 'd.title', 'd.is_hidden', 'p.number', 'p.author_id', 'lc.name as shared_name']);
 
         $stats = [];
         foreach ($rows as $row) {
@@ -46,7 +51,8 @@ final readonly class EloquentCategoryStatsQuery implements CategoryStatsQueryInt
                 lastDiscussionNumber: $shown ? (int) $row->discussion_number : null,
                 lastDiscussionTitle: $shown ? (string) $row->title : null,
                 lastPostNumber: $shown && $row->number !== null ? (int) $row->number : null,
-                lastPostAuthorId: $shown && $row->author_id !== null ? strtolower((string) $row->author_id) : null,
+                lastPostAuthorId: $shown && $row->author_id !== null && $row->shared_name === null ? strtolower((string) $row->author_id) : null,
+                lastPostSharedName: $shown && $row->shared_name !== null ? (string) $row->shared_name : null,
             );
         }
 

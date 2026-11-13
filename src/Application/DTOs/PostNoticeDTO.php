@@ -10,7 +10,7 @@ use Modules\Forum\Domain\Entities\Post;
 
 /**
  * What a notice about a post shows, read when it is delivered: the post, where it is, who wrote
- * it, a short excerpt and its address (a path of the site and the absolute one for mail).
+ * it (the character's name when it speaks as a shared one), a short excerpt and its address (a path of the site and the absolute one for mail).
  */
 final readonly class PostNoticeDTO
 {
@@ -23,5 +23,15 @@ final readonly class PostNoticeDTO
         public string $excerpt,
         public string $path,
         public string $url,
+        public bool $anonymousAuthor = false,
     ) {}
+
+    /**
+     * Who the notice is about, for grouping and muting: nobody when the post speaks as a shared
+     * character (its author is not shown, and authorName is the character's).
+     */
+    public function actorId(): ?string
+    {
+        return $this->anonymousAuthor ? null : $this->post->authorId();
+    }
 }

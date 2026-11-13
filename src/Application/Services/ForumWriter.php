@@ -22,6 +22,7 @@ use Modules\Forum\Domain\Exceptions\InvalidPostException;
 use Modules\Forum\Domain\Exceptions\ModerationRefusedException;
 use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
@@ -63,6 +64,7 @@ final readonly class ForumWriter
         private PostRolls $rolls,
         private RedirectRepositoryInterface $redirects,
         private DiscussionCarryOverInterface $carryOver,
+        private CharacterRepositoryInterface $characters,
     ) {}
 
     /**
@@ -442,6 +444,11 @@ final readonly class ForumWriter
                     }
 
                     $first = $posts[0];
+                    // The author of a discussion is always shown: a shared character's post cannot open one
+                    if ($first->characterId() instanceof CharacterId && ($this->characters->find($first->characterId())?->isNpc() ?? false)) {
+                        throw ModerationRefusedException::splitSharedCharacter();
+                    }
+
                     $new = Discussion::start($newId, $categoryId, $first->authorId(), $title, $first->publishedAt() ?? $first->createdAt());
                     $new->numberAs($this->discussions->nextNumber());
                     $this->discussions->save($new);

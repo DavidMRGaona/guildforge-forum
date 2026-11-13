@@ -105,6 +105,10 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
     {
         $query = DB::table('forum_discussions as d')
             ->leftJoin('forum_posts as p', 'p.id', '=', 'd.last_post_id')
+            // Only a shared character (no owner) is read: a personal one never replaces its author
+            ->leftJoin('forum_characters as lc', static function (JoinClause $join): void {
+                $join->on('lc.id', '=', 'p.character_id')->whereNull('lc.owner_id');
+            })
             ->whereIn('d.category_id', $criteria->categoryIds)
             // A discussion with no visible post (its first awaits approval) is not listed yet
             ->where('d.post_count', '>', 0)
@@ -113,7 +117,7 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
             ->orderByDesc('d.id')
             ->select([
                 'd.id', 'd.number', 'd.title', 'd.category_id', 'd.author_id', 'd.status', 'd.is_pinned', 'd.is_hidden',
-                'd.post_count', 'd.last_activity_at', 'd.created_at', 'p.number as last_post_number', 'p.author_id as last_post_author_id',
+                'd.post_count', 'd.last_activity_at', 'd.created_at', 'p.number as last_post_number', 'p.author_id as last_post_author_id', 'lc.name as last_post_shared_name',
             ]);
 
         $moderated = $criteria->moderatedCategoryIds;
@@ -188,11 +192,12 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
             hidden: (bool) $row->is_hidden,
             postCount: (int) $row->post_count,
             lastPostNumber: $row->last_post_number === null ? null : (int) $row->last_post_number,
-            lastPostAuthorId: $row->last_post_author_id === null ? null : strtolower((string) $row->last_post_author_id),
+            lastPostAuthorId: $row->last_post_author_id === null || $row->last_post_shared_name !== null ? null : strtolower((string) $row->last_post_author_id),
             lastActivityAt: $this->instant($row->last_activity_at ?? $row->created_at),
             createdAt: $this->instant($row->created_at),
             topics: $topics[strtolower((string) $row->id)] ?? [],
             lastReadNumber: $this->readThrough($row),
+            lastPostSharedName: $row->last_post_shared_name === null ? null : (string) $row->last_post_shared_name,
         ), $rows));
     }
 

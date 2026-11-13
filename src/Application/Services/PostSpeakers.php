@@ -31,27 +31,29 @@ final readonly class PostSpeakers
     ) {}
 
     /**
-     * The character a new post in the category speaks as.
+     * The character a new post in the category speaks as. A shared character only answers: the
+     * author of a discussion is always shown, so one never starts it.
      *
      * @throws CharacterUnavailableException
      */
-    public function forNewPost(Authenticatable $author, ?string $characterId, Category $category): ?CharacterId
+    public function forNewPost(Authenticatable $author, ?string $characterId, Category $category, bool $startsDiscussion = false): ?CharacterId
     {
         if ($characterId === null || $characterId === '') {
             return null;
         }
 
-        return $this->usable($author, $characterId, $category)->id();
+        return $this->usable($author, $characterId, $category, $startsDiscussion)->id();
     }
 
     /**
      * Who an edited post speaks as.
      *
      * @param  bool  $given  whether the editor said (an older client, or a moderator's edit, does not)
+     * @param  bool  $startsDiscussion  whether the post is the first of its discussion, which no shared character writes
      *
      * @throws CharacterUnavailableException
      */
-    public function forEdit(Authenticatable $author, Post $post, Category $category, bool $given, ?string $characterId): SpeakerChoice
+    public function forEdit(Authenticatable $author, Post $post, Category $category, bool $given, ?string $characterId, bool $startsDiscussion = false): SpeakerChoice
     {
         if (! $given) {
             return SpeakerChoice::keep();
@@ -66,7 +68,7 @@ final readonly class PostSpeakers
             return SpeakerChoice::keep();
         }
 
-        return SpeakerChoice::as($this->usable($author, $characterId, $category)->id());
+        return SpeakerChoice::as($this->usable($author, $characterId, $category, $startsDiscussion)->id());
     }
 
     /**
@@ -80,8 +82,11 @@ final readonly class PostSpeakers
             return [];
         }
 
+        // Their own, and the shared ones of the campaign space when they direct its campaign
+        $candidates = [...$this->characters->ownedBy((string) ForumBrowser::accountId($user)), ...($category->isPublicationSpace() ? $this->characters->sharedIn($category->id()) : [])];
+
         return array_values(array_filter(
-            $this->characters->ownedBy((string) ForumBrowser::accountId($user)),
+            $candidates,
             fn (Character $character): bool => $this->rules->usableIn($user, $character, $category),
         ));
     }
@@ -111,10 +116,10 @@ final readonly class PostSpeakers
     /**
      * @throws CharacterUnavailableException
      */
-    private function usable(Authenticatable $author, string $characterId, Category $category): Character
+    private function usable(Authenticatable $author, string $characterId, Category $category, bool $startsDiscussion = false): Character
     {
         $character = Str::isUuid($characterId) ? $this->characters->find(CharacterId::fromString(strtolower($characterId))) : null;
-        if (! $character instanceof Character || ! $this->rules->usableIn($author, $character, $category)) {
+        if (! $character instanceof Character || ($startsDiscussion && $character->isNpc()) || ! $this->rules->usableIn($author, $character, $category)) {
             throw CharacterUnavailableException::for($characterId);
         }
 

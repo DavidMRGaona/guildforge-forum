@@ -7,7 +7,9 @@ namespace Modules\Forum\Tests\Integration\Conversations;
 use App\Application\Services\UserServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Conversations\BlockService;
 use Modules\Forum\Application\Conversations\ConversationAccess;
@@ -21,11 +23,13 @@ use Modules\Forum\Domain\Exceptions\ConversationRefusedException;
 use Modules\Forum\Domain\Exceptions\InvalidConversationException;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Repositories\ConversationRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\ConversationId;
 use Modules\Forum\Domain\ValueObjects\ConversationMessageId;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ConversationMessageModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ConversationModel;
 use Modules\Forum\Tests\Support\BuildsConversations;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use RuntimeException;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -106,16 +110,59 @@ final class ConversationServiceTest extends ModuleTestCase
         $this->assertSame(0, app(ConversationListQueryInterface::class)->page($this->eva->id, 1, 20)['total']);
     }
 
-    public function test_reading_fails_closed_when_the_participants_cannot_be_read(): void
+    public function test_reading_and_writing_fail_closed_when_the_participants_cannot_be_read(): void
     {
         $conversation = $this->aConversation($this->ana, $this->luis);
-        DB::statement('ALTER TABLE forum_conversation_participants RENAME TO forum_conversation_participants_gone');
+        // A store that fails, rather than a broken schema: PostgreSQL aborts the test's
+        // transaction on the first failed statement, so the schema could not be put back
+        $this->app->instance(ConversationParticipantsInterface::class, new class implements ConversationParticipantsInterface
+        {
+            public function of(ConversationId $id): array
+            {
+                throw new RuntimeException('The participants cannot be read');
+            }
 
-        try {
-            $this->assertFalse(app(ConversationAccess::class)->canRead($this->ana, $conversation->id()));
-        } finally {
-            DB::statement('ALTER TABLE forum_conversation_participants_gone RENAME TO forum_conversation_participants');
-        }
+            public function isIn(ConversationId $id, string $accountId): bool
+            {
+                throw new RuntimeException('The participants cannot be read');
+            }
+
+            public function add(ConversationId $id, string $accountId, int $readThrough, DateTimeImmutable $at): void
+            {
+                throw new RuntimeException('The participants cannot be written');
+            }
+
+            public function remove(ConversationId $id, string $accountId): void
+            {
+                throw new RuntimeException('The participants cannot be written');
+            }
+
+            public function readThrough(ConversationId $id, string $accountId): ?int
+            {
+                throw new RuntimeException('The participants cannot be read');
+            }
+
+            public function markRead(ConversationId $id, string $accountId, int $number): void
+            {
+                throw new RuntimeException('The participants cannot be written');
+            }
+
+            public function claimMail(ConversationId $id, string $accountId, int $number): bool
+            {
+                throw new RuntimeException('The participants cannot be written');
+            }
+
+            public function conversationsOf(string $accountId): array
+            {
+                throw new RuntimeException('The participants cannot be read');
+            }
+        });
+
+        $access = app(ConversationAccess::class);
+        $this->assertFalse($access->canRead($this->ana, $conversation->id()));
+        $this->assertSame(ConversationRefusedException::CANNOT_WRITE, $access->writeRefusal($this->ana, $conversation));
+        $this->expectException(ConversationNotFoundException::class);
+        $this->conversations()->readable($this->ana, $conversation->id());
     }
 
     public function test_a_conversation_has_from_two_to_ten_people(): void

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
+import { FormSelect } from '@/components/form';
 import CharacterDialog from '../../../resources/js/components/characters/CharacterDialog.vue';
 import type { ForumCharacterForm } from '../../../resources/js/types/forum';
 
@@ -88,9 +89,12 @@ describe('CharacterDialog', () => {
         const name = field<HTMLInputElement>('character-name');
         name.value = 'Arwen';
         name.dispatchEvent(new Event('input'));
-        const category = field<HTMLSelectElement>('character-category');
-        category.value = 'campanas';
-        category.dispatchEvent(new Event('change'));
+        expect(document.body.querySelector('select')).toBeNull();
+        const category = wrapper.getComponent(FormSelect);
+        expect(category.props('describedBy')).toBe(
+            document.body.querySelector('[id^="character-category-help-"]')?.id
+        );
+        category.vm.$emit('update:modelValue', 'campanas');
         await nextTick();
         field<HTMLButtonElement>('character-submit')
             .closest('form')

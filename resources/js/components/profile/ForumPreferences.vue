@@ -5,6 +5,7 @@ import { MessagesSquare } from '@lucide/vue';
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { useVerificationGate } from '@/composables/useVerificationGate';
 import { sendJson } from '../../forum/api';
+import ChoiceMark from '../forms/ChoiceMark.vue';
 import ForumBlocks from './ForumBlocks.vue';
 import type { ForumPreferences } from '../../types/forum';
 
@@ -48,7 +49,10 @@ async function setAutoFollow(event: Event): Promise<void> {
     if (preferences.value === null) {
         return;
     }
-    const wanted = (event.target as HTMLInputElement).checked;
+    const box = event.target as HTMLInputElement;
+    const wanted = box.checked;
+    // The drawn box follows the native one at once, and goes back if saving fails
+    preferences.value.autoFollow = wanted;
     saving.value = true;
     error.value = null;
     const answer = await sendJson<{ autoFollow: boolean }>(preferences.value.updateUrl, 'PUT', {
@@ -60,7 +64,8 @@ async function setAutoFollow(event: Event): Promise<void> {
 
         return;
     }
-    (event.target as HTMLInputElement).checked = !wanted;
+    preferences.value.autoFollow = !wanted;
+    box.checked = !wanted;
     error.value = answer.message ?? t('forum.preferences.saveError');
 }
 
@@ -120,15 +125,16 @@ onMounted(() => {
             <p class="text-sm text-base-secondary">{{ t('forum.preferences.intro') }}</p>
 
             <div class="rounded-lg border border-default bg-surface p-4">
-                <label class="flex cursor-pointer items-start gap-3">
+                <label class="relative flex cursor-pointer items-start gap-3">
                     <input
                         type="checkbox"
-                        class="mt-1 h-5 w-5 shrink-0 rounded border-default text-primary focus:ring-primary-500"
+                        class="peer sr-only"
                         :checked="preferences.autoFollow"
                         :disabled="saving"
                         aria-describedby="forum-auto-follow-hint"
                         @change="setAutoFollow"
                     />
+                    <ChoiceMark class="mt-0.5" :checked="preferences.autoFollow" />
                     <span>
                         <span class="block text-sm font-medium text-base-primary">
                             {{ t('forum.preferences.autoFollow') }}

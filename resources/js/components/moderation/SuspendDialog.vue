@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { FormSelect } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { sendJson } from '../../forum/api';
 
@@ -51,6 +52,16 @@ function label(option: string): string {
     return option === 'forever'
         ? t('forum.suspensions.forever')
         : t('forum.suspensions.days', Number(option));
+}
+
+const durationOptions = computed(() =>
+    DURATIONS.map((option) => ({ value: option, label: label(option) }))
+);
+
+function chooseDuration(value: string | number | null): void {
+    if (DURATIONS.some((option) => option === value)) {
+        duration.value = String(value);
+    }
 }
 
 function cancel(): void {
@@ -123,16 +134,14 @@ async function submit(): Promise<void> {
                     >
                         {{ t('forum.suspensions.duration') }}
                     </label>
-                    <select
+                    <FormSelect
                         :id="`suspend-duration-${uid}`"
-                        v-model="duration"
-                        class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary"
+                        class="mt-1"
+                        :model-value="duration"
+                        :options="durationOptions"
                         data-testid="suspend-duration"
-                    >
-                        <option v-for="option in DURATIONS" :key="option" :value="option">
-                            {{ label(option) }}
-                        </option>
-                    </select>
+                        @update:model-value="chooseDuration"
+                    />
                 </div>
 
                 <p v-if="error" role="alert" class="mt-3 text-sm text-red-600">{{ error }}</p>

@@ -3,6 +3,7 @@ import { Dices, Trash2 } from '@lucide/vue';
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3';
 import { computed, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ChoiceMark from '../components/forms/ChoiceMark.vue';
 import { MAX_EXPRESSION_LENGTH, MAX_REASON_LENGTH } from './rollText';
 
 /**
@@ -92,12 +93,14 @@ function setReason(event: Event): void {
             <label class="forum-roll__hidden-toggle">
                 <input
                     type="checkbox"
+                    class="peer sr-only"
                     :checked="hidden"
                     :disabled="locked"
                     :aria-describedby="`${id}-hint`"
                     data-roll-hidden
                     @change="setHidden"
                 />
+                <ChoiceMark :checked="hidden" />
                 {{ t('forum.editor.roll.hidden') }}
             </label>
             <button

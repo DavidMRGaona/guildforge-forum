@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Bell, BellOff, BellRing } from '@lucide/vue';
+import { FormSelect } from '@/components/form';
 import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
 import type { ForumDiscussionFollow, ForumFollowLevel } from '../../types/forum';
@@ -19,6 +20,10 @@ const reportMerged = useMergedDiscussion();
 
 const LEVELS: ForumFollowLevel[] = ['following', 'normal', 'muted'];
 
+const options = computed(() =>
+    LEVELS.map((option) => ({ value: option, label: t(`forum.follow.${option}`) }))
+);
+
 const level = ref<ForumFollowLevel>(props.follow.level);
 const saving = ref(false);
 const status = ref<string>('');
@@ -31,8 +36,15 @@ watch(
     }
 );
 
-async function change(event: Event): Promise<void> {
-    const next = (event.target as HTMLSelectElement).value as ForumFollowLevel;
+function isLevel(value: string | number | null): value is ForumFollowLevel {
+    return LEVELS.some((option) => option === value);
+}
+
+async function change(value: string | number | null): Promise<void> {
+    if (!isLevel(value) || value === level.value) {
+        return;
+    }
+    const next = value;
     const previous = level.value;
     level.value = next;
     saving.value = true;
@@ -69,17 +81,14 @@ async function change(event: Event): Promise<void> {
             <Bell v-else class="h-4 w-4" aria-hidden="true" />
             {{ t('forum.follow.label') }}
         </label>
-        <select
+        <FormSelect
             :id="`forum-follow-${discussionId}`"
-            class="min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-sm text-base-primary sm:w-64"
-            :value="level"
+            class="w-full sm:w-64"
+            :model-value="level"
+            :options="options"
             :disabled="saving"
-            @change="change"
-        >
-            <option v-for="option in LEVELS" :key="option" :value="option">
-                {{ t(`forum.follow.${option}`) }}
-            </option>
-        </select>
+            @update:model-value="change"
+        />
         <span class="text-sm text-base-muted" aria-live="polite">{{ status }}</span>
         <p v-if="error" role="alert" class="w-full text-sm text-red-600">{{ error }}</p>
     </div>

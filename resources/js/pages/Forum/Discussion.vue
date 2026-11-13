@@ -4,6 +4,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { EyeOff, Lock, Pin } from '@lucide/vue';
+import { FormCheckbox } from '@/components/form';
 import { useAuth } from '@/composables/useAuth';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import MovedPostsNotice from '../../components/forum/MovedPostsNotice.vue';
@@ -338,23 +339,19 @@ async function send(document: JSONContent, characterId: string | null): Promise<
             <template v-for="entry in entries" :key="entry.key">
                 <MovedPostsNotice v-if="entry.moved" :moved="entry.moved" />
                 <div v-else-if="entry.post" class="space-y-2">
-                    <label
+                    <FormCheckbox
                         v-if="choosing && choosable(entry.post)"
-                        class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-default bg-surface px-3 text-sm text-base-primary hover:bg-muted"
+                        class="w-full rounded-md border border-default bg-surface px-3 py-3 hover:bg-muted"
+                        :model-value="selection.has(entry.post.number ?? 0)"
                         data-testid="split-pick"
+                        @update:model-value="selection.toggle(entry.post.number ?? 0)"
                     >
-                        <input
-                            type="checkbox"
-                            class="h-5 w-5"
-                            :checked="selection.has(entry.post.number ?? 0)"
-                            @change="selection.toggle(entry.post.number ?? 0)"
-                        />
-                        <span>{{
+                        <span class="text-base-primary">{{
                             t('forum.moderation.discussion.splitPick', {
                                 number: entry.post.number,
                             })
                         }}</span>
-                    </label>
+                    </FormCheckbox>
                     <PostItem
                         :post="entry.post"
                         :focused="entry.post.number !== null && entry.post.number === focusNumber"

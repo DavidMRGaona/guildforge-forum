@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
+import { FormSelect } from '@/components/form';
 import SpeakAsSelect from '../../../resources/js/components/characters/SpeakAsSelect.vue';
 import type { ForumCharacterPicker } from '../../../resources/js/types/forum';
 
@@ -43,8 +44,18 @@ function aPicker(overrides: Partial<ForumCharacterPicker> = {}): ForumCharacterP
     };
 }
 
+/** «Fuera de personaje» (the empty choice) and then every option, as the list shows them */
 function options(wrapper: ReturnType<typeof mount>): string[] {
-    return wrapper.findAll('option').map((option) => option.text());
+    const select = wrapper.getComponent(FormSelect);
+
+    return [
+        select.props('placeholder') ?? '',
+        ...select.props('options').map((option: { label: string }) => option.label),
+    ];
+}
+
+function choose(wrapper: ReturnType<typeof mount>, value: string): void {
+    wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', value);
 }
 
 describe('SpeakAsSelect', () => {
@@ -57,14 +68,18 @@ describe('SpeakAsSelect', () => {
             'Boromir',
             'Nuevo personaje…',
         ]);
-        expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('arwen');
+        expect(wrapper.find('select').exists()).toBe(false);
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBe('arwen');
         expect(wrapper.find('label').text()).toBe('Hablar como');
+        expect(wrapper.find('label').attributes('for')).toBe(
+            wrapper.getComponent(FormSelect).props('id')
+        );
     });
 
     it('says null when the post goes out of character', async () => {
         const wrapper = mount(SpeakAsSelect, { props: { modelValue: 'arwen', picker: aPicker() } });
 
-        await wrapper.find('select').setValue('');
+        choose(wrapper, '');
 
         expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
     });
@@ -75,10 +90,11 @@ describe('SpeakAsSelect', () => {
             attachTo: document.body,
         });
 
-        await wrapper.find('select').setValue('__new__');
+        choose(wrapper, '__new__');
         await nextTick();
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBeNull();
         expect(
             document.body.querySelector<HTMLDialogElement>('[data-testid="character-dialog"]')?.open
         ).toBe(true);
@@ -128,13 +144,12 @@ describe('SpeakAsSelect', () => {
         expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
     });
 
-    it('groups the shared PNJ of a campaign apart from the person’s own characters', async () => {
+    it('puts the shared PNJ of a campaign after the person’s own characters, marked', async () => {
         const wrapper = mount(SpeakAsSelect, {
             props: {
                 modelValue: null,
                 picker: aPicker({
                     items: [
-                        { id: 'arwen', name: 'Arwen', initials: 'A', portraitUrl: null },
                         {
                             id: 'mercader',
                             name: 'Mercader',
@@ -142,29 +157,31 @@ describe('SpeakAsSelect', () => {
                             portraitUrl: null,
                             isShared: true,
                         },
+                        { id: 'arwen', name: 'Arwen', initials: 'A', portraitUrl: null },
                     ],
                 }),
             },
         });
 
-        const groups = wrapper.findAll('optgroup');
-        expect(groups.map((group) => group.attributes('label'))).toEqual([
-            'Mis personajes',
-            'PNJ de la campaña',
+        expect(options(wrapper)).toEqual([
+            'Fuera de personaje',
+            'Arwen',
+            'Mercader · PNJ de la campaña',
+            'Nuevo personaje…',
         ]);
-        expect(groups[0]?.findAll('option').map((option) => option.text())).toEqual(['Arwen']);
-        expect(groups[1]?.findAll('option').map((option) => option.text())).toEqual(['Mercader']);
 
-        await wrapper.find('select').setValue('mercader');
+        choose(wrapper, 'mercader');
+        await nextTick();
 
         expect(wrapper.emitted('update:modelValue')).toEqual([['mercader']]);
     });
 
-    it('leaves out the group of their own when only shared PNJ can be chosen', () => {
+    it('marks the shared PNJ also when only they can be chosen', () => {
         const wrapper = mount(SpeakAsSelect, {
             props: {
                 modelValue: null,
                 picker: aPicker({
+                    createUrl: null,
                     items: [
                         {
                             id: 'mercader',
@@ -178,14 +195,6 @@ describe('SpeakAsSelect', () => {
             },
         });
 
-        expect(wrapper.findAll('optgroup').map((group) => group.attributes('label'))).toEqual([
-            'PNJ de la campaña',
-        ]);
-    });
-
-    it('draws no groups when the person has no shared PNJ here', () => {
-        const wrapper = mount(SpeakAsSelect, { props: { modelValue: null, picker: aPicker() } });
-
-        expect(wrapper.findAll('optgroup')).toHaveLength(0);
+        expect(options(wrapper)).toEqual(['Fuera de personaje', 'Mercader · PNJ de la campaña']);
     });
 });

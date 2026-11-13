@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { FormSelect } from '@/components/form';
 import CharacterAvatar from './CharacterAvatar.vue';
 import CharacterDialog from './CharacterDialog.vue';
 import type {
@@ -37,7 +38,6 @@ const { t } = useI18n();
 const uid = Math.random().toString(36).slice(2, 10);
 const creating = ref(false);
 const created = ref<ForumCharacterOption[]>([]);
-const select = ref<HTMLSelectElement | null>(null);
 
 /** The category the post is written in: chosen on the page, or the discussion's */
 const here = computed(() => props.categoryId ?? props.picker.categoryId);
@@ -56,9 +56,22 @@ const options = computed<ForumCharacterBasics[]>(() => {
     return usable;
 });
 
-/** Shared PNJ go in their own group, below the person's characters */
-const ownOptions = computed(() => options.value.filter((option) => option.isShared !== true));
-const sharedOptions = computed(() => options.value.filter((option) => option.isShared === true));
+/**
+ * The person's characters first, then the shared PNJ, each marked as one (the list has no
+ * groups), and «Nuevo personaje…» last. «Fuera de personaje» is the empty choice.
+ */
+const choices = computed(() => [
+    ...options.value
+        .filter((option) => option.isShared !== true)
+        .map((option) => ({ value: option.id, label: option.name })),
+    ...options.value
+        .filter((option) => option.isShared === true)
+        .map((option) => ({
+            value: option.id,
+            label: t('forum.characters.shared.option', { name: option.name }),
+        })),
+    ...(props.picker.createUrl ? [{ value: NEW, label: t('forum.characters.newCharacter') }] : []),
+]);
 
 const chosen = computed(
     () => options.value.find((option) => option.id === props.modelValue) ?? null
@@ -75,16 +88,14 @@ watch(
     { immediate: true }
 );
 
-function change(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+function change(value: string | number | null): void {
     if (value === NEW) {
-        // Back to what was chosen until the new one is saved
-        (event.target as HTMLSelectElement).value = props.modelValue ?? '';
+        // What was chosen stays until the new one is saved
         creating.value = true;
 
         return;
     }
-    emit('update:modelValue', value === '' ? null : value);
+    emit('update:modelValue', value === null || value === '' ? null : String(value));
 }
 
 function added(character: ForumPostCharacter, boundTo: string | null): void {
@@ -111,7 +122,7 @@ function added(character: ForumPostCharacter, boundTo: string | null): void {
     } else {
         notice.value = t('forum.characters.createdElsewhere', { name: character.name });
     }
-    select.value?.focus();
+    document.getElementById(`speak-as-${uid}`)?.focus();
 }
 </script>
 
@@ -127,40 +138,16 @@ function added(character: ForumPostCharacter, boundTo: string | null): void {
                 :portrait-url="chosen.portraitUrl"
                 size="sm"
             />
-            <select
+            <FormSelect
                 :id="`speak-as-${uid}`"
-                ref="select"
-                :value="modelValue ?? ''"
+                class="w-full min-w-0 sm:w-64"
+                :model-value="modelValue"
+                :options="choices"
+                :placeholder="t('forum.characters.outOfCharacter')"
                 :disabled="disabled"
-                class="block min-h-[44px] w-full min-w-0 rounded-md border border-default bg-surface px-3 text-sm text-base-primary sm:w-64"
                 data-testid="speak-as-select"
-                @change="change"
-            >
-                <option value="">{{ t('forum.characters.outOfCharacter') }}</option>
-                <template v-if="sharedOptions.length > 0">
-                    <optgroup
-                        v-if="ownOptions.length > 0"
-                        :label="t('forum.characters.shared.ownGroup')"
-                    >
-                        <option v-for="option in ownOptions" :key="option.id" :value="option.id">
-                            {{ option.name }}
-                        </option>
-                    </optgroup>
-                    <optgroup :label="t('forum.characters.shared.group')">
-                        <option v-for="option in sharedOptions" :key="option.id" :value="option.id">
-                            {{ option.name }}
-                        </option>
-                    </optgroup>
-                </template>
-                <template v-else>
-                    <option v-for="option in options" :key="option.id" :value="option.id">
-                        {{ option.name }}
-                    </option>
-                </template>
-                <option v-if="picker.createUrl" :value="NEW">
-                    {{ t('forum.characters.newCharacter') }}
-                </option>
-            </select>
+                @update:model-value="change"
+            />
         </div>
 
         <p v-if="notice" role="status" class="basis-full text-xs text-base-muted">{{ notice }}</p>

@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
+import { FormCheckbox, FormSelect } from '@/components/form';
 import ModerationDialog from '../../../resources/js/components/moderation/ModerationDialog.vue';
 
 beforeAll(() => {
@@ -46,7 +47,11 @@ describe('ModerationDialog', () => {
 
         field('moderation-reason').value = '  Spam  ';
         field('moderation-reason').dispatchEvent(new Event('input'));
-        field('moderation-confirmation').click();
+        const box = field('moderation-confirmation');
+        // The site's checkbox: the native input stays, hidden, inside its label
+        expect(wrapper.findComponent(FormCheckbox).exists()).toBe(true);
+        expect(box.querySelector('input')?.classList.contains('sr-only')).toBe(true);
+        box.querySelector('input')?.click();
         await nextTick();
         expect(submit.disabled).toBe(false);
 
@@ -83,11 +88,18 @@ describe('ModerationDialog', () => {
     });
 
     it('offers the categories a discussion may move to', async () => {
-        await opened({ moveTargets: [{ id: 'c-1', name: 'Dudas', parentName: 'General' }] });
+        const wrapper = await opened({
+            moveTargets: [{ id: 'c-1', name: 'Dudas', parentName: 'General' }],
+        });
 
-        expect(
-            document.body.querySelector('[data-testid="moderation-category"]')?.textContent
-        ).toContain('General › Dudas');
+        expect(document.body.querySelector('select')).toBeNull();
+        const select = wrapper.getComponent(FormSelect);
+        expect(select.props('placeholder')).toBe('Elige una categoría');
+        expect(select.props('options')).toEqual([{ value: 'c-1', label: 'General › Dudas' }]);
         expect(field('moderation-submit').disabled).toBe(true);
+
+        select.vm.$emit('update:modelValue', 'c-1');
+        await nextTick();
+        expect(field('moderation-submit').disabled).toBe(false);
     });
 });

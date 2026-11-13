@@ -218,6 +218,11 @@ describe('the roll in the post editor', () => {
         const inputs = wrapper.findAll('[data-forum-roll] input[type="text"]');
         expect(inputs).toHaveLength(2);
         expect(wrapper.find('[data-roll-hidden]').attributes('disabled')).toBeUndefined();
+        // The native box stays, hidden, with the site's box drawn after it
+        const hidden = wrapper.find('[data-roll-hidden]').element as HTMLInputElement;
+        expect(hidden.classList.contains('sr-only')).toBe(true);
+        expect(hidden.getAttribute('aria-describedby')).toMatch(/-hint$/);
+        expect(hidden.nextElementSibling?.getAttribute('aria-hidden')).toBe('true');
         expect(wrapper.find('[data-roll-expression]').attributes('readonly')).toBeUndefined();
         expect(wrapper.find('[data-forum-roll]').text()).toContain(
             'Se tira en el servidor al publicar'

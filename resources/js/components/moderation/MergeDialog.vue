@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { FormCheckbox } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { sendJson } from '../../forum/api';
@@ -168,16 +169,15 @@ function submit(): void {
                         class="mt-1 block w-full rounded-md border border-default bg-surface px-3 py-2 text-base-primary"
                         data-testid="merge-reason"
                     />
-                    <label class="mt-4 flex items-start gap-2 text-sm text-base-primary">
-                        <input
-                            v-model="confirmed"
-                            type="checkbox"
-                            class="mt-1 h-4 w-4"
-                            required
-                            data-testid="merge-confirmation"
-                        />
-                        <span>{{ t('forum.moderation.discussion.mergeConfirmation') }}</span>
-                    </label>
+                    <FormCheckbox
+                        v-model="confirmed"
+                        class="mt-2 w-full py-3"
+                        data-testid="merge-confirmation"
+                    >
+                        <span class="text-base-primary">{{
+                            t('forum.moderation.discussion.mergeConfirmation')
+                        }}</span>
+                    </FormCheckbox>
                 </template>
 
                 <p v-if="error" role="alert" class="mt-3 text-sm text-red-600">{{ error }}</p>

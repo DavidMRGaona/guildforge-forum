@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FormSelect } from '@/components/form';
 import FollowSelect from '../../../resources/js/components/forum/FollowSelect.vue';
 
 function answer(body: unknown, status = 200): Response {
@@ -25,7 +26,15 @@ describe('FollowSelect', () => {
         });
 
         expect(wrapper.get('label').text()).toBe('Avisos de este tema');
-        await wrapper.get('select').setValue('muted');
+        expect(wrapper.find('select').exists()).toBe(false);
+        const select = wrapper.getComponent(FormSelect);
+        expect(select.props('id')).toBe(wrapper.get('label').attributes('for'));
+        expect(select.props('options')).toEqual([
+            { value: 'following', label: 'Seguir: cada respuesta' },
+            { value: 'normal', label: 'Normal: menciones y citas' },
+            { value: 'muted', label: 'Silenciar: ningún aviso' },
+        ]);
+        select.vm.$emit('update:modelValue', 'muted');
         await flushPromises();
 
         expect(fetch).toHaveBeenCalledWith(
@@ -44,10 +53,10 @@ describe('FollowSelect', () => {
             },
         });
 
-        await wrapper.get('select').setValue('normal');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'normal');
         await flushPromises();
 
-        expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('following');
+        expect(wrapper.getComponent(FormSelect).props('modelValue')).toBe('following');
         expect(wrapper.get('[role="alert"]').text()).toBe(
             'No se ha podido guardar. Inténtalo de nuevo.'
         );

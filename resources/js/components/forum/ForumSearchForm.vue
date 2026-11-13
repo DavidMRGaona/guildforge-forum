@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { Search } from '@lucide/vue';
+import { FormSelect } from '@/components/form';
 import type { ForumSearchCategoryOption } from '../../types/forum';
 
 /**
@@ -39,6 +40,17 @@ watch(
 );
 
 const prefix = props.idPrefix ?? 'forum-search';
+
+const categoryOptions = computed(() =>
+    (props.categories ?? []).map((option) => ({
+        value: option.slug,
+        label: option.depth > 0 ? `— ${option.name}` : option.name,
+    }))
+);
+
+function choose(value: string | number | null): void {
+    chosen.value = value === null ? '' : String(value);
+}
 
 function submit(): void {
     const query: Record<string, string> = {};
@@ -87,17 +99,15 @@ function submit(): void {
             >
                 {{ t('forum.search.category') }}
             </label>
-            <select
+            <FormSelect
                 :id="`${prefix}-category`"
-                v-model="chosen"
-                name="categoria"
-                class="min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-sm text-base-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-                <option value="">{{ t('forum.search.anyCategory') }}</option>
-                <option v-for="option in categories" :key="option.slug" :value="option.slug">
-                    {{ option.depth > 0 ? `— ${option.name}` : option.name }}
-                </option>
-            </select>
+                :model-value="chosen"
+                :options="categoryOptions"
+                :placeholder="t('forum.search.anyCategory')"
+                @update:model-value="choose"
+            />
+            <!-- What the plain GET form sends; nothing when no category is chosen -->
+            <input type="hidden" name="categoria" :value="chosen" :disabled="chosen === ''" />
         </div>
 
         <button

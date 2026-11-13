@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FormSelect } from '@/components/form';
 import ForumSearchForm from '../../../resources/js/components/forum/ForumSearchForm.vue';
 
 const CATEGORIES = [
@@ -26,7 +28,11 @@ describe('ForumSearchForm', () => {
         expect(wrapper.get(`label[for="${input.attributes('id')}"]`).text()).toBe(
             'Buscar en el foro'
         );
-        expect(wrapper.find('select[name="categoria"]').exists()).toBe(true);
+        expect(wrapper.find('select').exists()).toBe(false);
+        // No category chosen: nothing to send
+        expect(wrapper.get('input[type="hidden"][name="categoria"]').attributes()).toHaveProperty(
+            'disabled'
+        );
     });
 
     it('searches the text in the chosen category', async () => {
@@ -34,7 +40,11 @@ describe('ForumSearchForm', () => {
             props: { action: '/foro/buscar', query: 'dados', categories: CATEGORIES },
         });
 
-        await wrapper.get('select').setValue('rol');
+        wrapper.getComponent(FormSelect).vm.$emit('update:modelValue', 'rol');
+        await nextTick();
+        const hidden = wrapper.get('input[type="hidden"][name="categoria"]');
+        expect((hidden.element as HTMLInputElement).value).toBe('rol');
+        expect(hidden.attributes()).not.toHaveProperty('disabled');
         await wrapper.get('form').trigger('submit');
 
         expect(router.get).toHaveBeenCalledWith('/foro/buscar', { q: 'dados', categoria: 'rol' });
@@ -45,11 +55,13 @@ describe('ForumSearchForm', () => {
             props: { action: '/foro/buscar', category: 'rol', categories: CATEGORIES },
         });
 
-        expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('rol');
-        expect(wrapper.findAll('option').map((option) => option.text())).toEqual([
-            'Todas las categorías',
-            'General',
-            '— Rol',
+        const select = wrapper.getComponent(FormSelect);
+        expect(select.props('modelValue')).toBe('rol');
+        expect(select.props('id')).toBe('forum-search-category');
+        expect(select.props('placeholder')).toBe('Todas las categorías');
+        expect(select.props('options')).toEqual([
+            { value: 'general', label: 'General' },
+            { value: 'rol', label: '— Rol' },
         ]);
     });
 
@@ -58,7 +70,8 @@ describe('ForumSearchForm', () => {
             props: { action: '/foro/buscar', query: '  ', categories: [] },
         });
 
-        expect(wrapper.find('select').exists()).toBe(false);
+        expect(wrapper.findComponent(FormSelect).exists()).toBe(false);
+        expect(wrapper.find('input[name="categoria"]').exists()).toBe(false);
         await wrapper.get('form').trigger('submit');
 
         expect(router.get).toHaveBeenCalledWith('/foro/buscar', {});

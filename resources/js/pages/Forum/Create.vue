@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
+import { FormCheckbox, FormSelect } from '@/components/form';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SpeakAsSelect from '../../components/characters/SpeakAsSelect.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
@@ -53,6 +54,20 @@ const topicsFull = computed(() => chosenTopics.value.length >= props.limits.topi
 
 function categoryLabel(category: ForumCategoryOption): string {
     return category.parentName ? `${category.parentName} › ${category.name}` : category.name;
+}
+
+const categoryOptions = computed(() =>
+    props.categories.map((category) => ({ value: category.id, label: categoryLabel(category) }))
+);
+
+function chooseCategory(value: string | number | null): void {
+    categoryId.value = value === null ? '' : String(value);
+}
+
+function toggleTopic(key: string, on: boolean): void {
+    chosenTopics.value = on
+        ? [...chosenTopics.value.filter((chosen) => chosen !== key), key]
+        : chosenTopics.value.filter((chosen) => chosen !== key);
 }
 
 function validate(): boolean {
@@ -186,19 +201,16 @@ async function submit(document: JSONContent): Promise<void> {
                 <label for="forum-category" class="block text-sm font-medium text-base-primary">{{
                     t('forum.create.categoryLabel')
                 }}</label>
-                <select
+                <FormSelect
                     id="forum-category"
-                    v-model="categoryId"
-                    required
-                    class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    :aria-invalid="errors.category ? 'true' : 'false'"
-                    :aria-describedby="errors.category ? 'forum-category-error' : undefined"
-                >
-                    <option value="" disabled>{{ t('forum.create.categoryPlaceholder') }}</option>
-                    <option v-for="category in categories" :key="category.id" :value="category.id">
-                        {{ categoryLabel(category) }}
-                    </option>
-                </select>
+                    class="mt-1"
+                    :model-value="categoryId"
+                    :options="categoryOptions"
+                    :placeholder="t('forum.create.categoryPlaceholder')"
+                    :error="errors.category ?? ''"
+                    :described-by="errors.category ? 'forum-category-error' : undefined"
+                    @update:model-value="chooseCategory"
+                />
                 <p
                     v-if="errors.category"
                     id="forum-category-error"
@@ -217,20 +229,15 @@ async function submit(document: JSONContent): Promise<void> {
                     {{ t('forum.create.topicsHelp', { max: limits.topicsMax }) }}
                 </p>
                 <div class="mt-2 flex flex-wrap gap-2">
-                    <label
+                    <FormCheckbox
                         v-for="topic in topics"
                         :key="topic.key"
-                        class="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border border-default px-3 text-sm text-base-secondary has-[:checked]:border-primary has-[:checked]:bg-primary-light has-[:checked]:text-primary"
-                    >
-                        <input
-                            v-model="chosenTopics"
-                            type="checkbox"
-                            class="h-4 w-4"
-                            :value="topic.key"
-                            :disabled="topicsFull && !chosenTopics.includes(topic.key)"
-                        />
-                        {{ topic.label }}
-                    </label>
+                        class="min-h-[44px] rounded-full border border-default px-3 py-2.5 has-[:checked]:border-primary has-[:checked]:bg-primary-light"
+                        :model-value="chosenTopics.includes(topic.key)"
+                        :label="topic.label"
+                        :disabled="topicsFull && !chosenTopics.includes(topic.key)"
+                        @update:model-value="toggleTopic(topic.key, $event)"
+                    />
                 </div>
                 <p v-if="errors.topics" role="alert" class="mt-1 text-sm text-red-600">
                     {{ errors.topics }}
@@ -241,14 +248,16 @@ async function submit(document: JSONContent): Promise<void> {
                 <legend class="text-sm font-medium text-base-primary">
                     {{ t('forum.create.moderationLabel') }}
                 </legend>
-                <label class="flex min-h-[44px] items-center gap-2 text-sm text-base-secondary">
-                    <input v-model="pinned" type="checkbox" class="h-4 w-4" />
-                    {{ t('forum.create.pinned') }}
-                </label>
-                <label class="flex min-h-[44px] items-center gap-2 text-sm text-base-secondary">
-                    <input v-model="closed" type="checkbox" class="h-4 w-4" />
-                    {{ t('forum.create.closed') }}
-                </label>
+                <FormCheckbox
+                    v-model="pinned"
+                    class="w-full py-3"
+                    :label="t('forum.create.pinned')"
+                />
+                <FormCheckbox
+                    v-model="closed"
+                    class="w-full py-3"
+                    :label="t('forum.create.closed')"
+                />
                 <p v-if="errors.moderation" role="alert" class="text-sm text-red-600">
                     {{ errors.moderation }}
                 </p>

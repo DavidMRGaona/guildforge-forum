@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -39,6 +40,7 @@ final readonly class FollowService
         private DiscussionRepositoryInterface $discussions,
         private MailSubjectMuteServiceInterface $mutes,
         private SystemAccountInterface $systemAccount,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     public function levelOf(?Authenticatable $user, Discussion $discussion): FollowLevel
@@ -74,6 +76,7 @@ final readonly class FollowService
         }
 
         $this->follows->setDiscussionLevel($userId, $discussionId, $level, CarbonImmutable::now());
+        $this->live->pulseChanged($userId);
 
         return $level;
     }
@@ -110,11 +113,13 @@ final readonly class FollowService
 
         if ($follow) {
             $this->follows->followCategory($userId, $category->id(), CategoryFollowOrigin::Person, CarbonImmutable::now());
+            $this->live->pulseChanged($userId);
 
             return;
         }
 
         $this->follows->unfollowCategory($userId, $category->id());
+        $this->live->pulseChanged($userId);
     }
 
     public function autoFollows(Authenticatable $user): bool

@@ -7,6 +7,7 @@ namespace Modules\Forum\Application\Services;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\Queries\DiscussionCursor;
@@ -31,6 +32,7 @@ final readonly class ForumBrowser
         private DiscussionListQueryInterface $lists,
         private DiscussionReadsInterface $reads,
         private ForumSettingsInterface $settings,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -146,6 +148,7 @@ final readonly class ForumBrowser
             array_map(static fn (CategoryAccessDTO $access): CategoryId => $access->category->id(), $scope),
             $at,
         );
+        $this->live->pulseChanged($readerId);
     }
 
     public static function accountId(?Authenticatable $user): ?string

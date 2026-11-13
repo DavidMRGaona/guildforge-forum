@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
 use Modules\Forum\Application\DTOs\MovedPostsDTO;
@@ -40,6 +41,7 @@ final readonly class ConversationReader
         private DiscussionReadsInterface $reads,
         private ForumSettingsInterface $settings,
         private MovedPostsQueryInterface $moved,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -181,7 +183,7 @@ final readonly class ConversationReader
      */
     public function markRead(Authenticatable $reader, DiscussionId $id, int $number, DateTimeImmutable $at): void
     {
-        $this->readable($reader, $id);
+        $discussion = $this->readable($reader, $id);
 
         $readerId = ForumBrowser::accountId($reader);
         $highest = $this->posts->highestNumber($id)->value ?? 0;
@@ -189,7 +191,12 @@ final readonly class ConversationReader
             return;
         }
 
+        // The menu counts discussions with something unread: only reaching the end changes that
+        $finishes = $number >= $highest && $this->reads->readThrough($readerId, $id, $discussion->categoryId()) < $highest;
         $this->reads->advance($readerId, $id, min($number, $highest), $at);
+        if ($finishes) {
+            $this->live->pulseChanged($readerId);
+        }
     }
 
     /**

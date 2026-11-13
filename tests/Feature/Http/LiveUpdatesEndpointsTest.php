@@ -11,6 +11,7 @@ use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\CategoryFollowOrigin;
 use Modules\Forum\Domain\Enums\FollowLevel;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
@@ -247,6 +248,57 @@ final class LiveUpdatesEndpointsTest extends ModuleTestCase
         }
 
         $this->actingAs($this->reader)->getJson(route('forum.updates'))->assertStatus(429);
+    }
+
+    public function test_posts_said_to_have_changed_come_again_as_the_reader_sees_them_now(): void
+    {
+        [$discussion] = $this->aDiscussion($this->public);
+        $this->aReply($discussion, '2026-11-10 18:05:00', text: 'Segundo');
+        $third = $this->aReply($discussion, '2026-11-10 18:06:00', text: 'Tercero');
+        app(ForumWriter::class)->changePost($third->id(), static fn (Post $post) => $post->hide('Fuera de tema'));
+
+        $response = $this->getJson($this->postsUrl($discussion, 3).'&cambiados=2,3')->assertOk();
+
+        $response->assertJsonPath('highestNumber', 3)
+            ->assertJsonPath('more', false)
+            ->assertJsonCount(2, 'posts')
+            ->assertJsonPath('posts.0.number', 2)
+            ->assertJsonPath('posts.1.number', 3)
+            ->assertJsonPath('posts.1.status', 'hidden')
+            ->assertJsonPath('posts.1.html', null);
+        self::assertStringNotContainsString('Tercero', (string) $response->getContent());
+    }
+
+    public function test_changed_posts_come_with_the_new_ones_and_unknown_numbers_are_left_out(): void
+    {
+        [$discussion] = $this->aDiscussion($this->public);
+        $this->aReply($discussion, '2026-11-10 18:05:00');
+        $this->aReply($discussion, '2026-11-10 18:06:00');
+
+        $this->getJson($this->postsUrl($discussion, 2).'&cambiados=1,40')
+            ->assertOk()
+            ->assertJsonCount(2, 'posts')
+            ->assertJsonPath('posts.0.number', 1)
+            ->assertJsonPath('posts.1.number', 3);
+        $this->getJson($this->postsUrl($discussion, 3).'&cambiados=40')->assertNoContent();
+    }
+
+    public function test_changed_posts_of_a_discussion_the_person_may_not_read_answer_not_found(): void
+    {
+        [$private] = $this->aDiscussion($this->members, title: 'Reservado');
+
+        $this->getJson($this->postsUrl($private, 1).'&cambiados=1')->assertNotFound();
+    }
+
+    public function test_the_changed_numbers_are_few_whole_numbers(): void
+    {
+        [$discussion] = $this->aDiscussion($this->public);
+
+        $this->getJson($this->postsUrl($discussion, 1).'&cambiados=abc')->assertUnprocessable();
+        $this->getJson($this->postsUrl($discussion, 1).'&cambiados=0')->assertUnprocessable();
+        $this->getJson($this->postsUrl($discussion, 1).'&cambiados=')->assertUnprocessable();
+        $this->getJson($this->postsUrl($discussion, 1).'&cambiados='.implode(',', range(1, 51)))->assertUnprocessable();
+        $this->getJson($this->postsUrl($discussion, 1).'&cambiados='.implode(',', range(1, 50)))->assertOk();
     }
 
     private function postsUrl(Discussion $discussion, int $after): string

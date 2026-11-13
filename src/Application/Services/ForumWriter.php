@@ -10,6 +10,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\DiscussionCarryOverInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\DTOs\PostsMovedDTO;
 use Modules\Forum\Application\DTOs\SpeakerChoice;
@@ -44,7 +45,8 @@ use RuntimeException;
  *
  * Who may write what is decided before calling it (the forum's access rules); this class only
  * keeps the records consistent. Every post that gets its number (and every edit of a published
- * post) is handed to the notices, which run once the write commits.
+ * post) is handed to the notices, which run once the write commits, and open pages hear about
+ * every change in real time (ForumLiveSignalsInterface).
  */
 final readonly class ForumWriter
 {
@@ -65,6 +67,7 @@ final readonly class ForumWriter
         private RedirectRepositoryInterface $redirects,
         private DiscussionCarryOverInterface $carryOver,
         private CharacterRepositoryInterface $characters,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -186,6 +189,7 @@ final readonly class ForumWriter
             $this->posts->save($post);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+            $this->live->postChanged($post);
 
             return $post;
         }, self::ATTEMPTS);
@@ -205,6 +209,7 @@ final readonly class ForumWriter
             $this->posts->save($post);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+            $this->live->postChanged($post);
         }, self::ATTEMPTS);
     }
 
@@ -244,6 +249,10 @@ final readonly class ForumWriter
             return $post;
         }, self::ATTEMPTS);
 
+        if ($replaced instanceof PostBody) {
+            $this->live->postChanged($post);
+        }
+
         // Only who the edit newly mentions or quotes hears about it
         if ($replaced instanceof PostBody && $post->isVisible()) {
             $this->notices->postEdited($postId, $replaced);
@@ -269,6 +278,7 @@ final readonly class ForumWriter
             $this->posts->save($post);
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
+            $this->live->postChanged($post);
 
             return $post;
         }, self::ATTEMPTS);
@@ -291,6 +301,7 @@ final readonly class ForumWriter
             $this->revisions->deleteOfPost($postId);
             $this->rolls->forget($postId);
             $this->posts->save($post);
+            $this->live->postChanged($post);
 
             return $post;
         }, self::ATTEMPTS);
@@ -346,6 +357,7 @@ final readonly class ForumWriter
             $this->discussions->save($discussion);
 
             $this->refresh($discussionId, $categories);
+            $this->live->discussionChanged($discussionId);
 
             return $discussion;
         }, self::ATTEMPTS);
@@ -373,6 +385,7 @@ final readonly class ForumWriter
             $this->discussions->save($discussion);
 
             $this->refresh($discussion->id(), $categories);
+            $this->live->discussionChanged($discussion->id());
         }, self::ATTEMPTS);
     }
 
@@ -392,6 +405,7 @@ final readonly class ForumWriter
         }, self::ATTEMPTS);
 
         $this->notices->forgetDiscussion($discussionId);
+        $this->live->discussionChanged($discussionId);
     }
 
     /**
@@ -471,6 +485,7 @@ final readonly class ForumWriter
 
                     $this->counters->refreshDiscussion($fromId);
                     $this->refresh($newId, $categories);
+                    $this->live->discussionChanged($fromId);
 
                     return new PostsMovedDTO($new, $map);
                 }, self::ATTEMPTS);
@@ -526,6 +541,9 @@ final readonly class ForumWriter
             $this->discussions->delete($absorbedId);
 
             $this->refresh($intoId, $categories);
+            // The merged one's pages learn where it went; the other's ask for the posts it gained
+            $this->live->discussionChanged($absorbedId);
+            $this->live->discussionChanged($intoId);
 
             return new PostsMovedDTO($into, $map, count($pending));
         }, self::ATTEMPTS);
@@ -538,6 +556,7 @@ final readonly class ForumWriter
     {
         if ($post->isVisible()) {
             $this->notices->postPublished($post->id());
+            $this->live->postPublished($post);
         }
 
         return $post;

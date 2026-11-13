@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Domain\Entities\DiceRoll;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
@@ -33,6 +34,7 @@ final readonly class RollReveals
         private ForumAccessInterface $access,
         private HiddenRolls $hiddenRolls,
         private PostRenderer $renderer,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -72,6 +74,8 @@ final readonly class RollReveals
 
             $current = array_values(array_filter($this->rolls->ofPost($post->id()), static fn (DiceRoll $roll): bool => ! $roll->isRemoved()));
             $this->posts->replacePlainText($post->id(), $this->renderer->plainText($post->body()->document, $current));
+            // Open pages ask for the post again, each drawn by the hidden rolls' rules for its reader
+            $this->live->postChanged($post);
 
             return $this->posts->findOrFail($post->id());
         });

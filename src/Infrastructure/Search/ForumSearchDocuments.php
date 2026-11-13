@@ -8,6 +8,7 @@ use App\Application\Search\DTOs\SearchDocumentDTO;
 use App\Domain\Search\Enums\SearchAudience;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Search\ForumSearchAudiences;
 use Modules\Forum\Domain\Entities\Category;
@@ -56,6 +57,32 @@ final class ForumSearchDocuments
             ->where('number', '>', 1)
             ->whereNotNull('published_at')
             ->whereHas('discussion', static fn (Builder $discussion): Builder => self::onlyListedDiscussions($discussion));
+    }
+
+    /**
+     * The discussions among these whose opening post is no longer visible: their document's body is that
+     * post's text only while it is (discussionDocuments()), so a stored one may still hold it. One query.
+     *
+     * @param  list<string>  $ids  lower-case uuids
+     * @return list<string>
+     */
+    public static function withoutVisibleOpening(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return array_values(DiscussionModel::query()
+            ->whereKey($ids)
+            ->whereNotExists(static fn (QueryBuilder $opening): QueryBuilder => $opening
+                ->selectRaw('1')
+                ->from((new PostModel)->getTable())
+                ->whereColumn('discussion_id', (new DiscussionModel)->qualifyColumn('id'))
+                ->where('number', 1)
+                ->where('status', PostStatus::Visible->value))
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all());
     }
 
     /**

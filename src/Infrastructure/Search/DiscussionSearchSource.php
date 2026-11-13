@@ -6,14 +6,17 @@ namespace Modules\Forum\Infrastructure\Search;
 
 use App\Application\Search\Contracts\ChecksSearchHits;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
+use App\Application\Search\Contracts\WithholdsSearchSnippets;
 use App\Application\Search\DTOs\SearchDocumentDTO;
 use Illuminate\Support\Str;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 
 /**
- * The discussions readers can find: the title and the opening message.
+ * The discussions readers can find: the title and the opening message. A discussion whose opening
+ * moderation has just hidden stays listed, shown by its title alone until its document is refreshed;
+ * its meta (the category's name) holds nothing that can be hidden.
  */
-final readonly class DiscussionSearchSource implements ChecksSearchHits, IndexedSearchSourceInterface
+final readonly class DiscussionSearchSource implements ChecksSearchHits, IndexedSearchSourceInterface, WithholdsSearchSnippets
 {
     public const string TYPE = 'forum-discussion';
 
@@ -61,6 +64,18 @@ final readonly class DiscussionSearchSource implements ChecksSearchHits, Indexed
     public function visibleSearchHits(array $ids, ?object $user): array
     {
         return $this->checks->discussions($ids, $user);
+    }
+
+    /**
+     * @param  non-empty-list<string>  $ids
+     * @return list<string>
+     */
+    public function staleSearchSnippets(array $ids, ?object $user): array
+    {
+        // Keys are uuids: anything else matches no row, and PostgreSQL rejects it in the query
+        $uuids = array_values(array_unique(array_map(strtolower(...), array_filter($ids, Str::isUuid(...)))));
+
+        return ForumSearchDocuments::withoutVisibleOpening($uuids);
     }
 
     /**

@@ -55,7 +55,7 @@ final class VimeoProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '/^\d{1,12}$/';
+        return '/^\d{1,12}\z/';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

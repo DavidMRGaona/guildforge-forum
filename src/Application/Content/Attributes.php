@@ -107,7 +107,7 @@ final class Attributes
     {
         $value = $attributes[$key] ?? null;
 
-        if (! is_string($value) || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $value) !== 1) {
+        if (! is_string($value) || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/', $value) !== 1) {
             throw InvalidDocumentException::because(InvalidDocumentException::INVALID_ATTRIBUTE, $path, "'{$key}' is an id");
         }
     }

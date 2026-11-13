@@ -24,7 +24,7 @@ use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 final class RollNode extends AbstractNodeType
 {
     /** The id of a stored roll, as the server hands it out */
-    public const string ID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+    public const string ID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/';
 
     public function name(): string
     {

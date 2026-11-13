@@ -27,7 +27,7 @@ final class Character
     /** The folder portraits are stored in, claimed by the forum's portrait media source */
     public const string PORTRAIT_FOLDER = 'forum/characters/';
 
-    private const string PORTRAIT_PATTERN = '#^forum/characters/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$#';
+    private const string PORTRAIT_PATTERN = '#^forum/characters/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)\z#';
 
     private readonly string $ownerId;
 

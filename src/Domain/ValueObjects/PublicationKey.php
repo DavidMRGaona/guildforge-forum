@@ -23,7 +23,7 @@ final readonly class PublicationKey
         public string $type,
         public string $id,
     ) {
-        if (strlen($type) > self::MAX_TYPE_LENGTH || preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/', $type) !== 1) {
+        if (strlen($type) > self::MAX_TYPE_LENGTH || preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\z/', $type) !== 1) {
             throw new InvalidArgumentException("Publication type '{$type}' must be kebab-case.");
         }
 

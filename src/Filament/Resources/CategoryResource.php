@@ -110,7 +110,7 @@ final class CategoryResource extends BaseResource
                         ->helperText(__('forum::messages.categories.fields.slug_help'))
                         ->required()
                         ->maxLength(CategorySlug::MAX_LENGTH)
-                        ->regex('/^[a-z0-9]+(?:-[a-z0-9]+)*$/')
+                        ->regex('/^[a-z0-9]+(?:-[a-z0-9]+)*\z/')
                         ->unique(CategoryModel::class, 'slug', ignoreRecord: true),
                     Textarea::make('description')
                         ->label(__('forum::messages.categories.fields.description'))
@@ -130,7 +130,7 @@ final class CategoryResource extends BaseResource
                 ->schema([
                     ColorPicker::make('color')
                         ->label(__('forum::messages.categories.fields.color'))
-                        ->regex('/^#[0-9a-fA-F]{6}$/'),
+                        ->regex('/^#[0-9a-fA-F]{6}\z/'),
                     Select::make('icon')
                         ->label(__('forum::messages.categories.fields.icon'))
                         ->native(false)

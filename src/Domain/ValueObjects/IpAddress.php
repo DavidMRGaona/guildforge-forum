@@ -51,7 +51,7 @@ final readonly class IpAddress
     ];
 
     /** Dotted decimal without leading zeros, so «0177.0.0.1» is not read as anything */
-    private const string V4_PATTERN = '/^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$/';
+    private const string V4_PATTERN = '/^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}\z/';
 
     private function __construct(
         public string $value,

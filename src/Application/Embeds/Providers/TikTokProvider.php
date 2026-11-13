@@ -59,7 +59,7 @@ final class TikTokProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '#^[A-Za-z0-9._]{1,30}/\d{1,20}$#';
+        return '#^[A-Za-z0-9._]{1,30}/\d{1,20}\z#';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

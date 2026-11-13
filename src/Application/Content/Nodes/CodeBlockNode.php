@@ -13,7 +13,7 @@ use Modules\Forum\Application\Content\Rendering\RenderContext;
  */
 final class CodeBlockNode extends AbstractNodeType
 {
-    public const string LANGUAGE_PATTERN = '/^[a-z0-9][a-z0-9+#.-]{0,29}$/';
+    public const string LANGUAGE_PATTERN = '/^[a-z0-9][a-z0-9+#.-]{0,29}\z/';
 
     public function name(): string
     {

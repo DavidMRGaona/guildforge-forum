@@ -66,7 +66,7 @@ final readonly class ForumSettings implements ForumSettingsInterface
     public const string DEFAULT_EMBED_COOKIE_CATEGORY = 'marketing';
 
     /** A cookie category slug, as the cookie consent module names them */
-    public const string COOKIE_CATEGORY_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,39}$/';
+    public const string COOKIE_CATEGORY_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,39}\z/';
 
     public function discussionsPerPage(): int
     {
@@ -132,7 +132,7 @@ final readonly class ForumSettings implements ForumSettingsInterface
         // Only well-formed ids: anything else in the settings never matches a category
         return array_values(array_unique(array_map(
             strtolower(...),
-            array_filter($stored, static fn (mixed $id): bool => is_string($id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1),
+            array_filter($stored, static fn (mixed $id): bool => is_string($id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i', $id) === 1),
         )));
     }
 

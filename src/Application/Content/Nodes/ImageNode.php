@@ -37,9 +37,9 @@ final class ImageNode extends AbstractNodeType
     /** The folder of the copies of images from other sites, claimed by the same source */
     public const string EXTERNAL_FOLDER = 'forum/external/';
 
-    public const string PATH_PATTERN = '#^forum/posts/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$#';
+    public const string PATH_PATTERN = '#^forum/posts/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)\z#';
 
-    public const string EXTERNAL_PATH_PATTERN = '#^forum/external/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$#';
+    public const string EXTERNAL_PATH_PATTERN = '#^forum/external/\d{4}/\d{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)\z#';
 
     public const int MAX_ALT_LENGTH = 300;
 

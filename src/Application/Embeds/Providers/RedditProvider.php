@@ -54,7 +54,7 @@ final class RedditProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '#^[A-Za-z0-9_]{2,21}/[a-z0-9]{1,12}$#';
+        return '#^[A-Za-z0-9_]{2,21}/[a-z0-9]{1,12}\z#';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

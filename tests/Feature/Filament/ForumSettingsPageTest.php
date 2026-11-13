@@ -154,6 +154,11 @@ final class ForumSettingsPageTest extends ModuleTestCase
             ->set('data.embed_cookie_categories.x', 'Con espacios')
             ->call('save')
             ->assertHasErrors(['data.embed_services', 'data.embed_cookie_categories.x']);
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.embed_cookie_categories.x', "videos\n")
+            ->call('save')
+            ->assertHasErrors(['data.embed_cookie_categories.x']);
     }
 
     public function test_saving_is_refused_without_the_permission(): void

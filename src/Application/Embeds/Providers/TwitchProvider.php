@@ -62,7 +62,7 @@ final class TwitchProvider extends AbstractEmbedProvider
 
     protected function idPattern(): string
     {
-        return '/^(v:\d{1,12}|c:[A-Za-z0-9_-]{1,100}|ch:[a-z0-9_]{3,25})$/';
+        return '/^(v:\d{1,12}|c:[A-Za-z0-9_-]{1,100}|ch:[a-z0-9_]{3,25})\z/';
     }
 
     protected function idFromLink(RemoteUrl $url): ?string

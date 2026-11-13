@@ -15,7 +15,7 @@ final readonly class RemoteUrl
 {
     public const int MAX_LENGTH = 2048;
 
-    private const string PATTERN = '#^https://([A-Za-z0-9.-]+)(?::443)?(/[A-Za-z0-9\-._~:/?\[\]@!$&\'()*+,;=%]*)?$#';
+    private const string PATTERN = '#^https://([A-Za-z0-9.-]+)(?::443)?(/[A-Za-z0-9\-._~:/?\[\]@!$&\'()*+,;=%]*)?\z#';
 
     private const string LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
 
@@ -48,7 +48,7 @@ final readonly class RemoteUrl
     public static function isHostName(string $value): bool
     {
         return strlen($value) <= 253
-            && preg_match('/^(?:'.self::LABEL.'\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $value) === 1;
+            && preg_match('/^(?:'.self::LABEL.'\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?\z/', $value) === 1;
     }
 
     public function pathAndQuery(): string

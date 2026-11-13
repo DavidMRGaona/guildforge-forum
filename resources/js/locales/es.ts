@@ -416,11 +416,11 @@ export default {
             },
             blocks: {
                 block: 'Bloquear a {name}',
-                badge: 'bloqueada',
+                badge: 'con bloqueo',
                 unblock: 'Desbloquear',
                 confirmTitle: '¿Bloquear a {name}?',
                 confirmMessage:
-                    'No podrá escribirte ni añadirte a conversaciones, tampoco en las que ya compartís. No se le avisa. Puedes desbloquearla cuando quieras desde esta conversación o desde tu perfil.',
+                    'No podrá escribirte ni añadirte a conversaciones, tampoco en las que ya compartís. No se le avisa. Puedes quitar el bloqueo cuando quieras desde esta conversación o desde tu perfil.',
                 confirm: 'Bloquear',
                 blocked: 'Has bloqueado a {name}',
                 unblocked: 'Has desbloqueado a {name}',

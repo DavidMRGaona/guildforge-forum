@@ -149,7 +149,10 @@ onMounted(() => {
                 <p v-if="preferences.categories.length === 0" class="text-sm text-base-muted">
                     {{ t('forum.preferences.noCategories') }}
                 </p>
-                <ul v-else class="divide-y divide-default rounded-lg border border-default">
+                <ul
+                    v-else
+                    class="divide-y divide-[var(--color-border)] rounded-lg border border-default"
+                >
                     <li
                         v-for="category in preferences.categories"
                         :key="category.id"
@@ -185,7 +188,10 @@ onMounted(() => {
                 <p v-if="preferences.discussions.length === 0" class="text-sm text-base-muted">
                     {{ t('forum.preferences.noDiscussions') }}
                 </p>
-                <ul v-else class="divide-y divide-default rounded-lg border border-default">
+                <ul
+                    v-else
+                    class="divide-y divide-[var(--color-border)] rounded-lg border border-default"
+                >
                     <li
                         v-for="discussion in preferences.discussions"
                         :key="discussion.id"

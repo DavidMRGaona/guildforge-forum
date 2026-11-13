@@ -307,7 +307,11 @@
     border-color: var(--color-primary-500);
 }
 
-/* Dice rolls: as the server renders them (Application/Content/Nodes/RollNode) and while writing */
+/*
+ * Dice rolls: as the server renders them (Application/Content/Nodes/RollNode) and while writing.
+ * Module sheets sit below the typography plugin, so what .prose also sets (paragraph margins,
+ * the backticks it draws around code) is marked important.
+ */
 .forum-roll {
     margin: 0.75rem 0;
     border: 1px solid var(--color-border);
@@ -318,8 +322,8 @@
     color: var(--color-text-primary);
 }
 
-.forum-roll p {
-    margin: 0;
+.forum-roll :where(p) {
+    margin: 0 !important;
 }
 
 .forum-roll__head {
@@ -339,6 +343,11 @@
 
 .forum-roll__expression {
     font-weight: 700;
+}
+
+.forum-roll__expression::before,
+.forum-roll__expression::after {
+    content: none !important;
 }
 
 .forum-roll__reason {

@@ -347,6 +347,27 @@ final class HiddenRollsTest extends ModuleTestCase
         $this->actingAs($this->reader)->get('/foro/buscar?q=Ataque')->assertOk()->assertDontSee('= 9', false);
     }
 
+    public function test_the_index_and_the_stored_text_hold_the_result_only_once_the_public_text_does(): void
+    {
+        $postId = $this->hiddenReply($this->generalDiscussion)->json('post.id');
+
+        // Before revealing: neither the stored text nor any search document has it
+        $this->assertSame('Tirada oculta: 2d6+3 Ataque', $this->replyRow()->plain_text);
+        foreach (SearchDocumentModel::query()->where('module', 'forum')->pluck('body') as $body) {
+            $this->assertStringNotContainsString('= 9', (string) $body);
+        }
+
+        $this->reveal($this->thrower, DiceRollModel::query()->sole()->id)->assertOk();
+
+        // After: the public text holds it, and the post's search document says exactly that
+        $text = $this->replyRow()->plain_text;
+        $this->assertSame('2d6+3 Ataque = 9', $text);
+        $this->assertSame($text, (string) SearchDocumentModel::query()->where('module', 'forum')->where('source_id', $postId)->value('body'));
+        foreach (SearchDocumentModel::query()->where('module', 'forum')->where('source_id', '!=', $postId)->pluck('body') as $body) {
+            $this->assertStringNotContainsString('= 9', (string) $body, 'Only the revealed post says it.');
+        }
+    }
+
     public function test_notices_and_mails_never_carry_the_result(): void
     {
         $mentioned = UserModel::factory()->create();

@@ -23,8 +23,8 @@ use Modules\Forum\Http\Controllers\PostLikesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
 use Modules\Forum\Http\Controllers\ReportController;
-use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\RollController;
+use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 

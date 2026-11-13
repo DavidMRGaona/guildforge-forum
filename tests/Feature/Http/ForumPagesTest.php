@@ -64,6 +64,7 @@ final class ForumPagesTest extends ModuleTestCase
                 ->has('discussions.items', 1)
                 ->where('discussions.items.0.title', 'Hola a todos')
                 ->where('discussions.items.0.url', '/foro/t/1-hola-a-todos')
+                ->where('discussions.items.0.categoryId', $this->public->id()->value)
                 ->where('discussions.items.0.isUnread', null)
                 ->where('markReadUrl', null)
                 ->where('canStart', false)

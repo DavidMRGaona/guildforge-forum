@@ -33,8 +33,11 @@ const props = withDefaults(
     { closedNotice: null, isAwaitingApproval: false }
 );
 
-/** The document, and the character it speaks as (null out of character) */
-const emit = defineEmits<{ submit: [document: JSONContent, characterId: string | null] }>();
+/** The document, and the character it speaks as (null out of character); `typing` as the reader types */
+const emit = defineEmits<{
+    submit: [document: JSONContent, characterId: string | null];
+    typing: [];
+}>();
 
 const { t } = useI18n();
 const { isAuthenticated, mustVerifyEmail } = useAuth();
@@ -83,23 +86,26 @@ defineExpose({
             :picker="reply.characters"
             :disabled="sending"
         />
-        <PostEditor
-            ref="editor"
-            :label="label"
-            :draft-key="draftKey"
-            :mentions-url="reply.mentionsUrl"
-            :upload-url="reply.uploadUrl"
-            :max-images="reply.maxImages"
-            :image-types="reply.imageTypes"
-            :external-image-url="reply.externalImageUrl"
-            :external-image-hosts="reply.externalImageHosts"
-            :embed-url="reply.embedUrl"
-            :embed-services="reply.embedServices"
-            :submit-label="submitLabel"
-            :submitting="sending"
-            :error="error"
-            @submit="(document: JSONContent) => emit('submit', document, speaker)"
-        />
+        <!-- Only what the reader types counts: a draft restored or a quotation inserted is no input -->
+        <div @input="emit('typing')">
+            <PostEditor
+                ref="editor"
+                :label="label"
+                :draft-key="draftKey"
+                :mentions-url="reply.mentionsUrl"
+                :upload-url="reply.uploadUrl"
+                :max-images="reply.maxImages"
+                :image-types="reply.imageTypes"
+                :external-image-url="reply.externalImageUrl"
+                :external-image-hosts="reply.externalImageHosts"
+                :embed-url="reply.embedUrl"
+                :embed-services="reply.embedServices"
+                :submit-label="submitLabel"
+                :submitting="sending"
+                :error="error"
+                @submit="(document: JSONContent) => emit('submit', document, speaker)"
+            />
+        </div>
     </div>
 
     <p v-else class="rounded-lg border border-default bg-surface p-4 text-sm text-base-secondary">

@@ -8,6 +8,7 @@ use App\Application\Publications\DTOs\PublicationDTO;
 use App\Application\Publications\DTOs\PublicationRosterDTO;
 use App\Application\Publications\Enums\PublicationState;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
+use App\Application\Realtime\Services\RealtimePublisherInterface;
 use App\Application\Services\UserServiceInterface;
 use App\Application\SiteNotifications\Services\SiteNotificationServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -48,6 +49,7 @@ use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeCampaignSource;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Modules\Forum\Tests\Support\FakePublicationSource;
+use Modules\Forum\Tests\Support\RecordingRealtimePublisher;
 use Modules\Forum\Tests\Unit\Domain\Dice\FixedNumbers;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -483,6 +485,28 @@ final class HiddenRollsTest extends ModuleTestCase
 
         // There is no way back, and nothing to reveal twice
         $this->reveal($this->thrower, $rollId)->assertStatus(409)->assertJsonPath('reason', 'already_revealed');
+    }
+
+    public function test_a_changed_post_asked_for_in_real_time_follows_the_hidden_rolls_rules_for_each_reader(): void
+    {
+        $realtime = new RecordingRealtimePublisher;
+        $this->app->instance(RealtimePublisherInterface::class, $realtime);
+        config(['broadcasting.default' => 'reverb', 'broadcasting.connections.reverb.key' => 'example-key', 'broadcasting.connections.reverb.secret' => 'example-secret', 'broadcasting.connections.reverb.app_id' => 'example-app', 'broadcasting.connections.reverb.options.host' => 'realtime.internal']);
+        $this->hiddenReply($this->generalDiscussion)->assertCreated();
+        $changed = "/foro/temas/{$this->generalDiscussion->id()->value}/novedades?despues=2&cambiados=2";
+
+        // Before revealing: the reader is told it is hidden, whoever threw it sees the result
+        $this->assertWithheld((string) $this->actingAs($this->reader)->getJson($changed)->assertOk()->json('posts.0.html'));
+        $this->assertStringContainsString(self::RESULT, (string) $this->actingAs($this->thrower)->getJson($changed)->assertOk()->json('posts.0.html'));
+
+        $realtime->forget();
+        $this->reveal($this->thrower, DiceRollModel::query()->sole()->id)->assertOk();
+
+        self::assertSame(
+            [['event' => 'post.changed', 'payload' => ['number' => 2]]],
+            $realtime->on('forum.discussion.'.$this->generalDiscussion->id()->value),
+        );
+        $this->assertStringContainsString(self::RESULT, (string) $this->actingAs($this->reader)->getJson($changed)->assertOk()->json('posts.0.html'));
     }
 
     public function test_the_direction_reveals_a_hidden_roll_in_its_campaign_space(): void

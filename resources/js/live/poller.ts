@@ -32,6 +32,12 @@ export interface Poller {
     stop: () => void;
     /** Asks now, unless the tab is hidden; with a question in flight, asks once more right after it */
     pollNow: () => void;
+    /**
+     * While live (a real-time channel tells the page what changed) it stops asking at its pace:
+     * it only asks when told (`pollNow`), and tries a failed question again with the usual waits.
+     * Back off live, it goes back to its pace.
+     */
+    setLive: (live: boolean) => void;
 }
 
 export function createPoller(options: PollerOptions): Poller {
@@ -43,6 +49,7 @@ export function createPoller(options: PollerOptions): Poller {
     // Asked for news while a question was in flight (an answer that said there is more)
     let again = false;
     let stopped = true;
+    let live = false;
 
     function clear(): void {
         if (timer !== null) {
@@ -98,6 +105,12 @@ export function createPoller(options: PollerOptions): Poller {
 
             return;
         }
+        // While live an answer that worked waits for the next message; a failure is tried again
+        if (live && outcome === 'ok') {
+            clear();
+
+            return;
+        }
         schedule();
     }
 
@@ -143,5 +156,22 @@ export function createPoller(options: PollerOptions): Poller {
         visibility.removeEventListener('visibilitychange', onVisibility);
     }
 
-    return { start, stop, pollNow };
+    function setLive(value: boolean): void {
+        if (live === value) {
+            return;
+        }
+
+        live = value;
+        // Going live drops the next question at the pace (a retry after a failure stays);
+        // leaving it starts the pace again
+        if (live) {
+            if (failures === 0) {
+                clear();
+            }
+        } else if (!stopped && !running && timer === null) {
+            schedule();
+        }
+    }
+
+    return { start, stop, pollNow, setLive };
 }

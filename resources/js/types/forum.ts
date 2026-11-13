@@ -79,6 +79,8 @@ export interface ForumDiscussionRow {
     id: string;
     number: number;
     title: string;
+    /** Its category, whose real-time channel the list listens to */
+    categoryId: string;
     url: string;
     /** Where reading resumes (first unread post); null when never opened or for guests */
     resumeUrl: string | null;
@@ -573,6 +575,13 @@ export interface ForumConversationEntry {
     createdLabel: string;
     deleteUrl: string | null;
     reportUrl: string | null;
+}
+
+/** What an open conversation asks for: the entries after its last one and those that changed */
+export interface ForumConversationUpdates {
+    entries: ForumConversationEntry[];
+    highestNumber: number;
+    more: boolean;
 }
 
 /** A reported private message as moderation reads it: the copy taken when it was reported */

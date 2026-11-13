@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -11,10 +11,14 @@ import PostEditor from '../../components/editor/PostEditor.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import ReportDialog from '../../components/moderation/ReportDialog.vue';
 import { sendJson } from '../../forum/api';
+import { CONVERSATION_EVENTS, conversationChannel, useChannelFeed } from '../../live/channels';
+import type { LiveConnection } from '../../live/transport';
+import { liveConversation } from '../../live/transports';
 import type {
     ForumConversationEntry,
     ForumConversationParticipant,
     ForumConversationPagination,
+    ForumConversationUpdates,
     ForumPerson,
 } from '../../types/forum';
 
@@ -64,6 +68,57 @@ const status = ref('');
 
 const breadcrumbs = computed(() => [{ name: t('forum.conversations.title'), url: props.indexUrl }]);
 const onLastPage = computed(() => props.pagination.nextUrl === null);
+
+// What the others write while the last page is open: through the conversation's real-time
+// channel when there is one, by consultation otherwise (forum#89). Only its people may listen
+const channel = useChannelFeed(
+    () => conversationChannel(props.conversation.id),
+    CONVERSATION_EVENTS
+);
+const live = liveConversation(props.conversation.id, channel);
+let connection: LiveConnection | null = null;
+const highest = computed(() => list.value.reduce((top, entry) => Math.max(top, entry.number), 0));
+
+function receive(update: ForumConversationUpdates): void {
+    const known = new Set(list.value.map((entry) => entry.id));
+    const incoming = new Map(update.entries.map((entry) => [entry.id, entry]));
+    const fresh = update.entries.filter((entry) => !known.has(entry.id));
+    list.value = [...list.value.map((entry) => incoming.get(entry.id) ?? entry), ...fresh].sort(
+        (a, b) => a.number - b.number
+    );
+
+    if (fresh.some((entry) => entry.kind !== 'message')) {
+        // Someone joined or left: who is in it changed
+        router.reload({ only: ['participants'] });
+    }
+    const fromOthers = fresh.filter((entry) => entry.kind === 'message' && !entry.isMine).length;
+    if (fromOthers > 0) {
+        status.value = t('forum.live.newPosts', { count: fromOthers }, fromOthers);
+        // Showing it on the open page reads it, as opening the page does
+        if (document.visibilityState === 'visible') {
+            void sendJson(props.write.readUrl, 'POST', { number: highest.value });
+        }
+    }
+    if (update.more) {
+        connection?.refresh();
+    }
+}
+
+onMounted(() => {
+    if (onLastPage.value) {
+        connection = live.connect(
+            {
+                cursor: () => highest.value,
+                holds: (number) => list.value.some((entry) => entry.number === number),
+            },
+            receive
+        );
+    }
+});
+onBeforeUnmount(() => {
+    connection?.stop();
+    connection = null;
+});
 
 function noteOf(entry: ForumConversationEntry): string {
     return entry.kind === 'added'

@@ -11,6 +11,7 @@ use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
+use App\Application\Realtime\Contracts\RealtimeChannelInterface;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Application\Security\Services\ContentSecurityPolicySourcesInterface;
 use App\Domain\Events\UserAnonymized;
@@ -45,6 +46,7 @@ use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\FollowsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
@@ -142,6 +144,11 @@ use Modules\Forum\Infrastructure\Queries\EloquentForumActivityQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentModerationQueueQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentMovedPostsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentSearchHitsQuery;
+use Modules\Forum\Infrastructure\Realtime\AccountRealtimeChannel;
+use Modules\Forum\Infrastructure\Realtime\CategoryRealtimeChannel;
+use Modules\Forum\Infrastructure\Realtime\ConversationRealtimeChannel;
+use Modules\Forum\Infrastructure\Realtime\DiscussionRealtimeChannel;
+use Modules\Forum\Infrastructure\Realtime\RealtimeForumSignals;
 use Modules\Forum\Infrastructure\Search\DiscussionSearchSource;
 use Modules\Forum\Infrastructure\Search\ForumSearchObserver;
 use Modules\Forum\Infrastructure\Search\PostSearchSource;
@@ -251,6 +258,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(PostLikesInterface::class, EloquentPostLikes::class);
         $this->app->bind(FollowsInterface::class, EloquentFollows::class);
         $this->app->bind(ForumNoticesInterface::class, QueuedForumNotices::class);
+        $this->app->bind(ForumLiveSignalsInterface::class, RealtimeForumSignals::class);
         $this->app->bind(DiscussionListQueryInterface::class, EloquentDiscussionListQuery::class);
         $this->app->bind(ForumActivityQueryInterface::class, EloquentForumActivityQuery::class);
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
@@ -342,6 +350,17 @@ final class ForumServiceProvider extends ModuleServiceProvider
 
         // The site search learns at once what was written, moved, hidden, approved or deleted
         ForumSearchObserver::register();
+    }
+
+    /**
+     * The real-time channels (core#493): a discussion's, a category's, a conversation's and each person's own, each
+     * granted by the same access rules as the page it feeds.
+     *
+     * @return list<class-string<RealtimeChannelInterface>>
+     */
+    public function registerRealtimeChannels(): array
+    {
+        return [DiscussionRealtimeChannel::class, CategoryRealtimeChannel::class, ConversationRealtimeChannel::class, AccountRealtimeChannel::class];
     }
 
     /**

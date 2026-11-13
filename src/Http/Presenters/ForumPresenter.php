@@ -433,6 +433,8 @@ final readonly class ForumPresenter
             'id' => $row->id,
             'number' => $row->number,
             'title' => $row->title,
+            // The list listens to the real-time channel of each category it shows
+            'categoryId' => $row->categoryId,
             'url' => $this->urls->discussionFrom($row->number, $row->title),
             // Where reading should resume: the first unread post, or the last one once all is read
             'resumeUrl' => $row->lastReadNumber === null || $row->lastPostNumber === null || $row->lastReadNumber === 0

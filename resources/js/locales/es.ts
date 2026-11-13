@@ -333,6 +333,11 @@ export default {
             unreadFollowedMany: 'Hay muchos temas sin leer entre los que sigues en el foro',
             unreadFollowedBadge: 'un tema sin leer | {count} temas sin leer',
             unreadFollowedBadgeMany: 'muchos temas sin leer',
+            typingOne: '{name} está escribiendo…',
+            typingTwo: '{first} y {second} están escribiendo…',
+            typingWithSomeone: '{name} y alguien más están escribiendo…',
+            typingSomeone: 'Alguien está escribiendo…',
+            typingMany: 'Varias personas están escribiendo…',
             unreadConversations:
                 'Tienes una conversación privada sin leer | Tienes {count} conversaciones privadas sin leer',
             unreadConversationsBadge: 'una conversación sin leer | {count} conversaciones sin leer',

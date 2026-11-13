@@ -331,6 +331,11 @@ export default {
             unreadFollowedMany: 'Many discussions you follow in the forum are unread',
             unreadFollowedBadge: 'one unread discussion | {count} unread discussions',
             unreadFollowedBadgeMany: 'many unread discussions',
+            typingOne: '{name} is typing…',
+            typingTwo: '{first} and {second} are typing…',
+            typingWithSomeone: '{name} and someone else are typing…',
+            typingSomeone: 'Someone is typing…',
+            typingMany: 'Several people are typing…',
             unreadConversations:
                 'You have an unread private conversation | You have {count} unread private conversations',
             unreadConversationsBadge: 'one unread conversation | {count} unread conversations',

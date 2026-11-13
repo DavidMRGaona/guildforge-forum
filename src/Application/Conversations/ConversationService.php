@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ConversationNoticesInterface;
 use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\ConversationStartsInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Domain\ConversationRules;
@@ -54,6 +55,7 @@ final readonly class ConversationService
         private ConversationDocuments $documents,
         private PostRateLimiterInterface $rateLimiter,
         private ConversationNoticesInterface $notices,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -145,6 +147,7 @@ final readonly class ConversationService
 
         if ($message instanceof ConversationMessage) {
             $this->notices->messageWritten($conversation->id(), $message->id());
+            $this->live->conversationEntryAdded($conversation->id(), $message->number(), $authorId);
         }
 
         return $conversation;
@@ -183,6 +186,7 @@ final readonly class ConversationService
         });
 
         $this->notices->messageWritten($id, $message->id());
+        $this->live->conversationEntryAdded($id, $message->number(), $authorId);
 
         return $message;
     }
@@ -202,7 +206,8 @@ final readonly class ConversationService
             throw ConversationRefusedException::because(ConversationRefusedException::UNAVAILABLE_PEOPLE);
         }
 
-        DB::transaction(function () use ($adder, $adderId, $id, $added): void {
+        $noteNumber = 0;
+        DB::transaction(function () use ($adder, $adderId, $id, $added, &$noteNumber): void {
             $conversation = $this->locked($adder, $id);
             $people = $this->participants->of($id);
             // Adding writes a note everyone reads: whoever may not write there adds nobody. Being
@@ -224,9 +229,11 @@ final readonly class ConversationService
             $note = ConversationMessage::added(ConversationMessageId::generate(), $id, $conversation->takeNumber(ConversationEntryKind::Added, $now), $adderId, $added, $now);
             $this->conversations->saveMessage($note);
             $this->conversations->save($conversation);
+            $noteNumber = $note->number();
         });
 
         $this->notices->added($id, $added, $adderId);
+        $this->live->conversationEntryAdded($id, $noteNumber, $adderId);
     }
 
     /**
@@ -246,7 +253,8 @@ final readonly class ConversationService
      */
     public function leaveAs(string $accountId, ConversationId $id): void
     {
-        $gone = DB::transaction(function () use ($accountId, $id): bool {
+        $noteNumber = 0;
+        $gone = DB::transaction(function () use ($accountId, $id, &$noteNumber): bool {
             $conversation = $this->conversations->lock($id);
             if (! $conversation instanceof Conversation || ! $this->participants->isIn($id, $accountId)) {
                 return false;
@@ -260,14 +268,18 @@ final readonly class ConversationService
             }
 
             $now = CarbonImmutable::now()->toDateTimeImmutable();
-            $this->conversations->saveMessage(ConversationMessage::left(ConversationMessageId::generate(), $id, $conversation->takeNumber(ConversationEntryKind::Left, $now), $accountId, $now));
+            $note = ConversationMessage::left(ConversationMessageId::generate(), $id, $conversation->takeNumber(ConversationEntryKind::Left, $now), $accountId, $now);
+            $this->conversations->saveMessage($note);
             $this->conversations->save($conversation);
+            $noteNumber = $note->number();
 
             return false;
         });
 
         if ($gone) {
             $this->notices->forgetConversation($id);
+        } elseif ($noteNumber > 0) {
+            $this->live->conversationEntryAdded($id, $noteNumber, $accountId);
         }
     }
 
@@ -289,6 +301,7 @@ final readonly class ConversationService
 
         $message->deleteByAuthor(CarbonImmutable::now()->toDateTimeImmutable());
         $this->conversations->saveMessage($message);
+        $this->live->conversationEntryChanged($message->conversationId(), $message->number());
 
         return $message;
     }
@@ -301,7 +314,14 @@ final readonly class ConversationService
     public function markRead(Authenticatable $user, ConversationId $id, int $number): void
     {
         $conversation = $this->readable($user, $id);
-        $this->participants->markRead($id, (string) ForumBrowser::accountId($user), min(max(0, $number), $conversation->lastNumber()));
+        $accountId = (string) ForumBrowser::accountId($user);
+        $through = min(max(0, $number), $conversation->lastNumber());
+        // The menu counts conversations with something unread: only reaching the end changes that
+        $before = $this->participants->readThrough($id, $accountId);
+        $this->participants->markRead($id, $accountId, $through);
+        if ($before !== null && $before < $conversation->lastNumber() && $through >= $conversation->lastNumber()) {
+            $this->live->pulseChanged($accountId);
+        }
     }
 
     /**

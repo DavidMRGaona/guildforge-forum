@@ -185,6 +185,12 @@ Route::prefix('foro')
             Route::post('{conversation}/mensajes', [ConversationMessageController::class, 'store'])
                 ->whereUuid('conversation')
                 ->name('messages.store');
+            // What an open conversation asks for while it is open (forum#89): after its last entry,
+            // and the entries it was told changed; real time only says when
+            Route::get('{conversation}/novedades', [ConversationController::class, 'updates'])
+                ->whereUuid('conversation')
+                ->middleware('throttle:60,1,forum-conversation-updates')
+                ->name('updates');
             Route::post('{conversation}/leido', [ConversationController::class, 'read'])
                 ->whereUuid('conversation')
                 ->middleware('throttle:120,1,forum-conversation-reads')

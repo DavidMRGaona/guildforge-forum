@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ConversationNoticesInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumSuspensions;
@@ -51,6 +52,7 @@ final readonly class ConversationReportService
         private CategoryAccessPolicy $policy,
         private ModerationLogger $logger,
         private ConversationNoticesInterface $notices,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     public function canReport(?Authenticatable $user, ConversationMessage $message): bool
@@ -154,6 +156,7 @@ final readonly class ConversationReportService
                 if ($message instanceof ConversationMessage && $message->isShown()) {
                     $message->hide($reason, $now);
                     $this->conversations->saveMessage($message);
+                    $this->live->conversationEntryChanged($message->conversationId(), $message->number());
                     $hidden = true;
                 }
             }

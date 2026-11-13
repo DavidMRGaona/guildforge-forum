@@ -8,7 +8,8 @@ import NewPostsNotice from '../live/NewPostsNotice.vue';
 import SubjectConversationThread from './SubjectConversationThread.vue';
 import { useNewPosts } from '../../composables/useNewPosts';
 import { sendJson, subjectConversationUrl } from '../../forum/api';
-import { pollNewPosts } from '../../live/transports';
+import { DISCUSSION_EVENTS, discussionChannel, useChannelFeed } from '../../live/channels';
+import { liveNewPosts } from '../../live/transports';
 import type { ForumPost, ForumSubjectConversation } from '../../types/forum';
 
 /**
@@ -50,9 +51,15 @@ const replyError = ref<string | null>(null);
 const posts = computed<ForumPost[]>(() => [...earlier.value, ...(conversation.value?.posts ?? [])]);
 // New posts while the page is open, after the last one shown. The opening post is never one of
 // them: nothing at or below the highest number the conversation had is asked for
+// The discussion's real-time channel, once the conversation says which one it is
+const channel = useChannelFeed(() => {
+    const id = conversation.value?.discussion.id;
+
+    return id === undefined ? null : discussionChannel(id);
+}, DISCUSSION_EVENTS);
 const live = useNewPosts({
     posts: () => posts.value,
-    transport: pollNewPosts(() => conversation.value?.discussion.id ?? ''),
+    transport: liveNewPosts(() => conversation.value?.discussion.id ?? '', channel),
     enabled: () => conversation.value !== null && !conversation.value.discussion.isClosed,
     floor: () => conversation.value?.highestNumber ?? 0,
 });

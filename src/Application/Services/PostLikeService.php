@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
 use Modules\Forum\Application\Contracts\ForumNoticesInterface;
 use Modules\Forum\Application\Contracts\PostLikesInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
@@ -41,6 +42,7 @@ final readonly class PostLikeService
         private SystemAccountInterface $systemAccount,
         private ForumNoticesInterface $notices,
         private ForumSuspensions $suspensions,
+        private ForumLiveSignalsInterface $live,
     ) {}
 
     /**
@@ -57,6 +59,7 @@ final readonly class PostLikeService
         $likerId = (string) ForumBrowser::accountId($user);
         if ($this->likes->add($postId, $likerId, CarbonImmutable::now())) {
             $this->notices->postLiked($postId, $likerId);
+            $this->live->postChanged($post);
         }
 
         return $this->of($user, $postId);
@@ -67,8 +70,9 @@ final readonly class PostLikeService
      */
     public function unlike(Authenticatable $user, PostId $postId): PostLikesDTO
     {
-        $this->readable($user, $postId);
+        [$post] = $this->readable($user, $postId);
         $this->likes->remove($postId, (string) ForumBrowser::accountId($user));
+        $this->live->postChanged($post);
 
         return $this->of($user, $postId);
     }

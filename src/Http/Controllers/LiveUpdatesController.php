@@ -24,7 +24,8 @@ use Modules\Forum\Http\Presenters\PrivateMessageLinks;
 
 /**
  * What an open page asks for without reloading, as light JSON that no shared cache keeps:
- * - the posts of a discussion after the last one the page has (204 when there are none);
+ * - the posts of a discussion after the last one the page has, and those it was told changed
+ *   (204 when there are none);
  * - the forum's summary for the menu and the lists.
  * A discussion the person may not read answers like one that does not exist; one merged into
  * another answers 410 with where it went, when the person may read that.
@@ -46,11 +47,16 @@ final class LiveUpdatesController extends Controller
 
     public function posts(Request $request, string $discussion): JsonResponse|Response
     {
-        $validated = $request->validate(['despues' => ['required', 'integer', 'min:0', 'max:4294967295']]);
+        $validated = $request->validate([
+            'despues' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            // Posts the page holds and was told changed: a few numbers, comma-separated
+            'cambiados' => ['sometimes', 'string', 'regex:/^[1-9][0-9]{0,9}(,[1-9][0-9]{0,9}){0,'.(NewPostsReader::MAX - 1).'}$/'],
+        ]);
         $user = $request->user();
+        $changed = isset($validated['cambiados']) ? array_map(intval(...), explode(',', (string) $validated['cambiados'])) : [];
 
         try {
-            $news = $this->reader->after($user, DiscussionId::fromString($discussion), (int) $validated['despues']);
+            $news = $this->reader->after($user, DiscussionId::fromString($discussion), (int) $validated['despues'], $changed);
         } catch (DiscussionNotFoundException) {
             // A discussion merged into another says where it went, to whoever may read that
             $gone = $this->merged->for($user, $discussion);

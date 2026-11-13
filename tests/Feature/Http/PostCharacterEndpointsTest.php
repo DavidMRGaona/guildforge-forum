@@ -224,6 +224,17 @@ final class PostCharacterEndpointsTest extends ModuleTestCase
                 ->etc());
     }
 
+    public function test_the_reply_picker_names_the_discussions_category(): void
+    {
+        // «Hablar como» compares it with where a character just created is tied: without it, one
+        // tied to this very category is taken for one tied elsewhere and not chosen
+        $this->actingAs($this->author)->get($this->discussionUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('reply.characters.categoryId', $this->category->id()->value)
+                ->etc());
+    }
+
     public function test_a_character_tied_to_a_category_shows_only_to_whoever_reads_it(): void
     {
         $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');

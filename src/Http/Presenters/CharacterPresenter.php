@@ -100,6 +100,9 @@ final readonly class CharacterPresenter
         return [
             'items' => array_map($this->basics(...), $usable),
             'suggestedId' => $suggested?->value,
+            // Where the post is written: a character created from the picker is chosen only
+            // when it may speak here
+            'categoryId' => $category->id()->value,
             ...$this->form($user, $this->rules->bindableCategories($user)),
         ];
     }

@@ -349,15 +349,16 @@ async function remove(): Promise<void> {
             </span>
             <div class="min-w-0 flex-1">
                 <template v-if="post.character">
+                    <!-- The badge wraps below a long name instead of being cut with it -->
                     <p
                         :id="`${anchor}-author`"
-                        class="truncate font-semibold text-base-primary"
+                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
                         data-testid="post-character"
                     >
-                        {{ post.character.name }}
+                        <span class="min-w-0 truncate">{{ post.character.name }}</span>
                         <span
                             v-if="post.character.isRetired"
-                            class="ml-1 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-medium text-base-secondary"
+                            class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
                         >
                             {{ t('forum.characters.retiredBadge') }}
                         </span>
@@ -379,11 +380,17 @@ async function remove(): Promise<void> {
                         </span>
                     </p>
                 </template>
-                <p v-else :id="`${anchor}-author`" class="truncate font-semibold text-base-primary">
-                    {{ post.authorName ?? t('forum.posts.deletedAccount') }}
+                <p
+                    v-else
+                    :id="`${anchor}-author`"
+                    class="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
+                >
+                    <span class="min-w-0 truncate">{{
+                        post.authorName ?? t('forum.posts.deletedAccount')
+                    }}</span>
                     <span
                         v-if="post.isStarter"
-                        class="ml-1 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-medium text-base-secondary"
+                        class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
                     >
                         {{ t('forum.posts.starter') }}
                     </span>

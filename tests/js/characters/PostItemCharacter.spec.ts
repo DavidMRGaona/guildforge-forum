@@ -76,6 +76,15 @@ describe('a post written as a character', () => {
         expect(wrapper.find('#post-2-author').text()).toContain('Arwen');
     });
 
+    it('keeps the badges out of the truncated name, so on a phone they wrap whole', () => {
+        const retired = mounted(aPost(arwen));
+        expect(retired.find('#post-2-author .truncate').text()).toBe('Arwen');
+
+        const starter = mounted({ ...aPost(null), isStarter: true });
+        expect(starter.find('#post-2-author .truncate').text()).toBe('Jane Doe');
+        expect(starter.find('#post-2-author').text()).toContain('Autor del tema');
+    });
+
     it('shows the account out of character', () => {
         const wrapper = mounted(aPost(null));
 

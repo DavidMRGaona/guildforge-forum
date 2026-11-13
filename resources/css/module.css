@@ -147,6 +147,7 @@
 
 .forum-embed__card {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
     padding: 0.75rem;
 }
@@ -160,7 +161,9 @@
     object-fit: cover;
 }
 
+/* Below the thumbnail when there is no room for 12rem of text beside it (phones) */
 .forum-embed__body {
+    flex: 1 1 12rem;
     min-width: 0;
     overflow-wrap: anywhere;
 }

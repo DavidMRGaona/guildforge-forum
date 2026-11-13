@@ -19,30 +19,63 @@ const { t } = useI18n();
 const { isAuthenticated } = useAuth();
 const { setBadge, clearBadge } = useMenuBadges();
 
-const { unreadFollowed } = useForumPulse({ transport: pollPulse(), enabled: isAuthenticated });
-
-/** What the announcement says: a sentence of its own */
-const message = computed(() => {
-    const count = unreadFollowed.value;
-    if (count <= 0) {
-        return '';
-    }
-
-    return count >= PULSE_UNREAD_CAP
-        ? t('forum.live.unreadFollowedMany')
-        : t('forum.live.unreadFollowed', { count }, count);
+const { unreadFollowed, unreadConversations } = useForumPulse({
+    transport: pollPulse(),
+    enabled: isAuthenticated,
 });
 
-/** What the link reads after its name: «Foro, 3 temas sin leer» */
-const badge = computed(() => {
+/** «2 temas», «muchos temas» */
+function topicsPart(count: number): string {
+    return count >= PULSE_UNREAD_CAP
+        ? t('forum.live.topicsMany')
+        : t('forum.live.topics', { count }, count);
+}
+
+/** «una conversación», «3 conversaciones» */
+function conversationsPart(count: number): string {
+    return t('forum.live.conversations', { count }, count);
+}
+
+/** What the announcement says: one sentence naming whatever is unread */
+const message = computed(() => {
     const count = unreadFollowed.value;
-    if (count <= 0) {
-        return '';
+    const conversations = unreadConversations.value;
+    if (count > 0 && conversations > 0) {
+        return t('forum.live.unreadBoth', {
+            topics: topicsPart(count),
+            conversations: conversationsPart(conversations),
+        });
+    }
+    if (count > 0) {
+        return count >= PULSE_UNREAD_CAP
+            ? t('forum.live.unreadFollowedMany')
+            : t('forum.live.unreadFollowed', { count }, count);
     }
 
-    return count >= PULSE_UNREAD_CAP
-        ? t('forum.live.unreadFollowedBadgeMany')
-        : t('forum.live.unreadFollowedBadge', { count }, count);
+    return conversations > 0
+        ? t('forum.live.unreadConversations', { count: conversations }, conversations)
+        : '';
+});
+
+/** What the link reads after its name: «Foro, 2 temas y una conversación sin leer» */
+const badge = computed(() => {
+    const count = unreadFollowed.value;
+    const conversations = unreadConversations.value;
+    if (count > 0 && conversations > 0) {
+        return t('forum.live.unreadBothBadge', {
+            topics: topicsPart(count),
+            conversations: conversationsPart(conversations),
+        });
+    }
+    if (count > 0) {
+        return count >= PULSE_UNREAD_CAP
+            ? t('forum.live.unreadFollowedBadgeMany')
+            : t('forum.live.unreadFollowedBadge', { count }, count);
+    }
+
+    return conversations > 0
+        ? t('forum.live.unreadConversationsBadge', { count: conversations }, conversations)
+        : '';
 });
 
 watch(

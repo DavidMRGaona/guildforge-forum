@@ -32,4 +32,6 @@ enum ModerationAction: string
     case CharacterRetired = 'character_retired';
     case CharacterRestored = 'character_restored';
     case CharacterDeleted = 'character_deleted';
+    case PrivateMessageHidden = 'private_message_hidden';
+    case PrivateReportsResolved = 'private_reports_resolved';
 }

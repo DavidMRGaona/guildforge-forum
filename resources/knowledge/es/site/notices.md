@@ -5,14 +5,14 @@ summary: Qué te avisa el foro, por la campana y por correo, cómo elegirlo y c�
 category: community
 audience: site
 order: 60
-keywords: [avisos, notificaciones, correo, correos, campana, respuestas, menciones, citas, me gusta, temas nuevos, silenciar, silencio, resumen diario, dejar de recibir, demasiados correos, seguir, no me llegan]
-related: [forum.site.overview, forum.site.writing, core.account.mail-preferences, core.account.site-notifications]
+keywords: [avisos, mensajes privados, notificaciones, correo, correos, campana, respuestas, menciones, citas, me gusta, temas nuevos, silenciar, silencio, resumen diario, dejar de recibir, demasiados correos, seguir, no me llegan]
+related: [forum.site.overview, forum.site.writing, forum.site.private-messages, core.account.mail-preferences, core.account.site-notifications]
 ---
 El foro te avisa de lo que pasa en lo que sigues, en la campana de la cabecera y, según elijas, por correo. Esta guía explica qué avisos hay, cómo elegirlos y cómo callar un tema.
 
 ## Los cuatro tipos de aviso
 
-En tu perfil, en la pestaña **Avisos**, el foro tiene su propia sección **Foro** con cuatro tipos:
+En tu perfil, en la pestaña **Avisos**, el foro tiene su propia sección **Foro**. Estos son los cuatro tipos de los temas:
 
 - **Respuestas en temas que sigues**: cuando alguien responde en un tema que sigues. Por correo llega uno por tema hasta que lo vuelves a leer, para no llenarte la bandeja; en la campana, las respuestas de un mismo tema se agrupan en una.
 - **Temas nuevos y espacios de campaña**: temas nuevos en las categorías que sigues y los espacios de campaña a los que te añaden. El aviso «Te han añadido a la campaña…» sale solo en la campana.
@@ -20,6 +20,8 @@ En tu perfil, en la pestaña **Avisos**, el foro tiene su propia sección **Foro
 - **Me gusta**: cuando a alguien le gusta un mensaje tuyo. Solo en la campana, nunca por correo.
 
 Las respuestas y los temas nuevos admiten el **Resumen diario**: un solo correo al día con todo junto.
+
+Los **Mensajes privados** tienen su propio tipo: te avisa cuando te añaden a una conversación o te escriben en una, sin incluir nunca lo que se ha escrito. Mira la guía de mensajes privados.
 
 [[action:profile.show?tab=mail|Elegir mis avisos]]
 

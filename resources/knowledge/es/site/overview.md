@@ -1,12 +1,12 @@
 ---
 id: forum.site.overview
 title: Cómo funciona el foro
-summary: Categorías, seguir temas, mensajes sin leer, novedades sin recargar y el indicador del menú.
+summary: Categorías, seguir temas, mensajes sin leer, novedades sin recargar, el indicador del menú y los mensajes privados.
 category: community
 audience: site
 order: 10
 keywords: [foro, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
-related: [forum.site.writing, forum.site.notices, forum.site.play-by-post]
+related: [forum.site.writing, forum.site.notices, forum.site.play-by-post, forum.site.private-messages]
 ---
 El foro de {{site_name}} es el sitio para conversar con el resto de la comunidad. Esta guía explica cómo está organizado y cómo seguir lo que te interesa sin perder el hilo.
 
@@ -59,7 +59,11 @@ El foro no comprueba nada mientras la pestaña está oculta y se pone al día en
 
 ## El indicador del menú
 
-Si sigues temas del foro y alguno tiene mensajes que no has leído, el enlace **Foro** del menú muestra una marca, por ejemplo «2 temas sin leer». Desaparece al leerlos.
+Si sigues temas del foro y alguno tiene mensajes que no has leído, el enlace **Foro** del menú muestra una marca, por ejemplo «2 temas sin leer». También la muestra si tienes conversaciones privadas sin leer. Desaparece al leerlos.
+
+## Mensajes privados
+
+El enlace **Mensajes**, en la cabecera del foro, lleva a tus conversaciones privadas con otras personas de la comunidad. Solo las leen quienes están en ellas. Mira la guía de mensajes privados.
 
 ## Buscar y denunciar
 

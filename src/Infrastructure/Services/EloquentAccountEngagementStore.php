@@ -19,6 +19,12 @@ final readonly class EloquentAccountEngagementStore implements AccountEngagement
         ['forum_discussion_reads', 'user_id'],
         ['forum_category_reads', 'user_id'],
         ['forum_reports', 'reporter_id'],
+        // Private conversations: what the person blocked or was blocked by, their starts and
+        // the reports they made (AccountErasure takes them out of their conversations first)
+        ['forum_user_blocks', 'blocker_user_id'],
+        ['forum_user_blocks', 'blocked_user_id'],
+        ['forum_conversation_starts', 'user_id'],
+        ['forum_conversation_reports', 'reporter_id'],
     ];
 
     public function forget(string $accountId): void

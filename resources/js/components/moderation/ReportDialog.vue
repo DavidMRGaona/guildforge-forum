@@ -11,6 +11,8 @@ const props = defineProps<{
     modelValue: boolean;
     reportUrl: string;
     postNumber: number | null;
+    /** What moderation will read, when it is not the post alone (a private message) */
+    description?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -83,7 +85,9 @@ async function submit(): Promise<void> {
                 <h3 :id="`report-dialog-${uid}`" class="text-lg font-semibold text-base-primary">
                     {{ t('forum.reports.title', { number: postNumber ?? '' }) }}
                 </h3>
-                <p class="mt-2 text-sm text-base-secondary">{{ t('forum.reports.message') }}</p>
+                <p class="mt-2 text-sm text-base-secondary">
+                    {{ description ?? t('forum.reports.message') }}
+                </p>
 
                 <fieldset class="mt-4">
                     <legend class="text-sm font-medium text-base-primary">

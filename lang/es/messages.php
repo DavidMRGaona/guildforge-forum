@@ -245,6 +245,7 @@ return [
         'queue_title' => 'Moderación',
         'tabs' => [
             'reports' => 'Denuncias',
+            'private' => 'Mensajes privados',
             'pending' => 'Pendientes',
             'suspensions' => 'Suspensiones',
             'history' => 'Historial',
@@ -273,6 +274,8 @@ return [
             'character_retired' => 'Personaje retirado',
             'character_restored' => 'Personaje recuperado',
             'character_deleted' => 'Personaje borrado',
+            'private_message_hidden' => 'Mensaje privado ocultado',
+            'private_reports_resolved' => 'Denuncia de mensaje privado resuelta',
         ],
         'fields' => [
             'when' => 'Cuándo',
@@ -341,6 +344,14 @@ return [
             'edited' => 'Resolver como editado',
             'settled' => 'Denuncias resueltas',
             'empty_reports' => 'No hay denuncias pendientes',
+            'empty_private' => 'No hay mensajes privados denunciados',
+            'private_context' => 'Ver la copia denunciada',
+            'private_context_help' => 'La copia que se guardó al denunciar: el mensaje y los tres anteriores y posteriores. La conversación nunca se abre desde aquí.',
+            'private_reported' => 'Mensaje denunciado',
+            'private_deleted' => 'Mensaje borrado',
+            'private_added' => ':author ha añadido a :name',
+            'private_left' => ':author ha salido',
+            'close' => 'Cerrar',
             'empty_suspensions' => 'Nadie ha estado suspendido',
             'suspend' => 'Suspender',
             'suspend_heading' => 'Suspender en el foro',
@@ -575,10 +586,15 @@ return [
                 'label' => 'Denuncias de mensajes',
                 'description' => 'Para quien modera: cuando alguien denuncia un mensaje que te toca revisar. Solo se avisa de la primera denuncia de cada mensaje por correo.',
             ],
+            'conversations' => [
+                'label' => 'Mensajes privados',
+                'description' => 'Cuando te añaden a una conversación privada o te escriben en una. Nunca incluye lo que se ha escrito. Por correo, uno por conversación hasta que la vuelvas a leer.',
+            ],
         ],
         'subjects' => [
             'discussion' => 'Tema del foro',
             'category' => 'Categoría del foro',
+            'conversation' => 'Conversación privada',
         ],
         'mail' => [
             'greeting' => 'Hola:',
@@ -625,6 +641,38 @@ return [
             'grouped' => 'Han denunciado :count veces un mensaje en «:discussion»',
             'reason' => 'Motivo: :reason',
             'action' => 'Revisar el mensaje',
+        ],
+    ],
+
+    'conversations' => [
+        'pages' => [
+            'index_title' => 'Mensajes privados',
+            'create_title' => 'Nueva conversación',
+        ],
+        'refusals' => [
+            'barred' => 'Ahora no puedes escribir mensajes privados.',
+            'cannot_write' => 'No puedes escribir en esta conversación.',
+            'alone' => 'No queda nadie más en la conversación. Añade a alguien para seguir escribiendo.',
+            'unavailable_people' => 'No puedes escribir a alguna de las personas elegidas.',
+            'participants' => 'Una conversación es de 2 a 10 personas, contándote a ti.',
+            'full' => 'La conversación ya tiene 10 personas.',
+            'daily_limit' => 'Ya has empezado 5 conversaciones en las últimas 24 horas. Puedes seguir respondiendo en las que tienes.',
+            'already_in' => 'Esa persona ya está en la conversación.',
+            'not_allowed' => 'No puedes hacer eso con este mensaje.',
+        ],
+        'errors' => [
+            'title' => 'Escribe un título de 120 caracteres como máximo.',
+            'note' => 'La nota es demasiado larga.',
+        ],
+        'notices' => [
+            'started' => ':author ha empezado una conversación contigo: «:conversation»',
+            'message' => ':author te ha escrito en «:conversation»',
+            'added' => ':author te ha añadido a la conversación «:conversation»',
+            'grouped' => '{1} :author y otra persona te han escrito en «:conversation»|[2,*] :author y :count personas más te han escrito en «:conversation»',
+            'grouped_same' => '{1} :author te ha escrito en «:conversation»|[2,*] :author te ha escrito :count mensajes en «:conversation»',
+            'mail_privacy' => 'Por privacidad, este correo no incluye lo que se ha escrito.',
+            'mail_action' => 'Abrir la conversación',
+            'reported' => 'Han denunciado un mensaje privado',
         ],
     ],
 

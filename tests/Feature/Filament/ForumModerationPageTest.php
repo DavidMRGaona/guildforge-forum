@@ -16,18 +16,23 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Livewire\Livewire;
+use Modules\Forum\Application\Conversations\ConversationReportService;
+use Modules\Forum\Application\Conversations\ConversationService;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ReportService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Enums\ReportReason;
+use Modules\Forum\Domain\Repositories\ConversationRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Widgets\ForumActivityWidget;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ConversationMessageModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ConversationReportModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
@@ -233,6 +238,29 @@ final class ForumModerationPageTest extends ModuleTestCase
         $this->assertSame('no_action', ReportModel::query()->sole()->resolution);
     }
 
+    public function test_the_private_tab_shows_the_copy_of_a_reported_private_message_and_hides_it(): void
+    {
+        $this->actingAs($this->panelUser([self::MODERATE]));
+        $ana = $this->anAccount();
+        $luis = $this->anAccount();
+        $conversation = app(ConversationService::class)->start($ana, 'Privada', [$luis->id], ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Algo feo']]]]]);
+        $message = app(ConversationRepositoryInterface::class)->entries($conversation->id(), 1, 1)[0];
+        app(ConversationReportService::class)->report($luis, $message->id(), ReportReason::Offensive, null);
+        $this->assertSame('1', ForumModerationPage::getNavigationBadge());
+
+        $page = Livewire::test(ForumModerationPage::class)->set('activeTab', ForumModerationPage::TAB_PRIVATE)
+            ->assertCountTableRecords(1)
+            ->assertSee('Algo feo')
+            // The conversation's title is never shown: only the copy
+            ->assertDontSee('Privada');
+        $page->callTableAction('hide_private', ConversationReportModel::query()->sole(), ['reason' => 'Insultos'])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertNotNull(ConversationMessageModel::query()->findOrFail($message->id()->value)->hidden_at);
+        $this->assertSame('hidden', ConversationReportModel::query()->sole()->resolution);
+        $this->assertNull(ForumModerationPage::getNavigationBadge());
+    }
+
     public function test_suspending_from_the_header_and_lifting_from_the_row(): void
     {
         $this->actingAs($this->panelUser([self::MODERATE]));
@@ -320,6 +348,11 @@ final class ForumModerationPageTest extends ModuleTestCase
         yield 'reports reporter' => [ForumModerationPage::TAB_REPORTS, 'reporter.name', 'md'];
         yield 'reports when' => [ForumModerationPage::TAB_REPORTS, 'created_at', 'xl'];
         yield 'reports note' => [ForumModerationPage::TAB_REPORTS, 'note', '2xl'];
+        yield 'private excerpt' => [ForumModerationPage::TAB_PRIVATE, 'excerpt', null];
+        yield 'private author' => [ForumModerationPage::TAB_PRIVATE, 'messageAuthor.name', 'sm'];
+        yield 'private reason' => [ForumModerationPage::TAB_PRIVATE, 'reason', 'md'];
+        yield 'private when' => [ForumModerationPage::TAB_PRIVATE, 'created_at', 'xl'];
+        yield 'private note' => [ForumModerationPage::TAB_PRIVATE, 'note', '2xl'];
         yield 'suspensions person' => [ForumModerationPage::TAB_SUSPENSIONS, 'user.name', null];
         yield 'suspensions state' => [ForumModerationPage::TAB_SUSPENSIONS, 'state', 'sm'];
         yield 'suspensions end' => [ForumModerationPage::TAB_SUSPENSIONS, 'ends_at', 'md'];
@@ -350,7 +383,7 @@ final class ForumModerationPageTest extends ModuleTestCase
     {
         $this->actingAs($this->panelUser([self::MODERATE]));
 
-        foreach ([[ForumModerationPage::TAB_REPORTS, 'post.plain_text'], [ForumModerationPage::TAB_PENDING, 'discussion.title'], [ForumModerationPage::TAB_SUSPENSIONS, 'user.name'], [ForumModerationPage::TAB_HISTORY, 'action']] as [$tab, $name]) {
+        foreach ([[ForumModerationPage::TAB_REPORTS, 'post.plain_text'], [ForumModerationPage::TAB_PRIVATE, 'excerpt'], [ForumModerationPage::TAB_PENDING, 'discussion.title'], [ForumModerationPage::TAB_SUSPENSIONS, 'user.name'], [ForumModerationPage::TAB_HISTORY, 'action']] as [$tab, $name]) {
             $column = $this->table($tab)->getColumn($name);
             $this->assertInstanceOf(TextColumn::class, $column);
             $this->assertTrue($column->canWrap(), $name);

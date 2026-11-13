@@ -6,10 +6,10 @@ import { signIn } from '../support/page';
 
 const KEY = 'forum:forum.index';
 
-function serve(unreadFollowed: number): ReturnType<typeof vi.fn> {
+function serve(unreadFollowed: number, unreadConversations = 0): ReturnType<typeof vi.fn> {
     const fetchMock = vi.fn(
         async () =>
-            new Response(JSON.stringify({ unreadFollowed, discussions: {} }), {
+            new Response(JSON.stringify({ unreadFollowed, discussions: {}, unreadConversations }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
             })
@@ -63,6 +63,39 @@ describe('ForumMenuPulse', () => {
         const status = wrapper.get('[role="status"]');
         expect(status.attributes('aria-live')).toBe('polite');
         expect(status.text()).toBe('Hay 3 temas sin leer entre los que sigues en el foro');
+    });
+
+    it('adds the unread private conversations to the mark', async () => {
+        signIn();
+        serve(2, 1);
+        const wrapper = mount(ForumMenuPulse);
+
+        await tick(0);
+
+        expect(badge()).toBe('2 temas y una conversación sin leer');
+        expect(wrapper.get('[role="status"]').text()).toBe(
+            'Tienes 2 temas y una conversación sin leer en el foro'
+        );
+    });
+
+    it('marks the link for unread conversations alone', async () => {
+        signIn();
+        serve(0, 3);
+        mount(ForumMenuPulse);
+
+        await tick(0);
+
+        expect(badge()).toBe('3 conversaciones sin leer');
+    });
+
+    it('names many discussions and the conversations together', async () => {
+        signIn();
+        serve(100, 2);
+        mount(ForumMenuPulse);
+
+        await tick(0);
+
+        expect(badge()).toBe('muchos temas y 2 conversaciones sin leer');
     });
 
     it('uses the singular for one discussion', async () => {

@@ -34,6 +34,9 @@ final class ForumMailCategories
     /** For whoever moderates: someone reported a post */
     public const string REPORTS = 'forum.reports';
 
+    /** Private conversations: being added to one and new messages in them (never their text) */
+    public const string CONVERSATIONS = 'forum.conversations';
+
     private const string SECTION = 'forum::messages.notices.categories.section';
 
     /**
@@ -57,6 +60,7 @@ final class ForumMailCategories
                 site: true,
             ),
             self::category(self::REPORTS, 'reports'),
+            self::category(self::CONVERSATIONS, 'conversations'),
         ];
     }
 

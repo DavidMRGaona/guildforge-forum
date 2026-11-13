@@ -51,6 +51,19 @@ describe('PostEditor', () => {
         expect(wrapper.find('[data-toolbar-item="image"]').exists()).toBe(false);
     });
 
+    it('offers no dice rolls nor asides in text only (private messages)', async () => {
+        const wrapper = mountEditor({ textOnly: true });
+        await settle();
+
+        expect(wrapper.find('[data-toolbar-item="bold"]').exists()).toBe(true);
+        expect(wrapper.find('[data-toolbar-item="roll"]').exists()).toBe(false);
+        expect(wrapper.find('[data-toolbar-item="ooc"]').exists()).toBe(false);
+
+        const full = mountEditor();
+        await settle();
+        expect(full.find('[data-toolbar-item="roll"]').exists()).toBe(true);
+    });
+
     it('sends the document and refuses an empty one', async () => {
         const wrapper = mountEditor();
         await settle();

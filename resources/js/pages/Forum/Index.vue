@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { Plus, ShieldCheck } from '@lucide/vue';
+import { Mail, Plus, ShieldCheck } from '@lucide/vue';
 import HelpLink from '@/components/knowledge/HelpLink.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import type {
@@ -26,6 +26,8 @@ defineProps<{
     markReadUrl: string | null;
     /** The forum's moderation page, for whoever moderates something */
     moderationUrl: string | null;
+    /** The person's private conversations, with how many are unread; null without a session */
+    conversations?: { url: string; unread: number } | null;
 }>();
 
 const { t } = useI18n();
@@ -44,6 +46,24 @@ const { t } = useI18n();
                 <p class="mt-2 text-lg text-base-secondary">{{ t('forum.description') }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
+                <Link
+                    v-if="conversations"
+                    :href="conversations.url"
+                    class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-base-secondary hover:bg-muted hover:text-base-primary"
+                    data-testid="forum-conversations-link"
+                >
+                    <Mail class="h-4 w-4" aria-hidden="true" />
+                    {{ t('forum.conversations.link') }}
+                    <span
+                        v-if="conversations.unread > 0"
+                        class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-white"
+                    >
+                        <span aria-hidden="true">{{ conversations.unread }}</span>
+                        <span class="sr-only">{{
+                            t('forum.conversations.linkUnread', { count: conversations.unread })
+                        }}</span>
+                    </span>
+                </Link>
                 <Link
                     v-if="moderationUrl"
                     :href="moderationUrl"

@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\DTOs\NewPostsDTO;
+use Modules\Forum\Application\Queries\ConversationListQueryInterface;
+use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumPulse;
 use Modules\Forum\Application\Services\NewPostsReader;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
@@ -37,6 +39,7 @@ final class LiveUpdatesController extends Controller
         private readonly EngagementPresenter $engagement,
         private readonly ModerationProps $moderationProps,
         private readonly MergedDiscussionAnswer $merged,
+        private readonly ConversationListQueryInterface $conversations,
     ) {}
 
     public function posts(Request $request, string $discussion): JsonResponse|Response
@@ -92,7 +95,12 @@ final class LiveUpdatesController extends Controller
         $summary = $this->pulse->summary($user, $ids);
 
         return response()
-            ->json(['unreadFollowed' => $summary['unreadFollowed'], 'discussions' => (object) $summary['discussions']])
+            ->json([
+                'unreadFollowed' => $summary['unreadFollowed'],
+                'discussions' => (object) $summary['discussions'],
+                // Private conversations with messages the person has not read (forum#18)
+                'unreadConversations' => $this->conversations->unreadCount((string) ForumBrowser::accountId($user)),
+            ])
             ->header('Cache-Control', self::NO_STORE);
     }
 }

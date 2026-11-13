@@ -19,6 +19,8 @@ export interface ForumPulseOptions {
 export interface ForumPulseState {
     /** How many followed discussions have posts the person did not read (up to the server's cap) */
     unreadFollowed: Ref<number>;
+    /** How many private conversations have messages the person did not read */
+    unreadConversations: Ref<number>;
     /** The last post of each discussion the page asked about */
     lastPosts: Ref<Record<string, number>>;
     refresh: () => void;
@@ -30,6 +32,7 @@ export interface ForumPulseState {
  */
 export function useForumPulse(options: ForumPulseOptions): ForumPulseState {
     const unreadFollowed = ref(0);
+    const unreadConversations = ref(0);
     const lastPosts = ref<Record<string, number>>({});
     let connection: LiveConnection | null = null;
 
@@ -40,6 +43,7 @@ export function useForumPulse(options: ForumPulseOptions): ForumPulseState {
 
         connection = options.transport.connect({ cursor: () => 0 }, (update) => {
             unreadFollowed.value = update.unreadFollowed;
+            unreadConversations.value = update.unreadConversations ?? 0;
             lastPosts.value = update.discussions;
         });
     }
@@ -48,6 +52,7 @@ export function useForumPulse(options: ForumPulseOptions): ForumPulseState {
         connection?.stop();
         connection = null;
         unreadFollowed.value = 0;
+        unreadConversations.value = 0;
         lastPosts.value = {};
     }
 
@@ -62,5 +67,5 @@ export function useForumPulse(options: ForumPulseOptions): ForumPulseState {
     );
     onBeforeUnmount(disconnect);
 
-    return { unreadFollowed, lastPosts, refresh: () => connection?.refresh() };
+    return { unreadFollowed, unreadConversations, lastPosts, refresh: () => connection?.refresh() };
 }

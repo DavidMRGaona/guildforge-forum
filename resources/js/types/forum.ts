@@ -409,6 +409,8 @@ export interface ForumNewPosts {
 export interface ForumPulse {
     unreadFollowed: number;
     discussions: Record<string, number>;
+    /** Private conversations with messages the person has not read */
+    unreadConversations?: number;
 }
 
 /** What every character shows: its name and its portrait, or its initials without one */
@@ -511,4 +513,89 @@ export interface ForumSharedCharacters extends ForumCharacterForm {
     items: ForumSharedCharacter[];
     /** The most PNJ a space holds */
     max: number;
+}
+
+/** A conversation in the person's list of private messages */
+export interface ForumConversationRow {
+    id: string;
+    title: string;
+    url: string;
+    /** Messages by others the person has not read */
+    unread: number;
+    /** The names of a few of the others in it */
+    people: string[];
+    /** How many others there are besides those named */
+    morePeople: number;
+    lastActivityIso: string | null;
+    lastActivityLabel: string;
+}
+
+/** Pages of the list of conversations, or of one conversation */
+export interface ForumConversationPagination {
+    page: number;
+    lastPage: number;
+    previousUrl: string | null;
+    nextUrl: string | null;
+}
+
+/** Someone found for a private conversation */
+export interface ForumPerson {
+    id: string;
+    name: string;
+}
+
+export interface ForumConversationParticipant extends ForumPerson {
+    isMe: boolean;
+    /** Whether the reader blocked this person */
+    blocked: boolean;
+}
+
+/** One entry of a private conversation: a message, or the note that someone joined or left */
+export interface ForumConversationEntry {
+    id: string;
+    number: number;
+    kind: 'message' | 'added' | 'left';
+    state: 'shown' | 'deleted' | 'hidden' | 'note';
+    authorId: string | null;
+    authorName: string;
+    /** Who was added, for a note of someone added */
+    subjectName: string | null;
+    isMine: boolean;
+    html: string | null;
+    /** Why moderation hid it, for its author only */
+    hiddenReason: string | null;
+    createdIso: string | null;
+    createdLabel: string;
+    deleteUrl: string | null;
+    reportUrl: string | null;
+}
+
+/** A reported private message as moderation reads it: the copy taken when it was reported */
+export interface ForumConversationReport {
+    id: string;
+    authorId: string | null;
+    authorName: string;
+    reason: string;
+    note: string | null;
+    reportedLabel: string;
+    /** Its conversation went: only the copy is left */
+    messageGone: boolean;
+    context: Array<{
+        number: number;
+        kind: 'message' | 'added' | 'left' | 'deleted';
+        authorName: string;
+        subjectName: string | null;
+        text: string;
+        reported: boolean;
+        atLabel: string;
+    }>;
+    resolveUrl: string;
+}
+
+/** Someone the person blocked, in the profile */
+export interface ForumBlock {
+    id: string;
+    name: string;
+    sinceLabel: string;
+    unblockUrl: string;
 }

@@ -12,6 +12,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
+use Modules\Forum\Application\Queries\ConversationListQueryInterface;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ModerationQueue;
 use Modules\Forum\Http\Presenters\ForumPresenter;
@@ -29,6 +30,7 @@ final class ForumIndexController extends Controller
         private readonly ForumUrlsInterface $urls,
         private readonly SeoMetadataFactoryInterface $seo,
         private readonly ModerationQueue $queue,
+        private readonly ConversationListQueryInterface $conversations,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -44,6 +46,11 @@ final class ForumIndexController extends Controller
             'newDiscussionUrl' => route('forum.discussions.create'),
             'markReadUrl' => $reader === null ? null : route('forum.read'),
             'moderationUrl' => $this->queue->hasQueue($reader) ? route('forum.moderation.index') : null,
+            // Private conversations (forum#18), for whoever has a session
+            'conversations' => $reader === null ? null : [
+                'url' => route('forum.conversations.index'),
+                'unread' => $this->conversations->unreadCount((string) ForumBrowser::accountId($reader)),
+            ],
             'seo' => $this->seo->forPage(new SeoPageDTO(
                 title: __('forum::messages.pages.index_title'),
                 description: __('forum::messages.pages.index_description'),

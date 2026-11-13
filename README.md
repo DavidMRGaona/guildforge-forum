@@ -6,6 +6,7 @@ Módulo de GuildForge con el foro de la comunidad: categorías, temas y mensajes
 
 ## Qué hay
 
+- **Mensajes privados** entre 2 y 10 personas, que solo leen ellas. Ver [Mensajes privados](#mensajes-privados).
 - **Categorías, temas y mensajes** en las tablas `forum_categories`, `forum_discussions` y `forum_posts`.
 - **Mensajes**: se guarda el documento del editor (JSON de TipTap, nunca HTML) y una copia en texto plano para la búsqueda y los resúmenes. Ver [Editor de mensajes](#editor-de-mensajes).
 - **Historial de ediciones** en `forum_post_revisions`: cada edición guarda antes la versión que sustituye. Quien modera ve todas las versiones.
@@ -132,6 +133,7 @@ Las funciones propias del foro (dados, personajes, apartes fuera de personaje, m
 | `forum.approvals` | La moderación ha aprobado un mensaje o un tema tuyo que esperaba revisión (`ForumPostApproved`) | Al momento |
 | `forum.suspensions` | Te han suspendido en el foro, con el motivo y la fecha de fin o «hasta que se levante» (`ForumUserSuspended`), y que se ha levantado (`ForumUserSuspensionLifted`, solo si seguía en vigor y no hay otra). Obligatoria | Siempre, al momento |
 | `forum.reports` | Para quien modera: han denunciado un mensaje (`ForumPostReported`). En la web se agrupan por mensaje mientras haya denuncias abiertas | Solo por la primera denuncia abierta de cada mensaje |
+| `forum.conversations` | Mensajes privados: te han añadido a una conversación o te han escrito en ella. Nunca lleva el texto. En la web, agrupados por conversación | Uno por conversación hasta que se vuelve a leer |
 
 - Cada persona recibe un solo aviso por mensaje: mención antes que cita y cita antes que seguimiento. Al editar un mensaje, solo avisa a quien menciona o cita por primera vez.
 - Todo pasa por la cola: `ForumWriter` entrega cada mensaje que recibe número (respuestas, temas nuevos, aprobaciones y los mensajes de la cuenta del sistema) a `DeliverPostNoticesJob`, que decide a quién avisar (`PostNoticePlanner`), y cada aviso vuelve a comprobar al entregarse (`PostNoticeContext`) que la persona puede leer el tema en ese momento (`ForumAccessInterface`), que el mensaje sigue visible y que la cuenta está activa.
@@ -330,6 +332,35 @@ Cada cuenta escribe como sus personajes, para que las partidas se lean como una 
 - **Quién puede tenerlos**: ajuste «¿Quién puede tener personajes?»: nadie, cualquier cuenta con sesión (por defecto) o solo con `forum:characters.use`. Quien está suspendido en el foro no los crea ni escribe como ellos. Su dueño siempre puede verlos, retirarlos y borrarlos.
 - **Anonimización** (#15): `Character::stripPersonalDetails()` deja el nombre y quita la descripción y el retrato; falta llamarlo al anonimizar una cuenta.
 
+## Mensajes privados
+
+Conversaciones privadas entre personas con sesión (forum#18). Solo las leen quienes están en ellas: ni la moderación ni la administración tienen forma de abrirlas, y cualquier otra persona recibe un 404, como si no existieran. Todo lo que decide quién lee o escribe falla cerrado y vive en un solo servicio, `ConversationAccess`: `canRead()` es la única respuesta a «¿participa esta cuenta en esta conversación?», y el canal privado de una conversación (forum#17) debe reutilizarla.
+
+- **Tablas**: `forum_conversations` (título y numeración), `forum_conversation_participants` (quién está ahora y hasta dónde ha leído; salir borra la fila), `forum_conversation_messages` (mensajes y notas de quién entra o sale, numerados desde 1), `forum_conversation_starts` (para el límite diario), `forum_user_blocks` y `forum_conversation_reports`.
+- **Reglas** (`ConversationRules`, fijas, no son ajustes): de 2 a 10 personas, todas con una cuenta activa no suspendida en el foro; como máximo 5 conversaciones nuevas por persona en 24 horas (responder no cuenta); cada mensaje cuenta para el límite de mensajes por minuto del foro.
+- **Servicios** (`Application/Conversations`): `ConversationService` (empezar, escribir, añadir, salir, borrar lo propio, marcar como leído), `ConversationAccess`, `ConversationPeople` (el selector), `BlockService`, `ConversationReportService` y `ConversationDocuments` (el esquema reducido).
+- **Editor reducido**: solo texto y formato. Sin imágenes (llegarían a la biblioteca de medios, que ve el panel), menciones, citas de mensajes, tiradas, apartes ni incrustaciones. `PostEditor` con `text-only`.
+- **Bloqueos**: en un solo sentido y silenciosos. Quien está bloqueado no escribe en ninguna conversación donde esté quien le bloqueó (ni añade a nadie a ella), ni empieza una con esa persona, ni la añade, y el selector no se la ofrece. Las respuestas dicen «No puedes escribir en esta conversación» sin nombrar a nadie.
+- **Denuncias**: guardan una copia en texto plano del mensaje y de los tres anteriores y posteriores, con los ids de los autores (los nombres se leen al pintar). Solo quien modera todo el foro las ve y las resuelve, en `/foro/moderacion` y en la pestaña **Mensajes privados** del panel: ocultar el mensaje o sin acción. La copia sobrevive al borrado del mensaje y de la conversación.
+- **Búsqueda**: nunca se indexan. No hay fuente de búsqueda para ellas ni observador sobre sus modelos.
+- **Pulso**: `GET /foro/novedades` devuelve también `unreadConversations`, que el enlace **Foro** del menú suma a su marca.
+
+### Rutas (con sesión)
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /foro/conversaciones` | Lista con los no leídos (`Forum/Conversations`) |
+| `GET /foro/conversaciones/nueva?para=<uuid>` | Nueva conversación (`Forum/NewConversation`) |
+| `GET /foro/conversaciones/personas?q=&conversacion=` | Selector de personas (JSON, 60 por persona y minuto, como el buscador del foro); nunca devuelve cuentas anonimizadas, desactivadas ni el correo |
+| `POST /foro/conversaciones` | Empezar (`title`, `recipients`, `document`) |
+| `GET /foro/conversaciones/{uuid}` | Conversación (`Forum/Conversation`); marca como leído lo que muestra |
+| `POST /foro/conversaciones/{uuid}/mensajes` | Escribir |
+| `POST /foro/conversaciones/{uuid}/personas` · `/salir` · `/leido` | Añadir a alguien, salir, marcar como leído |
+| `DELETE /foro/conversaciones/mensajes/{uuid}` | Borrar un mensaje propio |
+| `POST /foro/conversaciones/mensajes/{uuid}/denuncias` | Denunciar |
+| `POST /foro/conversaciones/denuncias/{uuid}/resolver` | Resolver (quien modera todo el foro) |
+| `GET\|POST /foro/bloqueos`, `DELETE /foro/bloqueos/{uuid}` | Lista de bloqueos del perfil, bloquear y desbloquear |
+
 ## Cuentas anonimizadas, desactivadas y restauradas
 
 El foro sigue los eventos de cuentas del core (`UserAnonymized`, `UserDeactivated`, `UserRestored`, `UserProfileUpdated`).
@@ -339,6 +370,7 @@ El foro sigue los eventos de cuentas del core (`UserAnonymized`, `UserDeactivate
   - Se borran sus «me gusta», seguimientos, marcas de lectura, preferencias y las denuncias que hizo. Sus avisos de la campana, silencios y preferencias de correo ya los borra el core.
   - Los personajes pierden la descripción y el retrato (que dejan de contar como uso en la biblioteca de medios) y se retiran con bloqueo de moderación, así que nadie los usa aunque se restaure la cuenta. El nombre se queda en los mensajes.
   - Las denuncias que recibieron sus mensajes, sus suspensiones y el historial de moderación se quedan. Las imágenes de los mensajes también.
+  - Sale de todas sus conversaciones privadas (las demás personas ven que ha salido, y una conversación en la que no queda nadie se borra). Sus mensajes privados se quedan con el nombre anónimo. Se borran sus bloqueos (los que hizo y los que recibió), sus inicios de conversación y las denuncias de mensajes privados que hizo.
   - La cuenta del sistema nunca se anonimiza desde el foro; si lo hace el core, el foro crea otra cuando la necesita.
 - **Desactivar y restaurar**: el foro no guarda nada del estado. Quien tiene la cuenta desactivada (o anonimizada) cuenta como «impedida» (`ForumSuspensions::isBarred()`): no escribe, no da «me gusta», no denuncia, no modera, no usa personajes y no recibe avisos. Sus mensajes siguen visibles. Al restaurarla vuelve todo, salvo los personajes que retiró la moderación.
 - **Cambio de nombre o avatar**: no hace falta nada. Los nombres se leen al pintar y no hay cachés. La única copia es el texto plano de los mensajes que mencionan a alguien, que dice lo que era verdad al escribirlo (como una cita).
@@ -375,7 +407,7 @@ El módulo trae sus guías para la base de conocimiento del core (`resources/kno
 
 | Guía | Quién la ve |
 |------|-------------|
-| `forum.site.overview`, `writing`, `notices`, `play-by-post`, `dice` | Cualquier cuenta |
+| `forum.site.overview`, `writing`, `notices`, `private-messages`, `play-by-post`, `dice` | Cualquier cuenta |
 | `forum.site.images` | Con `forum:posts.upload_images` |
 | `forum.site.external-images` | Con `forum:posts.external_images` |
 | `forum.site.embeds` | Mientras algún servicio de incrustación esté activo (`forum.embeds_enabled`) |

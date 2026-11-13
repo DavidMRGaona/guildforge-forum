@@ -27,6 +27,12 @@ final class ErasedTables
             ['forum_discussion_reads', 'user_id'],
             ['forum_category_reads', 'user_id'],
             ['forum_reports', 'reporter_id'],
+            // Private conversations: the person leaves them all (AccountErasure)
+            ['forum_conversation_participants', 'user_id'],
+            ['forum_conversation_starts', 'user_id'],
+            ['forum_user_blocks', 'blocker_user_id'],
+            ['forum_user_blocks', 'blocked_user_id'],
+            ['forum_conversation_reports', 'reporter_id'],
         ];
     }
 
@@ -46,6 +52,8 @@ final class ErasedTables
             'forum_reports' => ['columns' => ['resolved_by'], 'why' => 'reports about posts that stay (the reporter column is erased)'],
             'forum_suspensions' => ['columns' => ['user_id', 'suspended_by', 'lifted_by'], 'why' => 'moderation history'],
             'forum_characters' => ['columns' => ['owner_id'], 'why' => 'details stripped and retired for good; the name stays on the posts (a shared character of a campaign space has no owner: nothing to erase)'],
+            'forum_conversation_messages' => ['columns' => ['author_id', 'subject_user_id'], 'why' => 'the conversation stays for the others, with the anonymous name'],
+            'forum_conversation_reports' => ['columns' => ['message_author_id', 'resolved_by'], 'why' => 'reports about private messages (the reporter column is erased)'],
         ];
     }
 
@@ -67,6 +75,8 @@ final class ErasedTables
             'forum_external_images',
             // Cards of embedded posts: the author named is the post's on the other service, not an account
             'forum_embeds',
+            // A private conversation's title and numbering; who is in it is kept apart
+            'forum_conversations',
         ];
     }
 }

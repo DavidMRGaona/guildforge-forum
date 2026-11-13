@@ -5,7 +5,7 @@ summary: Fijar, cerrar, mover, ocultar, separar y unir temas, y ocultar mensajes
 category: community
 audience: site
 order: 120
-keywords: [moderar, moderación, fijar, cerrar tema, mover tema, ocultar, mostrar, renombrar, borrar tema, separar mensajes, unir temas, aprobar, rechazar, suspender, denuncias, menú moderar, cola de moderación]
+keywords: [moderar, moderación, mensajes privados denunciados, fijar, cerrar tema, mover tema, ocultar, mostrar, renombrar, borrar tema, separar mensajes, unir temas, aprobar, rechazar, suspender, denuncias, menú moderar, cola de moderación]
 related: [forum.site.overview, forum.panel.moderation]
 conditions:
   capabilities: [forum.moderates]
@@ -50,6 +50,10 @@ Los mensajes pasan al final del destino y este tema desaparece; sus direcciones 
 - Editar un mensaje ajeno queda registrado.
 
 Las denuncias, la cola de pendientes y el historial se ven en la página **Moderación** del foro (el enlace **Moderación**, en la cabecera del foro) y, para quien modera todo el foro, también en el panel.
+
+## Mensajes privados denunciados
+
+Nadie de la moderación lee las conversaciones privadas. Quien modera todo el foro ve, en la página **Moderación**, la sección **Mensajes privados denunciados**: la copia que se guardó al denunciar, con el mensaje y los tres anteriores y posteriores. Desde ahí puede **Ocultar el mensaje** (para todos en la conversación), cerrar la denuncia con **Sin acción** o **Suspender a quien lo escribió**. Quien modera solo una categoría no las ve.
 
 ## Si algo no sale bien
 

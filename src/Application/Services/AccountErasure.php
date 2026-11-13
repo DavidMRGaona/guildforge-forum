@@ -7,8 +7,10 @@ namespace Modules\Forum\Application\Services;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\AccountEngagementStoreInterface;
+use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\MentionTextsInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Conversations\ConversationService;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 
 /**
@@ -22,6 +24,9 @@ use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
  *   already removed their notices, mail choices and muted discussions.
  * - Characters lose their description and portrait, and are retired by moderation, so nobody can
  *   use them again, not even if the account is restored. Their names stay on the posts.
+ * - Private conversations: the person leaves every one (the others read that they left, and a
+ *   conversation nobody is left in goes); their messages stay, with the anonymous name. Their
+ *   blocks (made and received), their starts and the reports they made go.
  * - Kept as moderation history: the reports their posts received, their suspensions and the log.
  * - The forum's system account is never touched from here; if the core anonymizes it, the forum
  *   makes a new one when it next needs it.
@@ -33,6 +38,8 @@ final readonly class AccountErasure
         private CharacterRepositoryInterface $characters,
         private SystemAccountInterface $systemAccount,
         private MentionTextsInterface $mentions,
+        private ConversationParticipantsInterface $participants,
+        private ConversationService $conversations,
     ) {}
 
     public function forget(string $accountId): void
@@ -42,6 +49,9 @@ final readonly class AccountErasure
         }
 
         DB::transaction(function () use ($accountId): void {
+            foreach ($this->participants->conversationsOf($accountId) as $conversationId) {
+                $this->conversations->leaveAs($accountId, $conversationId);
+            }
             $this->engagement->forget($accountId);
             $this->mentions->refreshFor($accountId);
             $this->closeCharacters($accountId, new DateTimeImmutable);

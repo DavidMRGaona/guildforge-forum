@@ -35,6 +35,8 @@ const props = defineProps<{
     canTakeExternalImages?: boolean;
     /** Whether posts of other services may be embedded (a session and services on) */
     canEmbed?: boolean;
+    /** Whether dice rolls and asides out of character are offered (not in private messages) */
+    canPlay?: boolean;
     disabled: boolean;
 }>();
 
@@ -180,21 +182,23 @@ const buttons = computed<Button[]>(() => {
         });
     }
 
-    core.push({
-        id: 'ooc',
-        label: t('forum.editor.toolbar.ooc'),
-        icon: MessageSquareDashed,
-        run: () => chain().toggleOoc().run(),
-        isActive: () => props.editor.isActive('ooc'),
-    });
+    if (props.canPlay !== false) {
+        core.push({
+            id: 'ooc',
+            label: t('forum.editor.toolbar.ooc'),
+            icon: MessageSquareDashed,
+            run: () => chain().toggleOoc().run(),
+            isActive: () => props.editor.isActive('ooc'),
+        });
 
-    core.push({
-        id: 'roll',
-        label: t('forum.editor.toolbar.roll'),
-        icon: Dices,
-        run: () => chain().insertRoll().run(),
-        isActive: () => false,
-    });
+        core.push({
+            id: 'roll',
+            label: t('forum.editor.toolbar.roll'),
+            icon: Dices,
+            run: () => chain().insertRoll().run(),
+            isActive: () => false,
+        });
+    }
 
     const extra = props.items.map((item) => ({
         id: item.id,

@@ -78,6 +78,14 @@ const props = withDefaults(
         disabled?: boolean;
         /** An error from the page (the server refused the post) */
         error?: string | null;
+        /**
+         * Text and formatting only (private messages): no dice rolls nor asides out of
+         * character, whose nodes the server refuses there. Images, mentions and embeds are off
+         * already when their endpoints are null.
+         */
+        textOnly?: boolean;
+        /** The help guide the «?» next to the send button opens */
+        helpGuide?: string;
     }>(),
     {
         modelValue: null,
@@ -98,6 +106,8 @@ const props = withDefaults(
         submitting: false,
         disabled: false,
         error: null,
+        textOnly: false,
+        helpGuide: 'forum.site.writing',
     }
 );
 
@@ -611,6 +621,7 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             :can-upload-images="uploadUrl !== null"
             :can-take-external-images="canTakeExternalImages"
             :can-embed="canEmbed"
+            :can-play="!textOnly"
             :disabled="disabled"
             @link="openLink"
             @image="chooseImage"
@@ -780,7 +791,7 @@ defineExpose({ focus, clear, clearDraft, quote, getDocument, submit });
             class="border-default flex flex-wrap items-center justify-end gap-2 border-t px-3 py-2"
         >
             <div class="mr-auto flex items-center gap-2">
-                <HelpLink guide="forum.site.writing" />
+                <HelpLink :guide="helpGuide" />
                 <span class="text-base-muted hidden text-xs sm:inline">{{
                     t('forum.editor.submit_hint')
                 }}</span>

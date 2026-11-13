@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Http\Controllers\BlocksController;
 use Modules\Forum\Http\Controllers\CategoryController;
 use Modules\Forum\Http\Controllers\CharacterController;
+use Modules\Forum\Http\Controllers\ConversationController;
+use Modules\Forum\Http\Controllers\ConversationMessageController;
+use Modules\Forum\Http\Controllers\ConversationReportController;
 use Modules\Forum\Http\Controllers\DiscussionController;
 use Modules\Forum\Http\Controllers\EmbedController;
 use Modules\Forum\Http\Controllers\ExternalImageController;
@@ -162,6 +166,63 @@ Route::prefix('foro')
             Route::post('incrustaciones', [EmbedController::class, 'store'])
                 ->middleware('throttle:30,10,forum-embeds')
                 ->name('embeds.store');
+        });
+
+        // Private conversations (forum#18). Only the people in one read it: anyone else, moderators
+        // and administrators included, gets what a missing conversation gets (404)
+        Route::middleware('auth')->prefix('conversaciones')->name('conversations.')->group(function (): void {
+            Route::get('/', [ConversationController::class, 'index'])->name('index');
+            Route::get('nueva', [ConversationController::class, 'create'])->name('create');
+            Route::get('personas', [ConversationController::class, 'people'])
+                ->middleware('throttle:60,1,forum-conversation-people')
+                ->name('people');
+            Route::post('/', [ConversationController::class, 'store'])
+                ->middleware('throttle:20,1,forum-conversation-starts')
+                ->name('store');
+            Route::get('{conversation}', [ConversationController::class, 'show'])
+                ->whereUuid('conversation')
+                ->name('show');
+            Route::post('{conversation}/mensajes', [ConversationMessageController::class, 'store'])
+                ->whereUuid('conversation')
+                ->name('messages.store');
+            Route::post('{conversation}/leido', [ConversationController::class, 'read'])
+                ->whereUuid('conversation')
+                ->middleware('throttle:120,1,forum-conversation-reads')
+                ->name('read');
+            Route::middleware('throttle:30,1,forum-conversation-people-changes')->group(function (): void {
+                Route::post('{conversation}/personas', [ConversationController::class, 'add'])
+                    ->whereUuid('conversation')
+                    ->name('participants.store');
+                Route::post('{conversation}/salir', [ConversationController::class, 'leave'])
+                    ->whereUuid('conversation')
+                    ->name('leave');
+            });
+            Route::delete('mensajes/{message}', [ConversationMessageController::class, 'destroy'])
+                ->whereUuid('message')
+                ->middleware('throttle:30,1,forum-conversation-edits')
+                ->name('messages.destroy');
+            Route::post('mensajes/{message}/denuncias', [ConversationReportController::class, 'store'])
+                ->whereUuid('message')
+                ->middleware('throttle:10,1,forum-reports')
+                ->name('reports.store');
+            // Whoever moderates the whole forum settles what was reported, from its copy
+            Route::post('denuncias/{report}/resolver', [ConversationReportController::class, 'resolve'])
+                ->whereUuid('report')
+                ->middleware('throttle:60,1,forum-moderation')
+                ->name('reports.resolve');
+        });
+
+        // Who the person does not want private messages from: listed in the profile
+        Route::middleware('auth')->group(function (): void {
+            Route::get('bloqueos', [BlocksController::class, 'index'])
+                ->middleware('throttle:60,1,forum-blocks')
+                ->name('blocks.index');
+            Route::middleware('throttle:30,1,forum-blocks-write')->group(function (): void {
+                Route::post('bloqueos', [BlocksController::class, 'store'])->name('blocks.store');
+                Route::delete('bloqueos/{account}', [BlocksController::class, 'destroy'])
+                    ->whereUuid('account')
+                    ->name('blocks.destroy');
+            });
         });
 
         // Likes, follows, characters and the forum's preferences, all JSON

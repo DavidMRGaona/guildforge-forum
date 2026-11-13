@@ -31,13 +31,17 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
+use Modules\Forum\Application\Conversations\ConversationReportService;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ReportService;
 use Modules\Forum\Application\Services\SuspensionService;
+use Modules\Forum\Domain\Entities\ConversationMessage;
+use Modules\Forum\Domain\Entities\ConversationReport;
 use Modules\Forum\Domain\Entities\ModerationLogEntry;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Entities\Suspension;
@@ -45,8 +49,12 @@ use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Enums\ReportReason;
 use Modules\Forum\Domain\Enums\ReportResolution;
+use Modules\Forum\Domain\Repositories\ConversationReportRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\ConversationReportId;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\SuspensionId;
+use Modules\Forum\Http\Presenters\ConversationPresenter;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ConversationReportModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ReportModel;
@@ -73,7 +81,10 @@ final class ForumModerationPage extends Page implements HasTable
 
     public const string TAB_HISTORY = 'history';
 
-    public const array TABS = [self::TAB_REPORTS, self::TAB_PENDING, self::TAB_SUSPENSIONS, self::TAB_HISTORY];
+    /** Reported private messages (forum#18): their copy, never the conversation */
+    public const string TAB_PRIVATE = 'private';
+
+    public const array TABS = [self::TAB_REPORTS, self::TAB_PRIVATE, self::TAB_PENDING, self::TAB_SUSPENSIONS, self::TAB_HISTORY];
 
     /** Suspensions offered from the panel, in days; null has no end */
     public const array SUSPENSION_DAYS = [1, 3, 7, 30, 90];
@@ -121,7 +132,12 @@ final class ForumModerationPage extends Page implements HasTable
 
     private static function openReports(): int
     {
-        return ReportModel::query()->whereNull('resolution')->count();
+        return ReportModel::query()->whereNull('resolution')->count() + self::openPrivateReports();
+    }
+
+    private static function openPrivateReports(): int
+    {
+        return ConversationReportModel::query()->whereNull('resolution')->count();
     }
 
     private static function pendingPosts(): int
@@ -146,7 +162,10 @@ final class ForumModerationPage extends Page implements HasTable
                 ->tabs([
                     self::TAB_REPORTS => Tab::make(__('forum::messages.moderation.tabs.reports'))
                         ->icon('heroicon-o-flag')
-                        ->badge(fn (): ?string => self::openReports() > 0 ? (string) self::openReports() : null),
+                        ->badge(fn (): ?string => self::openReports() - self::openPrivateReports() > 0 ? (string) (self::openReports() - self::openPrivateReports()) : null),
+                    self::TAB_PRIVATE => Tab::make(__('forum::messages.moderation.tabs.private'))
+                        ->icon('heroicon-o-envelope')
+                        ->badge(fn (): ?string => self::openPrivateReports() > 0 ? (string) self::openPrivateReports() : null),
                     self::TAB_PENDING => Tab::make(__('forum::messages.moderation.tabs.pending'))
                         ->icon('heroicon-o-clock')
                         ->badge(fn (): ?string => self::pendingPosts() > 0 ? (string) self::pendingPosts() : null),
@@ -179,6 +198,7 @@ final class ForumModerationPage extends Page implements HasTable
             self::TAB_PENDING => $this->pendingTable($table),
             self::TAB_SUSPENSIONS => $this->suspensionsTable($table),
             self::TAB_HISTORY => $this->historyTable($table),
+            self::TAB_PRIVATE => $this->privateReportsTable($table),
             default => $this->reportsTable($table),
         };
     }
@@ -242,6 +262,122 @@ final class ForumModerationPage extends Page implements HasTable
                         ->icon('heroicon-o-pencil-square'),
                 ]),
             ]);
+    }
+
+    /**
+     * Reported private messages, oldest first. Moderation reads the copy taken when each was
+     * reported (the message and three around it), never the conversation. Settling one settles
+     * every open report of the same message.
+     */
+    private function privateReportsTable(Table $table): Table
+    {
+        return $table
+            ->query(ConversationReportModel::query()->whereNull('resolution')->with(['messageAuthor']))
+            ->defaultSort('created_at')
+            ->emptyStateHeading(__('forum::messages.moderation.panel.empty_private'))
+            ->columns([
+                TextColumn::make('excerpt')
+                    ->label(__('forum::messages.moderation.fields.excerpt'))
+                    ->state(static fn (ConversationReportModel $record): string => Str::limit(trim(self::reportedText($record)), 140))
+                    ->placeholder(__('forum::messages.moderation.panel.private_deleted'))
+                    ->wrap(),
+                TextColumn::make('messageAuthor.name')
+                    ->label(__('forum::messages.moderation.fields.author'))
+                    ->placeholder(__('forum::messages.moderation.deleted_account'))
+                    ->visibleFrom('sm'),
+                TextColumn::make('reason')
+                    ->label(__('forum::messages.moderation.fields.reasons'))
+                    ->badge()
+                    ->formatStateUsing(static fn (string $state): string => self::label('forum::messages.reports.reasons.'.(ReportReason::tryFrom($state) ?? ReportReason::Other)->value, $state))
+                    ->visibleFrom('md'),
+                TextColumn::make('created_at')
+                    ->label(__('forum::messages.moderation.fields.reported_at'))
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->visibleFrom('xl'),
+                TextColumn::make('note')
+                    ->label(__('forum::messages.moderation.fields.notes'))
+                    ->placeholder(__('forum::messages.moderation.nobody'))
+                    ->wrap()
+                    ->visibleFrom('2xl'),
+            ])
+            ->recordActions([
+                $this->settlePrivateAction('hide_private', ReportResolution::Hidden)
+                    ->label(__('forum::messages.moderation.panel.hide_post'))
+                    ->icon('heroicon-o-eye-slash')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(static fn (ConversationReportModel $record): bool => $record->message_id !== null)
+                    ->schema([$this->reasonField(ConversationMessage::MAX_REASON_LENGTH)])
+                    ->button()
+                    ->labeledFrom('md'),
+                ActionGroup::make([
+                    RowDetailsAction::make(),
+                    Action::make('private_context')
+                        ->label(__('forum::messages.moderation.panel.private_context'))
+                        ->icon('heroicon-o-chat-bubble-left-right')
+                        ->modalHeading(__('forum::messages.moderation.panel.private_context'))
+                        ->modalDescription(__('forum::messages.moderation.panel.private_context_help'))
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel(__('forum::messages.moderation.panel.close'))
+                        ->slideOver()
+                        ->modalContent(fn (ConversationReportModel $record): HtmlString => $this->privateContext($record)),
+                    $this->settlePrivateAction('no_action_private', ReportResolution::NoAction)
+                        ->label(__('forum::messages.moderation.panel.no_action'))
+                        ->icon('heroicon-o-check'),
+                ]),
+            ]);
+    }
+
+    private function settlePrivateAction(string $name, ReportResolution $resolution): Action
+    {
+        return Action::make($name)
+            ->action(function (ConversationReportModel $record, array $data) use ($resolution): void {
+                $reason = is_string($data['reason'] ?? null) && trim($data['reason']) !== '' ? $data['reason'] : null;
+                $this->moderate(
+                    fn (): int => app(ConversationReportService::class)->resolve($this->moderator(), ConversationReportId::fromString($record->id), $resolution, $reason),
+                    __($resolution === ReportResolution::Hidden ? 'forum::messages.moderation.panel.hidden' : 'forum::messages.moderation.panel.settled'),
+                );
+            });
+    }
+
+    /**
+     * The copy as a list, every text escaped.
+     */
+    private function privateContext(ConversationReportModel $record): HtmlString
+    {
+        $report = app(ConversationReportRepositoryInterface::class)->find(ConversationReportId::fromString($record->id));
+        if (! $report instanceof ConversationReport) {
+            return new HtmlString('');
+        }
+
+        $shown = app(ConversationPresenter::class)->report($report);
+        $items = '';
+        foreach ($shown['context'] as $entry) {
+            $who = e($entry['authorName']);
+            $text = match ($entry['kind']) {
+                'added' => e(__('forum::messages.moderation.panel.private_added', ['author' => $entry['authorName'], 'name' => (string) $entry['subjectName']])),
+                'left' => e(__('forum::messages.moderation.panel.private_left', ['author' => $entry['authorName']])),
+                'deleted' => '<em>'.e(__('forum::messages.moderation.panel.private_deleted')).'</em>',
+                default => nl2br(e($entry['text'])),
+            };
+            // Plain markup: the panel theme compiles no classes from modules
+            $flag = $entry['reported'] ? '<p><strong>'.e(__('forum::messages.moderation.panel.private_reported')).'</strong></p>' : '';
+            $items .= "<li>{$flag}<p><strong>{$who}</strong> · ".e($entry['atLabel'])."</p><p>{$text}</p></li>";
+        }
+
+        return new HtmlString('<ol class="space-y-3">'.$items.'</ol>');
+    }
+
+    private static function reportedText(ConversationReportModel $record): string
+    {
+        foreach ($record->context as $entry) {
+            if (($entry['reported'] ?? false) === true) {
+                return is_string($entry['text'] ?? null) ? $entry['text'] : '';
+            }
+        }
+
+        return '';
     }
 
     /**

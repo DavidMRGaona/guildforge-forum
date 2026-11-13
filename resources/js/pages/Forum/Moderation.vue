@@ -7,21 +7,34 @@ import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import ModerationDialog, {
     type ModerationDialogFields,
 } from '../../components/moderation/ModerationDialog.vue';
+import SuspendDialog from '../../components/moderation/SuspendDialog.vue';
 import { sendJson } from '../../forum/api';
-import type { ForumPendingItem, ForumReportedItem } from '../../types/forum';
+import type {
+    ForumConversationReport,
+    ForumPendingItem,
+    ForumReportedItem,
+} from '../../types/forum';
 
 /**
  * «Moderación» in the forum: reported posts and posts awaiting approval in what the person
  * moderates. Hiding and rejecting ask first (a reason; rejecting, a box to tick); the rest
  * runs at once. Every answer reloads the lists.
  */
-defineProps<{
-    reported: ForumReportedItem[];
-    pending: ForumPendingItem[];
-}>();
+withDefaults(
+    defineProps<{
+        reported: ForumReportedItem[];
+        pending: ForumPendingItem[];
+        /** Reported private messages (their copy), for whoever moderates the whole forum */
+        privateReports?: ForumConversationReport[] | null;
+        suspendUrl?: string | null;
+    }>(),
+    { privateReports: null, suspendUrl: null }
+);
 
 type Pending =
-    { kind: 'hide'; item: ForumReportedItem } | { kind: 'reject'; item: ForumPendingItem };
+    | { kind: 'hide'; item: ForumReportedItem }
+    | { kind: 'reject'; item: ForumPendingItem }
+    | { kind: 'hidePrivate'; item: ForumConversationReport };
 
 const { t } = useI18n();
 const busy = ref<string | null>(null);
@@ -38,7 +51,7 @@ async function send(id: string, url: string, body: Record<string, unknown>): Pro
     const answer = await sendJson(url, 'POST', body);
     busy.value = null;
     if (answer.ok) {
-        router.reload({ only: ['reported', 'pending'] });
+        router.reload({ only: ['reported', 'pending', 'privateReports'] });
 
         return true;
     }
@@ -54,6 +67,18 @@ async function send(id: string, url: string, body: Record<string, unknown>): Pro
 
 function settle(item: ForumReportedItem, resolution: 'no_action' | 'edited'): void {
     void send(item.postId, item.resolveUrl, { resolution });
+}
+
+function dismissPrivate(item: ForumConversationReport): void {
+    void send(item.id, item.resolveUrl, { resolution: 'no_action' });
+}
+
+const suspending = ref<ForumConversationReport | null>(null);
+const suspendOpen = ref(false);
+
+function askSuspend(item: ForumConversationReport): void {
+    suspending.value = item;
+    suspendOpen.value = true;
 }
 
 function approve(item: ForumPendingItem): void {
@@ -73,15 +98,17 @@ async function confirm(fields: ModerationDialogFields): Promise<void> {
     }
     const reason = fields.reason === '' ? undefined : fields.reason;
     const done =
-        current.kind === 'hide'
-            ? await send(current.item.postId, current.item.resolveUrl, {
-                  resolution: 'hidden',
-                  reason,
-              })
-            : await send(current.item.postId, current.item.moderationUrl, {
-                  action: 'reject',
-                  reason,
-              });
+        current.kind === 'hidePrivate'
+            ? await send(current.item.id, current.item.resolveUrl, { resolution: 'hidden', reason })
+            : current.kind === 'hide'
+              ? await send(current.item.postId, current.item.resolveUrl, {
+                    resolution: 'hidden',
+                    reason,
+                })
+              : await send(current.item.postId, current.item.moderationUrl, {
+                    action: 'reject',
+                    reason,
+                });
     if (done) {
         dialogOpen.value = false;
         asking.value = null;
@@ -177,6 +204,116 @@ async function confirm(fields: ModerationDialogFields): Promise<void> {
             </ul>
         </section>
 
+        <section
+            v-if="privateReports !== null"
+            aria-labelledby="forum-private-reported"
+            class="space-y-4"
+        >
+            <h2 id="forum-private-reported" class="text-xl font-semibold text-base-primary">
+                {{ t('forum.conversations.moderation.title') }}
+            </h2>
+            <p class="text-sm text-base-secondary">
+                {{ t('forum.conversations.moderation.help') }}
+            </p>
+            <EmptyState
+                v-if="privateReports.length === 0"
+                icon="document"
+                :title="t('forum.conversations.moderation.empty')"
+            />
+            <ul v-else class="space-y-4">
+                <li
+                    v-for="item in privateReports"
+                    :key="item.id"
+                    class="rounded-lg border border-default bg-surface p-4"
+                    data-testid="private-reported-item"
+                >
+                    <p class="text-sm font-semibold break-words text-base-primary">
+                        {{ item.authorName }}
+                    </p>
+                    <p class="mt-1 text-xs text-base-muted">
+                        {{
+                            t('forum.conversations.moderation.reportedBy', {
+                                date: item.reportedLabel,
+                                reason: item.reason,
+                            })
+                        }}
+                    </p>
+                    <p v-if="item.note" class="mt-1 text-sm break-words text-base-secondary">
+                        {{ t('forum.conversations.moderation.note', { note: item.note }) }}
+                    </p>
+                    <p v-if="item.messageGone" class="mt-1 text-xs text-base-muted">
+                        {{ t('forum.conversations.moderation.gone') }}
+                    </p>
+                    <ol class="mt-3 space-y-2 border-l-2 border-default pl-3">
+                        <li
+                            v-for="entry in item.context"
+                            :key="entry.number"
+                            class="text-sm break-words"
+                            :class="
+                                entry.reported
+                                    ? 'rounded-md bg-primary-light p-2 text-base-primary'
+                                    : 'text-base-secondary'
+                            "
+                        >
+                            <template v-if="entry.kind === 'added'">
+                                <span class="text-xs text-base-muted">{{
+                                    t('forum.conversations.entries.added', {
+                                        author: entry.authorName,
+                                        name: entry.subjectName ?? '',
+                                    })
+                                }}</span>
+                            </template>
+                            <template v-else-if="entry.kind === 'left'">
+                                <span class="text-xs text-base-muted">{{
+                                    t('forum.conversations.entries.left', {
+                                        author: entry.authorName,
+                                    })
+                                }}</span>
+                            </template>
+                            <template v-else>
+                                <span class="block text-xs font-semibold text-base-muted"
+                                    >{{ entry.authorName }} · {{ entry.atLabel }}</span
+                                >
+                                <span
+                                    v-if="entry.kind === 'deleted'"
+                                    class="italic text-base-muted"
+                                    >{{ t('forum.conversations.moderation.deleted') }}</span
+                                >
+                                <span v-else class="whitespace-pre-line">{{ entry.text }}</span>
+                            </template>
+                        </li>
+                    </ol>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button
+                            v-if="!item.messageGone"
+                            type="button"
+                            class="inline-flex min-h-[44px] items-center rounded-md border border-default px-3 text-sm text-base-primary hover:bg-muted disabled:opacity-50"
+                            :disabled="busy === item.id"
+                            @click="ask({ kind: 'hidePrivate', item })"
+                        >
+                            {{ t('forum.conversations.moderation.hide') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex min-h-[44px] items-center rounded-md border border-default px-3 text-sm text-base-primary hover:bg-muted disabled:opacity-50"
+                            :disabled="busy === item.id"
+                            @click="dismissPrivate(item)"
+                        >
+                            {{ t('forum.conversations.moderation.dismiss') }}
+                        </button>
+                        <button
+                            v-if="suspendUrl && item.authorId"
+                            type="button"
+                            class="inline-flex min-h-[44px] items-center rounded-md border border-default px-3 text-sm text-red-600 dark:text-red-400 hover:bg-muted"
+                            @click="askSuspend(item)"
+                        >
+                            {{ t('forum.conversations.moderation.suspend') }}
+                        </button>
+                    </div>
+                </li>
+            </ul>
+        </section>
+
         <section aria-labelledby="forum-pending" class="space-y-4">
             <h2 id="forum-pending" class="text-xl font-semibold text-base-primary">
                 {{ t('forum.moderation.pendingTitle') }}
@@ -235,7 +372,9 @@ async function confirm(fields: ModerationDialogFields): Promise<void> {
         :title="
             asking?.kind === 'reject'
                 ? t('forum.moderation.post.rejectTitle')
-                : t('forum.moderation.post.hideTitle')
+                : asking?.kind === 'hidePrivate'
+                  ? t('forum.conversations.moderation.hide')
+                  : t('forum.moderation.post.hideTitle')
         "
         :message="
             asking?.kind === 'reject'
@@ -256,5 +395,13 @@ async function confirm(fields: ModerationDialogFields): Promise<void> {
         :busy="busy !== null"
         :error="dialogError"
         @confirm="confirm"
+    />
+    <SuspendDialog
+        v-if="suspendUrl"
+        v-model="suspendOpen"
+        :suspend-url="suspendUrl"
+        :user-id="suspending?.authorId ?? ''"
+        :user-name="suspending?.authorName ?? null"
+        @suspended="suspendOpen = false"
     />
 </template>

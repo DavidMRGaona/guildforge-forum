@@ -13,10 +13,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
+use Modules\Forum\Application\Conversations\ConversationReportService;
 use Modules\Forum\Application\Queries\PendingPostDTO;
 use Modules\Forum\Application\Queries\ReportedPostDTO;
 use Modules\Forum\Application\Services\ModerationQueue;
 use Modules\Forum\Domain\Enums\ReportReason;
+use Modules\Forum\Http\Presenters\ConversationPresenter;
 
 /**
  * «Moderación» in the forum (/foro/moderacion): reported posts and posts awaiting approval in
@@ -31,6 +33,8 @@ final class ModerationQueueController extends Controller
         private readonly ForumUrlsInterface $urls,
         private readonly TimezoneServiceInterface $timezone,
         private readonly SeoMetadataFactoryInterface $seo,
+        private readonly ConversationReportService $privateReports,
+        private readonly ConversationPresenter $conversations,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -69,6 +73,12 @@ final class ModerationQueueController extends Controller
                 'writtenLabel' => $this->timezone->format($row->writtenAt),
                 'moderationUrl' => route('forum.moderation.posts', ['post' => $row->postId]),
             ], $pending),
+            // Reported private messages, only for whoever moderates the whole forum: the copy taken
+            // when reported, never the conversation (forum#18)
+            'privateReports' => $this->privateReports->canSettle($user)
+                ? array_map($this->conversations->report(...), $this->privateReports->open($user, ModerationQueue::LIMIT))
+                : null,
+            'suspendUrl' => $this->privateReports->canSettle($user) ? route('forum.suspensions.store') : null,
             'seo' => $this->seo->forPage(new SeoPageDTO(title: __('forum::messages.moderation.queue_title'), noindex: true))->toArray(),
         ]);
     }

@@ -16,7 +16,7 @@ La página **Moderación del foro** (en **Comunicación**) junta lo que espera a
 
 El número junto al nombre de la página en el menú suma las denuncias abiertas y los mensajes pendientes, y el widget **Actividad del foro** del escritorio resume los últimos 30 días.
 
-Tiene cuatro pestañas, que quedan en la dirección de la página: un enlace puede abrir la que toca.
+Tiene cinco pestañas, que quedan en la dirección de la página: un enlace puede abrir la que toca.
 
 ## Denuncias
 
@@ -30,6 +30,18 @@ En el menú de la fila:
 - **Resolver como editado**, cuando ya has editado el mensaje.
 
 Ocultar o editar un mensaje denunciado también resuelve sus denuncias. La persona denunciada no sabe quién lo hizo.
+
+## Mensajes privados
+
+La moderación **no lee las conversaciones privadas**: ni desde aquí ni desde el foro se puede abrir una. Solo llega lo que alguien de la conversación denuncia. Con cada denuncia se guarda una copia del mensaje y de los tres anteriores y posteriores, tal como estaban al denunciar, y eso es lo único que se ve.
+
+Cada fila es un mensaje privado denunciado, con su autor, los **Motivos** y el comentario de quien denunció. En el menú de la fila:
+
+- **Ver la copia denunciada** abre la copia, con el mensaje denunciado marcado.
+- **Ocultar el mensaje** lo oculta para todas las personas de la conversación (pide un motivo, que solo ve su autor) y resuelve sus denuncias.
+- **Resolver sin acción** cierra las denuncias sin tocar el mensaje.
+
+Si quien escribió el mensaje lo borra, o la conversación desaparece porque todos han salido, la copia sigue aquí. Para suspender a su autor, usa **Suspender**, arriba. Lo mismo se hace desde la página **Moderación** del foro. Solo quien modera todo el foro ve estas denuncias: los moderadores de una categoría no, porque una conversación no es de ninguna categoría.
 
 ## Pendientes
 
@@ -59,7 +71,7 @@ Se hace desde el foro, no desde esta página: mira la guía de moderar desde el 
 
 ## Avisos de moderación
 
-- Quien modera recibe un aviso cuando alguien denuncia un mensaje que le toca revisar: por correo solo la primera denuncia de cada mensaje, y en la campana agrupadas por mensaje. Se elige en el tipo **Denuncias de mensajes** de **Avisos**, en su perfil.
+- Quien modera recibe un aviso cuando alguien denuncia un mensaje que le toca revisar: por correo solo la primera denuncia de cada mensaje, y en la campana agrupadas por mensaje. Se elige en el tipo **Denuncias de mensajes** de **Avisos**, en su perfil. Las denuncias de mensajes privados avisan a quien modera todo el foro, sin decir quién lo escribió ni qué dice.
 - El autor recibe aviso cuando se aprueba su mensaje o tema, y cuando se le suspende o se levanta la suspensión.
 
 ## Si algo no sale bien

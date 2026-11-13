@@ -5,11 +5,13 @@ import { MessagesSquare } from '@lucide/vue';
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { useVerificationGate } from '@/composables/useVerificationGate';
 import { sendJson } from '../../forum/api';
+import ForumBlocks from './ForumBlocks.vue';
 import type { ForumPreferences } from '../../types/forum';
 
 /**
  * The «Foro» tab of the profile: whether starting or replying to a discussion follows it, and
- * the categories and discussions the person follows, each with «Dejar de seguir».
+ * the categories and discussions the person follows, each with «Dejar de seguir», and the
+ * people the person blocked from private messages.
  */
 const { t } = useI18n();
 const gate = useVerificationGate();
@@ -208,6 +210,8 @@ onMounted(() => {
                     </li>
                 </ul>
             </div>
+
+            <ForumBlocks />
 
             <a
                 :href="preferences.forumUrl"

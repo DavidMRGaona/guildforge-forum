@@ -312,5 +312,17 @@ final class AccountErasureTest extends ModuleTestCase
             'id' => (string) Str::uuid(), 'post_id' => $this->othersPost->id()->value, 'reporter_id' => $id,
             'reason' => 'spam', 'created_at' => '2026-11-11 10:00:00',
         ]);
+
+        // Private conversations (forum#18): one with someone else, a start, blocks both ways and a report
+        $someone = UserModel::factory()->create();
+        $conversation = (string) Str::uuid();
+        DB::table('forum_conversations')->insert(['id' => $conversation, 'title' => 'Privada', 'last_number' => 1, 'last_message_number' => 1, 'last_activity_at' => '2026-11-11 10:00:00', 'created_at' => '2026-11-11 10:00:00', 'updated_at' => '2026-11-11 10:00:00']);
+        foreach ([$id, $someone->id] as $participant) {
+            DB::table('forum_conversation_participants')->insert(['conversation_id' => $conversation, 'user_id' => $participant, 'read_through' => 1, 'joined_at' => '2026-11-11 10:00:00']);
+        }
+        DB::table('forum_conversation_starts')->insert(['id' => (string) Str::uuid(), 'user_id' => $id, 'created_at' => '2026-11-11 10:00:00']);
+        DB::table('forum_user_blocks')->insert(['blocker_user_id' => $id, 'blocked_user_id' => $someone->id, 'created_at' => '2026-11-11 10:00:00']);
+        DB::table('forum_user_blocks')->insert(['blocker_user_id' => $someone->id, 'blocked_user_id' => $id, 'created_at' => '2026-11-11 10:00:00']);
+        DB::table('forum_conversation_reports')->insert(['id' => (string) Str::uuid(), 'reporter_id' => $id, 'reason' => 'spam', 'context' => '[]', 'created_at' => '2026-11-11 10:00:00']);
     }
 }

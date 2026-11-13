@@ -13,6 +13,7 @@ function aPost(character: ForumPostCharacter | null): ForumPost {
         status: 'visible',
         html: '<p>Hola</p>',
         placeholder: null,
+        quoteText: null,
         publishedAt: '2026-11-12T10:00:00+01:00',
         publishedLabel: '12/11/2026 10:00',
         editedAt: null,

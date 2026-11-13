@@ -323,6 +323,9 @@ final readonly class ForumPresenter
                 'status' => $post->status()->value,
                 'html' => $content->html,
                 'placeholder' => $content->placeholder,
+                // What a quotation of the whole post is checked against: its rendered text also
+                // holds the labels of rolls, asides and embeds. Only for a post shown as it is
+                'quoteText' => $post->status() === PostStatus::Visible && $content->html !== null ? $post->body()->plainText : null,
                 'publishedAt' => $this->timezone->iso($published),
                 'publishedLabel' => $this->timezone->format($published),
                 'editedAt' => $this->timezone->iso($post->editedAt()),

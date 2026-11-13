@@ -17,6 +17,7 @@ function aPost(number: number): ForumPost {
         status: 'visible',
         html: `<p>Mensaje ${number}</p>`,
         placeholder: null,
+        quoteText: null,
         publishedAt: '2026-11-10T10:00:00+01:00',
         publishedLabel: '10/11/2026 10:00',
         editedAt: null,

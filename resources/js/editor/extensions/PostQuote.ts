@@ -75,3 +75,15 @@ export function paragraphsFromText(text: string): JSONContent[] {
         .filter((line) => /\S/u.test(line))
         .map((line) => ({ type: 'paragraph', content: [{ type: 'text', text: line }] }));
 }
+
+/** Letters and digits only, in lower case: what the server compares when it checks a quotation */
+function words(text: string): string {
+    return text.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
+}
+
+/** Whether the server takes `quoted` as words of a post whose plain text is `postText` */
+export function quoteFits(postText: string, quoted: string): boolean {
+    const wanted = words(quoted);
+
+    return wanted !== '' && words(postText).includes(wanted);
+}

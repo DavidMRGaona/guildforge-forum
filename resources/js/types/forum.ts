@@ -129,6 +129,8 @@ export interface ForumPost {
     status: ForumPostStatus;
     html: string | null;
     placeholder: string | null;
+    /** The post's stored plain text, which a quotation of it is checked against; null unless visible */
+    quoteText: string | null;
     publishedAt: string | null;
     publishedLabel: string;
     editedAt: string | null;

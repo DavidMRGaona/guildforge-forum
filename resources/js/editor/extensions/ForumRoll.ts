@@ -3,13 +3,13 @@ import type { Attributes, Editor, KeyboardShortcutCommand, RawCommands } from '@
 import type { DOMOutputSpec, TagParseRule } from '@tiptap/pm/model';
 import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import RollNodeView from '../RollNodeView.vue';
-import { rollFromShortcut, type RollText } from '../rollText';
+import { rollFromShortcut, type RollShortcut } from '../rollText';
 
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
         forumRoll: {
             /** Adds a roll to fill in, below the block the cursor is in */
-            insertRoll: (roll?: Partial<RollText>) => ReturnType;
+            insertRoll: (roll?: Partial<RollShortcut>) => ReturnType;
         };
     }
 }
@@ -18,7 +18,10 @@ declare module '@tiptap/core' {
  * A dice roll. The node holds the expression and the reason the person wrote and, once the
  * server has thrown it, the id of the throw: never a result (the server throws the dice when
  * the post is published and keeps the throw apart). Copying a roll never copies its id, so a
- * copy is a new roll.
+ * copy is a new roll; a copy of a hidden roll is hidden too.
+ *
+ * `hidden` asks for a hidden roll. Only a new roll's counts: the server keeps a thrown roll as it
+ * was thrown, so the editor locks it once the roll has an id.
  */
 export const ForumRoll = Node.create({
     name: 'roll',
@@ -48,6 +51,12 @@ export const ForumRoll = Node.create({
                 default: null,
                 parseHTML: () => null,
                 renderHTML: () => ({}),
+            },
+            hidden: {
+                default: false,
+                parseHTML: (element: HTMLElement) => element.hasAttribute('data-hidden'),
+                renderHTML: (attributes: Record<string, unknown>) =>
+                    attributes['hidden'] === true ? { 'data-hidden': '' } : {},
             },
         };
     },
@@ -90,6 +99,7 @@ export const ForumRoll = Node.create({
                                             ? null
                                             : roll.reason,
                                     rollId: null,
+                                    hidden: roll?.hidden === true,
                                 },
                             },
                             { type: 'paragraph' },
@@ -100,7 +110,7 @@ export const ForumRoll = Node.create({
 
     addKeyboardShortcuts(): Record<string, KeyboardShortcutCommand> {
         return {
-            // «/tirada 2d6+3 Ataque» then Enter becomes a roll
+            // «/tirada 2d6+3 Ataque» (or «/tirada oculta …») then Enter becomes a roll
             Enter: ({ editor }) => turnShortcutIntoRoll(editor, this.name),
         };
     },
@@ -131,6 +141,7 @@ function turnShortcutIntoRoll(editor: Editor, nodeName: string): boolean {
                     expression: roll.expression,
                     reason: roll.reason === '' ? null : roll.reason,
                     rollId: null,
+                    hidden: roll.hidden,
                 },
             },
             ...(isLast ? [{ type: 'paragraph' }] : []),

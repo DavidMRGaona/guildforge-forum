@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Services;
 
 use Carbon\CarbonImmutable;
-use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;

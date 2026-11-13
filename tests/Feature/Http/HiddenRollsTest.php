@@ -8,11 +8,11 @@ use App\Application\Publications\DTOs\PublicationDTO;
 use App\Application\Publications\DTOs\PublicationRosterDTO;
 use App\Application\Publications\Enums\PublicationState;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
-use App\Application\Search\Contracts\SearchIndexWriterInterface;
 use App\Application\Services\UserServiceInterface;
 use App\Application\SiteNotifications\Services\SiteNotificationServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Search\Index\NullSearchIndexWriter;
+use App\Infrastructure\Search\Index\SearchIndexWriterInterface;
 use App\Infrastructure\Search\Persistence\Eloquent\Models\SearchDocumentModel;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -597,7 +597,6 @@ final class HiddenRollsTest extends ModuleTestCase
         $this->assertIsArray($data);
         $this->assertIsArray($data['props']);
 
-        /** @var array<string, mixed> */
         return $data['props'];
     }
 

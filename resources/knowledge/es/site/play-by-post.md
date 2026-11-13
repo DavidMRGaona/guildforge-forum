@@ -27,7 +27,7 @@ Un aparte se ve con borde discontinuo, fondo apagado y el rótulo **Fuera de per
 
 ## Tiradas de dados
 
-Las tiradas se hacen en el servidor y nadie puede elegir el resultado. Mira la guía de tiradas de dados para ver todas las expresiones.
+Las tiradas se hacen en el servidor y nadie puede elegir el resultado. Una tirada puede ser **oculta**: solo ven el resultado quien tira, la moderación y la dirección de la campaña, hasta que se revela. Mira la guía de tiradas de dados para ver todas las expresiones.
 
 ## Personajes
 

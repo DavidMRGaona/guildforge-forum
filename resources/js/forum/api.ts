@@ -115,6 +115,11 @@ export function subjectConversationUrl(subjectType: string, subjectId: string): 
     return `/foro/fichas/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectId)}`;
 }
 
+/** Where a hidden roll is revealed, for good (RollController::reveal) */
+export function revealRollUrl(rollId: string): string {
+    return `/foro/tiradas/${encodeURIComponent(rollId)}/revelar`;
+}
+
 /** The posts of a discussion after the number (LiveUpdatesController::posts) */
 export function discussionUpdatesUrl(discussionId: string, after: number): string {
     return `/foro/temas/${encodeURIComponent(discussionId)}/novedades?despues=${after}`;

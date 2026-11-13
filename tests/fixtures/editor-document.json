@@ -208,7 +208,8 @@
             "attrs": {
                 "expression": "2d6+3",
                 "reason": "Ataque",
-                "rollId": null
+                "rollId": null,
+                "hidden": false
             }
         },
         {

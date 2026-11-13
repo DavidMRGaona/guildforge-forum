@@ -190,10 +190,12 @@ export function sanitizeContent(node: JSONContent): JSONContent | null {
             : null;
     }
 
-    // A roll that is pasted or converted is a new one: its expression and reason, never an id or a result
+    // A roll that is pasted or converted is a new one: its expression and reason, never an id or a
+    // result; a copy of a hidden roll stays hidden
     if (node.type === 'roll') {
         const expression: unknown = node.attrs?.['expression'];
         const reason: unknown = node.attrs?.['reason'];
+        const hidden: unknown = node.attrs?.['hidden'];
 
         return {
             type: 'roll',
@@ -207,6 +209,7 @@ export function sanitizeContent(node: JSONContent): JSONContent | null {
                         ? reason.slice(0, MAX_REASON_LENGTH)
                         : null,
                 rollId: null,
+                hidden: hidden === true,
             },
         };
     }

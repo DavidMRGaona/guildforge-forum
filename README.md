@@ -416,8 +416,9 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 ## Panel
 
 - **Categorías del foro**: en *Comunicación* (hueco 30), con `forum:categories.manage`. Se ordenan arrastrando las filas. Las que dependen de un módulo que falta salen marcadas y no se ofrecen como madre ni como destino (ver [Depende de otros módulos](#depende-de-otros-módulos)). Al borrar una categoría con temas, hay que elegir antes a qué categoría pasan, y marcar una casilla para confirmarlo. En la sección *Moderación* se eligen sus roles moderadores, su aprobación previa y si es de solo lectura.
-- **Moderación del foro**: en *Comunicación* (hueco 35), con `forum:forum.moderate`. El número del menú suma denuncias abiertas y mensajes pendientes. Cuatro pestañas (`?pestana=`):
+- **Moderación del foro**: en *Comunicación* (hueco 35), con `forum:forum.moderate`. El número del menú suma denuncias abiertas y mensajes pendientes. Cinco pestañas (`?pestana=`):
   - *Denuncias*: las abiertas, lo más antiguo primero. «Ocultar el mensaje» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro», «Resolver sin acción» y «Resolver como editado».
+  - *Mensajes privados*: las denuncias abiertas de mensajes privados, solo para quien modera todo el foro. Muestra el mensaje, su autor, los motivos y el comentario; la moderación no abre la conversación. En el menú ⋯, «Ver detalles», «Ver la copia denunciada» (el mensaje y los tres anteriores y posteriores, tal como estaban al denunciar) y «Resolver sin acción»; «Ocultar el mensaje» a la vista.
   - *Pendientes*: lo que espera aprobación, lo más antiguo primero. «Aprobar» a la vista; en el menú ⋯, «Ver detalles», «Abrir en el foro» y «Rechazar», que pide un motivo opcional y marcar una casilla.
   - *Suspensiones*: las que están en vigor primero, con «Levantar». La acción «Suspender» de la cabecera elige a la persona, el motivo y la duración (1, 3, 7, 30 o 90 días, o sin fecha de fin).
   - *Historial*: el historial de moderación, lo más nuevo primero, con filtro por acción. Solo se lee.

@@ -68,8 +68,13 @@ async function split(fields: ModerationDialogFields): Promise<void> {
         class="fixed inset-x-0 bottom-0 z-40 border-t border-default bg-surface shadow-lg"
         data-testid="split-bar"
     >
+        <!--
+            Room at the left for a floating button fixed in the bottom left corner (cookie
+            consent's, 1rem from the edge and 3rem wide): from lg the centred column clears it
+        -->
         <div
-            class="mx-auto flex max-w-4xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+            class="mx-auto flex max-w-4xl flex-col gap-2 py-3 pr-4 pl-20 sm:flex-row sm:items-center sm:justify-between sm:pr-6 lg:pr-8 lg:pl-8"
+            data-testid="split-bar-content"
         >
             <p class="text-sm text-base-primary" aria-live="polite">
                 {{ t('forum.moderation.discussion.splitChosen', numbers.length) }}

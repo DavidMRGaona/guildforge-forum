@@ -28,6 +28,7 @@ enum ModerationAction: string
     case ReportResolved = 'report_resolved';
     case UserSuspended = 'user_suspended';
     case SuspensionLifted = 'suspension_lifted';
+    case TitleChanged = 'title_changed';
     case CharacterEdited = 'character_edited';
     case CharacterRetired = 'character_retired';
     case CharacterRestored = 'character_restored';

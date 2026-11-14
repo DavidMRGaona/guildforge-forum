@@ -30,6 +30,7 @@ use Modules\Forum\Http\Controllers\ReportController;
 use Modules\Forum\Http\Controllers\RollController;
 use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
+use Modules\Forum\Http\Controllers\MemberTitleController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 use Modules\Forum\Http\Middleware\EnsureForumIsVisible;
 
@@ -149,6 +150,7 @@ Route::prefix('foro')
                 Route::post('mensajes/{post}/denuncias/resolver', [ReportController::class, 'resolve'])
                     ->whereUuid('post')
                     ->name('reports.resolve');
+                Route::post('titulos', [MemberTitleController::class, 'store'])->name('titles.store');
                 Route::post('suspensiones', [SuspensionController::class, 'store'])->name('suspensions.store');
                 Route::delete('suspensiones/{suspension}', [SuspensionController::class, 'destroy'])
                     ->whereUuid('suspension')

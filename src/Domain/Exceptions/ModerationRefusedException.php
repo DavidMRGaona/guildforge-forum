@@ -62,6 +62,11 @@ final class ModerationRefusedException extends RuntimeException
         return new self("Discussion {$discussionId} is awaiting approval: approve or reject its first post.", 'awaiting_approval');
     }
 
+    public static function notTitleable(string $id): self
+    {
+        return new self("{$id} cannot take a forum title.", 'not_titleable');
+    }
+
     public static function notSuspendable(string $id): self
     {
         return new self("{$id} cannot be suspended in the forum.", 'not_suspendable');

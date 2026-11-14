@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Forum\Notifications;
 
 use App\Application\Mail\DTOs\MailCategoryDTO;
+use Closure;
+use Modules\Forum\Application\Services\ForumVisibility;
 
 /**
  * The forum's mail categories, in the «Foro» section of the profile. Their keys are stored with
@@ -56,6 +58,7 @@ final class ForumMailCategories
                 label: 'forum::messages.notices.categories.suspensions.label',
                 description: 'forum::messages.notices.categories.suspensions.description',
                 reason: 'forum::messages.notices.categories.suspensions.reason',
+                audience: self::audience(),
                 icon: 'users',
                 site: true,
             ),
@@ -71,10 +74,21 @@ final class ForumMailCategories
             section: self::SECTION,
             label: "forum::messages.notices.categories.{$name}.label",
             description: "forum::messages.notices.categories.{$name}.description",
+            audience: self::audience(),
             icon: 'users',
             digestible: $digestible,
             site: true,
             mail: $mail,
         );
+    }
+
+    /**
+     * Listed in the profile only to whoever sees the forum: a preview hides it from everyone else.
+     *
+     * @return Closure(object): bool
+     */
+    private static function audience(): Closure
+    {
+        return static fn (object $user): bool => app(ForumVisibility::class)->isVisibleTo($user);
     }
 }

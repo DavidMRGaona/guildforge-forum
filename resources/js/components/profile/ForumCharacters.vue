@@ -10,6 +10,9 @@ import ModerationDialog from '../moderation/ModerationDialog.vue';
 import { sendJson } from '../../forum/api';
 import type { ForumCharacterProfile, ForumOwnedCharacter } from '../../types/forum';
 
+// The page hands the forum's visibility to the tab (its visibleKey): declared, so it is not an attribute
+defineProps<{ forumVisible?: boolean }>();
+
 /**
  * The «Personajes» tab of the profile: the person's characters, to create, change, retire,
  * bring back and delete. One with posts is retired instead of deleted, and its posts keep

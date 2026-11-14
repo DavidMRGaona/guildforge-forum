@@ -8,7 +8,7 @@ order: 50
 keywords: [incrustar, incrustación, vídeo, youtube, vimeo, twitch, reddit, instagram, tiktok, bluesky, x, twitter, tarjeta, cookies, consentimiento, privacidad, cargar contenido]
 related: [forum.site.writing, forum.site.images, forum.site.external-images]
 conditions:
-  capabilities: [forum.embeds_enabled]
+  capabilities: [forum.visible, forum.embeds_enabled]
 ---
 Puedes poner en un mensaje un vídeo o una publicación de otro servicio. En el foro se ve como una **tarjeta** con su título, y el contenido del servicio solo se carga cuando quien lee lo pide.
 

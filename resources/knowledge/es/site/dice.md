@@ -7,6 +7,8 @@ audience: site
 order: 80
 keywords: [dados, tirada, tirar, d20, d6, 2d6, d%, dF, fate, reserva, éxitos, mantener, descartar, explotar, explosión, ventaja, desventaja, kh, kl, dh, dl, resultado, trampas, aleatorio, expresión, oculta, ocultas, secreta, pantalla, revelar, dirección]
 related: [forum.site.play-by-post, forum.site.characters, forum.site.writing]
+conditions:
+  capabilities: [forum.visible]
 ---
 Puedes tirar dados dentro de un mensaje. El foro tira los dados al publicar, en el servidor, y guarda el resultado: nadie, tampoco quien escribe, puede elegirlo ni repetir la tirada.
 

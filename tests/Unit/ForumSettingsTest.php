@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Unit;
 
+use Modules\Forum\Domain\Enums\ForumAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
@@ -171,5 +172,36 @@ final class ForumSettingsTest extends TestCase
 
         config(['modules.settings.forum' => ['subject_conversations' => 'reply']]);
         $this->assertSame(SubjectConversationMode::Hidden, (new ForumSettings)->subjectConversationMode('event'));
+    }
+
+    public function test_the_forum_is_open_only_when_the_site_says_so(): void
+    {
+        config(['modules.settings.forum' => ['access' => 'open']]);
+        $this->assertSame(ForumAccessMode::Open, (new ForumSettings)->access());
+
+        config(['modules.settings.forum' => ['access' => 'preview']]);
+        $this->assertSame(ForumAccessMode::Preview, (new ForumSettings)->access());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function unreadableAccess(): iterable
+    {
+        yield 'missing' => [[]];
+        yield 'unknown' => [['access' => 'everyone']];
+        yield 'a list' => [['access' => ['open']]];
+        yield 'a number' => [['access' => 1]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    #[DataProvider('unreadableAccess')]
+    public function test_a_missing_or_unreadable_access_is_a_preview(array $stored): void
+    {
+        config(['modules.settings.forum' => $stored]);
+
+        $this->assertSame(ForumAccessMode::Preview, (new ForumSettings)->access());
     }
 }

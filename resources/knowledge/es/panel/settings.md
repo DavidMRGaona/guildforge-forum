@@ -1,11 +1,11 @@
 ---
 id: forum.panel.settings
 title: Ajustes del foro
-summary: Tamaños de página, límites de publicación, conversación en las fichas, imágenes, incrustaciones con cookies, avisos de temas nuevos y personajes.
+summary: Acceso al foro, tamaños de página, límites de publicación, conversación en las fichas, imágenes, incrustaciones con cookies, avisos de temas nuevos y personajes.
 category: content
 audience: panel
 order: 180
-keywords: [ajustes del foro, configuración del foro, temas por página, mensajes por página, mensajes por minuto, temas por hora, conversación en las fichas, comentarios en eventos, solo lectura, imágenes, formatos, peso máximo, sitios permitidos, imgur, incrustaciones, youtube, vimeo, cookies, categoría de cookies, consentimiento, avisos de temas nuevos, telegram, personajes, quién puede tener personajes]
+keywords: [ajustes del foro, configuración del foro, acceso al foro, vista previa, abrir el foro, ocultar el foro, temas por página, mensajes por página, mensajes por minuto, temas por hora, conversación en las fichas, comentarios en eventos, solo lectura, imágenes, formatos, peso máximo, sitios permitidos, imgur, incrustaciones, youtube, vimeo, cookies, categoría de cookies, consentimiento, avisos de temas nuevos, telegram, personajes, quién puede tener personajes]
 related: [forum.panel.categories, forum.panel.permissions, forum.site.images, forum.site.external-images, forum.site.embeds, forum.site.characters]
 conditions:
   permissions:
@@ -14,6 +14,13 @@ conditions:
 Los ajustes del foro están en **Sistema** → **Configuración** → **Foro**. Cada campo muestra debajo su rango. Se guardan con **Guardar** y valen para todo el foro.
 
 [[action:filament.admin.configuracion.pages.forum-settings|Abrir los ajustes del foro]]
+
+## Acceso al foro
+
+- **Solo vista previa**: el foro solo lo ve quien tenga el permiso **Ver el foro en vista previa**; la administración siempre. Para el resto no existe: no hay enlace en el menú, sus páginas no se abren, las fichas no muestran la conversación, no se anuncian temas nuevos y no se envían avisos. Es como empieza el foro, para prepararlo antes de abrirlo.
+- **Abierto a todo el sitio**: cada categoría decide quién la ve y quién escribe en ella.
+
+Al cambiarlo, el enlace **Foro** del menú se ajusta solo: en vista previa lo ve quien tenga el permiso, y al abrir el foro vuelve a mostrarse como estaba.
 
 ## Listas y publicación
 
@@ -63,4 +70,5 @@ Al activar un servicio, el sitio autoriza a sus reproductores en la política de
 - **Un campo no deja guardar**: cada uno muestra su rango; corrige el que esté marcado en rojo.
 - **Un servicio aparece pero no carga su contenido**: revisa su **Categoría de cookies** y que el banner de cookies tenga esa categoría.
 - **Una ficha no muestra la conversación**: revisa el valor de su tipo en **Conversación en las fichas**. Tampoco sale si la ficha aún no tiene tema en el foro o si quien la mira no puede leer su categoría.
+- **Alguien no ve el foro**: si el acceso está en **Solo vista previa**, dale el permiso **Ver el foro en vista previa** o abre el foro.
 - **No veo estos ajustes**: hace falta el permiso **Configurar el foro**.

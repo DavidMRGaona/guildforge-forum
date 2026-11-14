@@ -18,6 +18,7 @@ use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumMailSubjects;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -58,6 +59,11 @@ final class SpaceOpenedNotification extends Notification implements HasMailCateg
 
     public function shouldSend(object $notifiable, string $channel): bool
     {
+        // Whoever may not see a forum in preview hears nothing from it
+        if (! app(ForumVisibility::class)->isVisibleTo($notifiable)) {
+            return false;
+        }
+
         return $this->openSpaceFor($notifiable) instanceof Category;
     }
 

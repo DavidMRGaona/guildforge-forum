@@ -7,6 +7,7 @@ namespace Modules\Forum\Infrastructure\Services;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
+use Modules\Forum\Domain\Enums\ForumAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
@@ -187,6 +188,14 @@ final readonly class ForumSettings implements ForumSettingsInterface
 
         // Shown only when the site chose how: an unknown value hides it rather than opening a reply box
         return is_string($mode) ? (SubjectConversationMode::tryFrom($mode) ?? SubjectConversationMode::Hidden) : SubjectConversationMode::Hidden;
+    }
+
+    public function access(): ForumAccessMode
+    {
+        $stored = config('modules.settings.forum.access');
+
+        // Missing or unknown: a preview rather than open to everyone
+        return is_string($stored) ? (ForumAccessMode::tryFrom($stored) ?? ForumAccessMode::Preview) : ForumAccessMode::Preview;
     }
 
     private function pageSize(string $key): int

@@ -43,6 +43,9 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="LOG_CHANNEL" value="null"/>
+        <!-- The forum starts as a preview on a site; the tests start it open, and the preview
+             has tests of its own -->
+        <env name="FORUM_ACCESS_DEFAULT" value="open"/>
         <ini name="memory_limit" value="512M"/>
     </php>
 </phpunit>

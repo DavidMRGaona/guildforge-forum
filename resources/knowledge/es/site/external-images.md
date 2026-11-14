@@ -8,6 +8,7 @@ order: 40
 keywords: [imagen externa, imagen de otro sitio, enlace de imagen, imgur, url de imagen, dirección de la imagen, copiar imagen, hotlink]
 related: [forum.site.images, forum.site.writing, forum.site.embeds]
 conditions:
+  capabilities: [forum.visible]
   permissions:
     all: ['forum:posts.external_images']
 ---

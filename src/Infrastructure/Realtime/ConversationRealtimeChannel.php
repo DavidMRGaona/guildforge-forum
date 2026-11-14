@@ -10,6 +10,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Conversations\ConversationAccess;
 use Modules\Forum\Application\Realtime\ForumChannels;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\ValueObjects\ConversationId;
 
 /**
@@ -36,6 +37,8 @@ final readonly class ConversationRealtimeChannel implements RealtimeChannelInter
             return false;
         }
 
-        return $this->container->make(ConversationAccess::class)->canRead($user, ConversationId::fromString($id)) === true;
+        // A forum in preview has no private messages for whoever may not see it
+        return $this->container->make(ForumVisibility::class)->isVisibleTo($user)
+            && $this->container->make(ConversationAccess::class)->canRead($user, ConversationId::fromString($id)) === true;
     }
 }

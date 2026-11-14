@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useAuth } from '@/composables/useAuth';
 import { useMenuBadges } from '@/composables/useMenuBadges';
 import { useForumPulse } from '../../composables/useForumPulse';
+import { useForumVisibility } from '../../composables/useForumVisibility';
 import { ACCOUNT_EVENTS, accountChannel, useChannelFeed } from '../../live/channels';
 import { PULSE_UNREAD_CAP, livePulse } from '../../live/transports';
 
@@ -19,16 +20,19 @@ const MENU_KEY = 'forum:forum.index';
 const { t } = useI18n();
 const { isAuthenticated, user } = useAuth();
 const { setBadge, clearBadge } = useMenuBadges();
+// A forum in preview the person may not see has no menu link to mark: nothing is asked
+const forumVisible = useForumVisibility();
+const listening = computed(() => isAuthenticated.value && forumVisible.value);
 
 // The person's own channel says when to ask; without real time it asks every minute
 const own = useChannelFeed(() => {
     const id = user.value?.id;
 
-    return typeof id === 'string' && id !== '' ? accountChannel(id) : null;
+    return forumVisible.value && typeof id === 'string' && id !== '' ? accountChannel(id) : null;
 }, ACCOUNT_EVENTS);
 const { unreadFollowed, unreadConversations } = useForumPulse({
     transport: livePulse(own),
-    enabled: isAuthenticated,
+    enabled: listening,
 });
 
 /** «2 temas», «muchos temas» */

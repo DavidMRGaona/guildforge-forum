@@ -7,6 +7,7 @@ namespace Modules\Forum\Infrastructure\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
@@ -26,11 +27,13 @@ final class CategoryForumAccess implements ForumAccessInterface
     public function __construct(
         private readonly CategoryRepositoryInterface $repository,
         private readonly CategoryAccessPolicy $policy,
+        private readonly ForumVisibility $visibility,
     ) {}
 
     public function canRead(?Authenticatable $user, Discussion $discussion): bool
     {
-        $category = $this->categoryOf($discussion);
+        // A forum in preview is nothing to whoever may not see it, hidden discussions included
+        $category = $this->visibility->isVisibleTo($user) ? $this->categoryOf($discussion) : null;
         if (! $category instanceof Category) {
             return false;
         }

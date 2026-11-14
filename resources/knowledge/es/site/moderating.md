@@ -8,7 +8,7 @@ order: 120
 keywords: [moderar, moderación, mensajes privados denunciados, fijar, cerrar tema, mover tema, ocultar, mostrar, renombrar, borrar tema, separar mensajes, unir temas, aprobar, rechazar, suspender, denuncias, menú moderar, cola de moderación]
 related: [forum.site.overview, forum.panel.moderation]
 conditions:
-  capabilities: [forum.moderates]
+  capabilities: [forum.visible, forum.moderates]
 ---
 Quien modera el foro, o solo una categoría, tiene en cada tema y en cada mensaje un menú **Moderar**. Aquí está lo que hace cada opción. Solo ves lo que te toca: una categoría concreta si solo moderas esa y sus subcategorías.
 

@@ -7,6 +7,8 @@ audience: site
 order: 10
 keywords: [foro, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, al momento, escribiendo, quién escribe, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
 related: [forum.site.writing, forum.site.notices, forum.site.play-by-post, forum.site.private-messages]
+conditions:
+  capabilities: [forum.visible]
 ---
 El foro de {{site_name}} es el sitio para conversar con el resto de la comunidad. Esta guía explica cómo está organizado y cómo seguir lo que te interesa sin perder el hilo.
 

@@ -18,6 +18,7 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Services\ForumBrowser;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Entities\Report;
@@ -59,6 +60,11 @@ final class PostReportedNotification extends Notification implements HasMailCate
 
     public function shouldSend(object $notifiable, string $channel): bool
     {
+        // Whoever may not see a forum in preview hears nothing from it
+        if (! app(ForumVisibility::class)->isVisibleTo($notifiable)) {
+            return false;
+        }
+
         $context = $this->contextFor($notifiable);
         if ($context === null) {
             return false;

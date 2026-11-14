@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Contracts;
 
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
+use Modules\Forum\Domain\Enums\ForumAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 
@@ -82,4 +83,7 @@ interface ForumSettingsInterface
      * the site never chose (one a later module brings) and for anything unreadable.
      */
     public function subjectConversationMode(string $type): SubjectConversationMode;
+
+    /** Who sees the forum on the site; a preview when missing or unreadable */
+    public function access(): ForumAccessMode;
 }

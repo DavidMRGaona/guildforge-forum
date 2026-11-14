@@ -17,6 +17,7 @@ use Illuminate\Notifications\Notification;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Services\ForumMailSubjects;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\Entities\Conversation;
 use Modules\Forum\Domain\Repositories\ConversationRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\ConversationId;
@@ -66,6 +67,11 @@ abstract class ConversationNotification extends Notification implements HasMailC
 
     public function shouldSend(object $notifiable, string $channel): bool
     {
+        // Whoever may not see a forum in preview hears nothing from it
+        if (! app(ForumVisibility::class)->isVisibleTo($notifiable)) {
+            return false;
+        }
+
         $conversation = $this->conversation();
         $recipientId = $this->idOf($notifiable);
         if (! $conversation instanceof Conversation || $recipientId === null || $recipientId === strtolower($this->actorId)) {

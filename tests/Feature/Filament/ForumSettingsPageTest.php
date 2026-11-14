@@ -6,14 +6,18 @@ namespace Modules\Forum\Tests\Feature\Filament;
 
 use App\Application\Modules\Services\ModuleSettingsStoreInterface;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
+use App\Domain\Navigation\Enums\MenuVisibility;
 use App\Filament\Clusters\SettingsCluster;
 use App\Filament\Pages\KnowledgeBasePage;
+use App\Infrastructure\Navigation\Persistence\Eloquent\Models\MenuItemModel;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Filament\Forms\Components\CheckboxList;
 use Livewire\Livewire;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
+use Modules\Forum\Database\Seeders\ForumMenuLinkSeeder;
+use Modules\Forum\Domain\Enums\ForumAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
@@ -228,6 +232,40 @@ final class ForumSettingsPageTest extends ModuleTestCase
             ->set('data.subject_conversations.event', 'everything')
             ->call('save')
             ->assertHasErrors(['data.subject_conversations.event']);
+    }
+
+    public function test_the_forum_starts_as_a_preview_and_opening_it_shows_the_menu_link_to_everyone(): void
+    {
+        app(ModuleSettingsStoreInterface::class)->store('forum', ['access' => 'preview']);
+        config(['modules.settings.forum.access' => 'preview']);
+        (new ForumMenuLinkSeeder)->run();
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->assertSet('data.access', 'preview')
+            ->set('data.access', 'open')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(ForumAccessMode::Open, app(ForumSettingsInterface::class)->access());
+        $this->assertSame(MenuVisibility::Public, MenuItemModel::query()->where('route', ForumMenuLinkSeeder::ROUTE)->sole()->visibility);
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.access', 'preview')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(MenuVisibility::Permission, MenuItemModel::query()->where('route', ForumMenuLinkSeeder::ROUTE)->sole()->visibility);
+    }
+
+    public function test_an_unknown_access_is_refused(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.access', 'everyone')
+            ->call('save')
+            ->assertHasErrors(['data.access']);
     }
 
     public function test_saving_is_refused_without_the_permission(): void

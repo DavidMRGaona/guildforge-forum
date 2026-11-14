@@ -9,6 +9,9 @@ import ChoiceMark from '../forms/ChoiceMark.vue';
 import ForumBlocks from './ForumBlocks.vue';
 import type { ForumPreferences } from '../../types/forum';
 
+// The page hands the forum's visibility to the tab (its visibleKey): declared, so it is not an attribute
+defineProps<{ forumVisible?: boolean }>();
+
 /**
  * The «Foro» tab of the profile: whether starting or replying to a discussion follows it, and
  * the categories and discussions the person follows, each with «Dejar de seguir», and the

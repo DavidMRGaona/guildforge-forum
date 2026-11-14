@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Domain\Entities\ConversationReport;
 use Modules\Forum\Domain\Repositories\ConversationReportRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\ConversationMessageId;
@@ -52,6 +53,11 @@ final class ConversationReportedNotification extends Notification implements Has
 
     public function shouldSend(object $notifiable, string $channel): bool
     {
+        // Whoever may not see a forum in preview hears nothing from it
+        if (! app(ForumVisibility::class)->isVisibleTo($notifiable)) {
+            return false;
+        }
+
         $report = $this->report();
         if (! $report instanceof ConversationReport || ! $report->isOpen() || ! $notifiable instanceof Authenticatable) {
             return false;

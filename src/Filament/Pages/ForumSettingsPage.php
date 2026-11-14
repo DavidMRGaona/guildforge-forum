@@ -29,7 +29,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumMenuLink;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
+use Modules\Forum\Domain\Enums\ForumAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
@@ -104,6 +106,18 @@ final class ForumSettingsPage extends Page implements HasForms
     {
         return $schema
             ->components([
+                Section::make(__('forum::messages.settings.access_section'))
+                    ->description(__('forum::messages.settings.access_section_help'))
+                    ->schema([
+                        Select::make('access')
+                            ->label(__('forum::messages.settings.access'))
+                            ->options($this->accessOptions())
+                            ->native(false)
+                            ->selectablePlaceholder(false)
+                            ->required()
+                            ->in(array_keys($this->accessOptions()))
+                            ->default(ForumAccessMode::Preview->value),
+                    ]),
                 Section::make(__('forum::messages.settings.lists'))
                     ->schema([
                         $this->pageSizeField('discussions_per_page'),
@@ -250,7 +264,7 @@ final class ForumSettingsPage extends Page implements HasForms
             ->statePath('data');
     }
 
-    public function save(ModuleManagerServiceInterface $moduleManager, ModuleSettingsStoreInterface $settingsStore): void
+    public function save(ModuleManagerServiceInterface $moduleManager, ModuleSettingsStoreInterface $settingsStore, ForumMenuLink $menuLink): void
     {
         // Livewire methods can be called without the page's button
         abort_unless(self::canAccess(), 403);
@@ -264,6 +278,8 @@ final class ForumSettingsPage extends Page implements HasForms
             is_array($state['subject_conversations'] ?? null) ? $state['subject_conversations'] : [],
         );
         $moduleManager->updateSettings(new ModuleName('forum'), array_merge($stored, $state));
+        // The menu link follows the access at once
+        $menuLink->applyAccess();
 
         Notification::make()
             ->title(__('forum::messages.settings.saved'))
@@ -298,6 +314,19 @@ final class ForumSettingsPage extends Page implements HasForms
     {
         $options = [];
         foreach (CharacterAccessMode::cases() as $mode) {
+            $options[$mode->value] = $mode->label();
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function accessOptions(): array
+    {
+        $options = [];
+        foreach (ForumAccessMode::cases() as $mode) {
             $options[$mode->value] = $mode->label();
         }
 

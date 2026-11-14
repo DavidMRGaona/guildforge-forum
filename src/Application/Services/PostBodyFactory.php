@@ -47,7 +47,7 @@ final readonly class PostBodyFactory
     public function fromInput(mixed $raw, Authenticatable $author, ?PostBody $previous = null, ?DiscussionId $discussionId = null): PostBody
     {
         // What is stored is the document with its numbers turned into references, checked again
-        $document = $this->schema->validate($this->references->link($this->schema->validate($raw)->toArray(), $discussionId));
+        $document = $this->schema->validate($this->references->link($this->schema->validate($raw)->toArray(), $discussionId, $author));
 
         $this->externalImages->assertAllowed($document, $author, $previous);
         $this->embeds->assertAllowed($document, $previous);

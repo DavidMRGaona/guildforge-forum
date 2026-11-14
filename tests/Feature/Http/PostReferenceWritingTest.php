@@ -129,6 +129,19 @@ final class PostReferenceWritingTest extends ModuleTestCase
         $this->assertSame($this->doc([$this->text('Hola '), $this->reference($this->first->id()->value)]), $this->bodyOf($mine->id()->value));
     }
 
+    public function test_editing_a_post_of_a_discussion_one_cannot_read_tells_nothing_about_its_posts(): void
+    {
+        $role = RoleModel::query()->create(['name' => 'keepers', 'display_name' => 'Keepers']);
+        [$private, $privateFirst] = $this->aDiscussion($this->aCategoryFor(CategoryAudience::roles([$role->id]), 'privada'));
+        $this->aReply($private, '2026-11-10 19:00:00');
+
+        // With a number of a post that exists there and without one: the same answer
+        foreach (['Hola #2', 'Hola'] as $text) {
+            $this->actingAs($this->author)->patchJson($this->updateUrl($privateFirst), ['document' => self::doc([self::text($text)])])
+                ->assertNotFound();
+        }
+    }
+
     public function test_without_a_discussion_numbers_stay_text(): void
     {
         // A new discussion's first post has nothing to point at yet (DiscussionStarter gives no discussion)

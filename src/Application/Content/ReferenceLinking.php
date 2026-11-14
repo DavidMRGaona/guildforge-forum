@@ -22,7 +22,8 @@ use Modules\Forum\Application\Content\Nodes\PostReferenceNode;
  */
 final class ReferenceLinking
 {
-    private const string NUMBER = '/#([1-9]\d{0,9})/u';
+    /** A «#N» that is a word of its own inside a run; its edges are checked against the runs next to it */
+    private const string NUMBER = '/(?<![\p{L}\p{N}\/#])#([1-9]\d{0,9})(?![\p{L}\p{N}])/u';
 
     /** Text with these marks keeps its words */
     private const array LITERAL_MARKS = ['code', 'link'];
@@ -64,8 +65,15 @@ final class ReferenceLinking
 
         $children = self::children($node);
         foreach ($children as $index => $child) {
+            // Only as many numbers as may become references are looked up
+            if (count($numbers) >= DocumentLimits::MAX_REFERENCES) {
+                return;
+            }
             if (self::isConvertibleText($child)) {
                 foreach (self::matches($children, $index) as [, , $number]) {
+                    if (count($numbers) >= DocumentLimits::MAX_REFERENCES) {
+                        break;
+                    }
                     $numbers[$number] = true;
                 }
             } else {
@@ -131,12 +139,16 @@ final class ReferenceLinking
             return [];
         }
 
+        // Inside the run the pattern already looked around each number; only a number at the
+        // run's start or end is checked against the run next to it
         $matches = [];
+        $length = strlen($text);
         foreach ($found[0] as $i => [$whole, $start]) {
-            $before = $start === 0 ? self::lastCharacterOf($siblings[$index - 1] ?? null) : mb_substr(substr($text, 0, $start), -1);
             $end = $start + strlen($whole);
-            $after = $end === strlen($text) ? self::firstCharacterOf($siblings[$index + 1] ?? null) : mb_substr(substr($text, $end), 0, 1);
-            if (preg_match('/[\p{L}\p{N}\/#]/u', $before) === 1 || preg_match('/[\p{L}\p{N}]/u', $after) === 1) {
+            if ($start === 0 && preg_match('/[\p{L}\p{N}\/#]/u', self::lastCharacterOf($siblings[$index - 1] ?? null)) === 1) {
+                continue;
+            }
+            if ($end === $length && preg_match('/[\p{L}\p{N}]/u', self::firstCharacterOf($siblings[$index + 1] ?? null)) === 1) {
                 continue;
             }
             $matches[] = [$start, strlen($whole), (int) $found[1][$i][0]];

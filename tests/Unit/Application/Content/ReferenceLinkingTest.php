@@ -160,6 +160,28 @@ final class ReferenceLinkingTest extends TestCase
         $this->assertSame([], $this->asked);
     }
 
+    public function test_at_most_the_limit_of_numbers_is_looked_up(): void
+    {
+        $text = implode(' ', array_map(static fn (int $number): string => '#'.$number, range(1, 100)));
+
+        $this->link(self::doc([self::paragraph([self::text($text)])]));
+
+        $this->assertSame([range(1, DocumentLimits::MAX_REFERENCES)], $this->asked);
+    }
+
+    public function test_a_long_text_full_of_numbers_takes_linear_time(): void
+    {
+        // About as long as a post may be: copying what comes before each number would take minutes
+        $text = str_repeat('#3 ', 80_000);
+        $started = microtime(true);
+
+        $linked = $this->link(self::doc([self::paragraph([self::text($text)])]));
+
+        $this->assertLessThan(2.0, microtime(true) - $started);
+        // 30 references, the spaces between them, and the rest of the text as it was
+        $this->assertCount(DocumentLimits::MAX_REFERENCES * 2, $linked['content'][0]['content']);
+    }
+
     public function test_only_up_to_the_limit_are_converted(): void
     {
         $text = implode(' ', array_map(static fn (int $number): string => '#'.$number, range(1, DocumentLimits::MAX_REFERENCES + 1)));

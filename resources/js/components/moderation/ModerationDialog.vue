@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { FormCheckbox, FormSelect } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import { categoryTreeOptions } from '../../forum/categoryOptions';
 import type { ForumMoveTarget } from '../../types/forum';
 
 export interface ModerationDialogFields {
@@ -72,12 +73,7 @@ const confirmed = ref(false);
 const uid = Math.random().toString(36).slice(2, 10);
 
 const asksMove = computed(() => props.moveTargets.length > 0);
-const categoryOptions = computed(() =>
-    props.moveTargets.map((target) => ({
-        value: target.id,
-        label: target.parentName ? `${target.parentName} › ${target.name}` : target.name,
-    }))
-);
+const categoryOptions = computed(() => categoryTreeOptions(props.moveTargets));
 
 function chooseCategory(value: string | number | null): void {
     category.value = value === null ? '' : String(value);

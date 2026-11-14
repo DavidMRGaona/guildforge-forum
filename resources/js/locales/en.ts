@@ -515,6 +515,10 @@ export default {
                 anyCategory: 'Any category',
                 categoryHelp:
                     'Tied to a category, it is offered only there and in its subcategories, and only whoever reads it sees it.',
+                pausedCategory: '{name} (paused)',
+                pausedUnknownCategory: 'Category you cannot read (paused)',
+                pausedHelp:
+                    'This character is paused. Choose another category or "Any category" to use it again.',
                 create: 'Create character',
                 save: 'Save changes',
             },
@@ -565,6 +569,15 @@ export default {
                 retiredByModeration: 'Retired by moderation',
                 tiedElsewhere: 'Tied to a category',
                 anyCategory: 'Any category',
+                pausedBadge: 'Paused',
+                paused: {
+                    left_campaign:
+                        'You are no longer in this campaign. It comes back if you rejoin.',
+                    campaign_gone: 'The campaign is no longer available.',
+                    no_access: 'You can no longer read its category.',
+                    category_gone: 'Its category no longer exists.',
+                },
+                pausedHint: 'It is not offered when writing. Edit it to change its category.',
                 edit: 'Edit',
                 editLabel: 'Edit {name}',
                 retire: 'Retire',

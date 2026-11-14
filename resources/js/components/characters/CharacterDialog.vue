@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { FormSelect } from '@/components/form';
+import { FormSelect, type SelectOption } from '@/components/form';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import CharacterAvatar from './CharacterAvatar.vue';
 import { sendForm } from '../../forum/api';
+import { categoryTreeOptions } from '../../forum/categoryOptions';
 import type { ForumCharacterForm, ForumPostCharacter } from '../../types/forum';
 
 /** What the form starts from when it changes a character */
@@ -12,6 +13,10 @@ export interface CharacterDialogStart {
     name: string;
     description: string | null;
     categoryId: string | null;
+    /** Name of the category it is tied to, when its owner may still see it */
+    categoryName?: string | null;
+    /** Tied to a category it cannot be used in now (forum#108) */
+    paused?: boolean;
     initials: string;
     portraitUrl: string | null;
     updateUrl: string;
@@ -52,11 +57,25 @@ const name = ref('');
 const description = ref('');
 const categoryId = ref('');
 
-const categoryOptions = computed(() =>
-    props.form.categories.map((category) => ({
-        value: category.id,
-        label: category.parentName ? `${category.parentName} › ${category.name}` : category.name,
-    }))
+const categoryOptions = computed<SelectOption[]>(() => {
+    const options = categoryTreeOptions(props.form.categories);
+    const current = props.start?.categoryId ?? null;
+    // A paused character keeps its category, which is no longer offered: show it, not pickable
+    if (current !== null && !options.some((option) => option.value === current)) {
+        options.push({
+            value: current,
+            label: props.start?.categoryName
+                ? t('forum.characters.form.pausedCategory', { name: props.start.categoryName })
+                : t('forum.characters.form.pausedUnknownCategory'),
+            disabled: true,
+        });
+    }
+
+    return options;
+});
+
+const showsPausedHelp = computed(
+    () => props.start?.paused === true && categoryId.value === (props.start.categoryId ?? '')
 );
 
 function chooseCategory(value: string | number | null): void {
@@ -366,7 +385,11 @@ async function submit(): Promise<void> {
                         @update:model-value="chooseCategory"
                     />
                     <p :id="`character-category-help-${uid}`" class="mt-1 text-xs text-base-muted">
-                        {{ t('forum.characters.form.categoryHelp') }}
+                        {{
+                            showsPausedHelp
+                                ? t('forum.characters.form.pausedHelp')
+                                : t('forum.characters.form.categoryHelp')
+                        }}
                     </p>
                     <p v-if="fieldErrors.category" class="mt-1 text-xs text-red-600">
                         {{ fieldErrors.category }}

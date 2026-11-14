@@ -489,10 +489,19 @@ export interface ForumCharacterPicker extends ForumCharacterForm {
 }
 
 /** A character in its owner's «Personajes» tab */
+/**
+ * Whether a character can be used where it is tied (forum#108, forum#109): every value but
+ * `free` and `active` means paused, and says why.
+ */
+export type ForumCharacterBinding =
+    'free' | 'active' | 'left_campaign' | 'campaign_gone' | 'no_access' | 'category_gone';
+
 export interface ForumOwnedCharacter extends ForumCharacterBasics {
     description: string | null;
     categoryId: string | null;
+    /** Shown while active, or paused by a campaign its owner was in; null otherwise */
     categoryName: string | null;
+    binding: ForumCharacterBinding;
     isRetired: boolean;
     isRetirementLocked: boolean;
     retiredLabel: string | null;

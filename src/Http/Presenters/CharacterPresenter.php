@@ -14,8 +14,10 @@ use Modules\Forum\Application\Services\CharacterService;
 use Modules\Forum\Application\Services\PostSpeakers;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
+use Modules\Forum\Domain\Enums\CharacterBinding;
 use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Exceptions\ForumActionDeniedException;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Http\Requests\SaveCharacterRequest;
@@ -34,6 +36,7 @@ final readonly class CharacterPresenter
         private PostSpeakers $speakers,
         private ForumSettingsInterface $settings,
         private TimezoneServiceInterface $timezone,
+        private CategoryRepositoryInterface $categories,
     ) {}
 
     /**
@@ -62,18 +65,13 @@ final readonly class CharacterPresenter
     {
         $characters = $this->service->ownedBy($owner);
         $categories = $this->rules->bindableCategories($owner);
-        $names = [];
-        foreach ($categories as $category) {
-            $names[$category->id()->value] = $category->name();
-        }
         $withPosts = array_flip($this->service->idsWithPosts($characters));
 
         return [
             'items' => array_map(fn (Character $character): array => [
                 ...$this->basics($character),
                 'description' => $character->description(),
-                'categoryId' => $character->categoryId()?->value,
-                'categoryName' => ($id = $character->categoryId()) instanceof CategoryId ? ($names[$id->value] ?? null) : null,
+                ...$this->tie($owner, $character),
                 'isRetired' => $character->isRetired(),
                 'isRetirementLocked' => $character->isRetirementLocked(),
                 'retiredLabel' => $character->retiredAt() instanceof \DateTimeImmutable ? $this->timezone->format($character->retiredAt()) : null,
@@ -228,9 +226,19 @@ final readonly class CharacterPresenter
      */
     private function form(Authenticatable $user, array $categories): array
     {
+        // A subcategory names its parent even when the parent is not offered (forum#108)
         $names = [];
         foreach ($categories as $category) {
             $names[$category->id()->value] = $category->name();
+        }
+        foreach ($categories as $category) {
+            $parentId = $category->parentId();
+            if ($parentId instanceof CategoryId && ! isset($names[$parentId->value])) {
+                $parent = $this->categories->find($parentId);
+                if ($parent instanceof Category) {
+                    $names[$parentId->value] = $parent->name();
+                }
+            }
         }
 
         return [
@@ -248,6 +256,25 @@ final readonly class CharacterPresenter
                 'portraitTypes' => array_map(static fn (PostImageType $type): string => $type->mimeType(), $this->settings->imageTypes()),
                 'perAccount' => CharacterService::MAX_PER_ACCOUNT,
             ],
+        ];
+    }
+
+    /**
+     * Where a character of the profile tab is tied and whether it can be used there
+     * (forum#108, forum#109). A paused one keeps its category; its name shows while the owner
+     * was in that campaign, never for a category they may no longer read.
+     *
+     * @return array{categoryId: string|null, categoryName: string|null, binding: string}
+     */
+    private function tie(Authenticatable $owner, Character $character): array
+    {
+        $binding = $this->rules->binding($owner, $character);
+        $named = in_array($binding, [CharacterBinding::Active, CharacterBinding::LeftCampaign, CharacterBinding::CampaignGone], true);
+
+        return [
+            'categoryId' => $character->categoryId()?->value,
+            'categoryName' => $named ? $this->rules->boundCategory($character)?->name() : null,
+            'binding' => $binding->value,
         ];
     }
 

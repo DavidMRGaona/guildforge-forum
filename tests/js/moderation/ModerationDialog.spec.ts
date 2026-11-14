@@ -95,7 +95,11 @@ describe('ModerationDialog', () => {
         expect(document.body.querySelector('select')).toBeNull();
         const select = wrapper.getComponent(FormSelect);
         expect(select.props('placeholder')).toBe('Elige una categoría');
-        expect(select.props('options')).toEqual([{ value: 'c-1', label: 'General › Dudas' }]);
+        // A subcategory goes under its category, which is not a target here (forum#108)
+        expect(select.props('options')).toEqual([
+            { value: 'parent:name:General', label: 'General', disabled: true },
+            { value: 'c-1', label: 'Dudas', level: 1 },
+        ]);
         expect(field('moderation-submit').disabled).toBe(true);
 
         select.vm.$emit('update:modelValue', 'c-1');

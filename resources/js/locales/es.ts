@@ -518,6 +518,10 @@ export default {
                 anyCategory: 'Cualquier categoría',
                 categoryHelp:
                     'Atado a una categoría, solo se ofrece allí y en sus subcategorías, y solo lo ve quien puede leerla.',
+                pausedCategory: '{name} (en pausa)',
+                pausedUnknownCategory: 'Categoría sin acceso (en pausa)',
+                pausedHelp:
+                    'Este personaje está en pausa. Elige otra categoría o «Cualquier categoría» para volver a usarlo.',
                 create: 'Crear personaje',
                 save: 'Guardar cambios',
             },
@@ -568,6 +572,15 @@ export default {
                 retiredByModeration: 'Retirado por la moderación',
                 tiedElsewhere: 'Atado a una categoría',
                 anyCategory: 'Cualquier categoría',
+                pausedBadge: 'En pausa',
+                paused: {
+                    left_campaign:
+                        'Ya no estás en esta campaña. Vuelve a estar disponible si regresas.',
+                    campaign_gone: 'La campaña ya no está disponible.',
+                    no_access: 'Ya no tienes acceso a su categoría.',
+                    category_gone: 'Su categoría ya no existe.',
+                },
+                pausedHint: 'No se ofrece al escribir. Edítalo para cambiarlo de categoría.',
                 edit: 'Editar',
                 editLabel: 'Editar a {name}',
                 retire: 'Retirar',

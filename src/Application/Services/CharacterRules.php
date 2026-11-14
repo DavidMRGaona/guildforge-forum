@@ -10,6 +10,8 @@ use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
+use Modules\Forum\Domain\Enums\CharacterBinding;
+use Modules\Forum\Domain\Enums\SpaceStanding;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Throwable;
@@ -23,6 +25,10 @@ use Throwable;
  *   suspended in the forum may not. Their owner may always list, retire and delete their own.
  * - A character tied to a category is offered only in it and in its subcategories, and only
  *   whoever reads that category sees it (its posts show their account to anyone else).
+ * - A campaign's space takes characters only of its roster (players and directors), whoever
+ *   moderates the whole forum included; they write there, but play nowhere they are not in
+ *   (forum#108). A character tied to a space its owner left, to a campaign that is gone or to a
+ *   deleted category stays tied and paused (binding()), and comes back on its own.
  * - A shared character (a PNJ) belongs to a campaign's space, not to an account: whoever directs
  *   the campaign (the publication's leaders, asked every time) creates, changes, retires and
  *   writes as it, and only there; once they stop directing they can do none of it and what they
@@ -153,15 +159,46 @@ final readonly class CharacterRules
 
         $inside = $category->id()->equals($boundId) || $category->parentId()?->equals($boundId) === true;
 
-        return $inside && $this->decide(function () use ($user, $character): bool {
-            $bound = $this->boundCategory($character);
-
-            return $bound instanceof Category && $this->policy->canView($user, $bound);
-        });
+        return $inside && $this->binding($user, $character) === CharacterBinding::Active;
     }
 
     /**
-     * The categories the person may tie a character to: those they may write in.
+     * Whether the owner may use a character where it is tied (forum#108, forum#109): tied to
+     * nothing, tied to a category they still read (to a campaign's space, only while in its
+     * roster), or paused, and why. It fails closed: anything that cannot be read pauses it.
+     */
+    public function binding(Authenticatable $owner, Character $character): CharacterBinding
+    {
+        if (! $character->categoryId() instanceof CategoryId) {
+            return CharacterBinding::Free;
+        }
+
+        try {
+            $bound = $this->boundCategory($character);
+            if (! $bound instanceof Category) {
+                return CharacterBinding::CategoryGone;
+            }
+
+            $standing = $this->policy->spaceStanding($owner, $bound);
+            if ($standing === SpaceStanding::Gone || ($standing instanceof SpaceStanding && ! $this->policy->isAvailable($bound))) {
+                return CharacterBinding::CampaignGone;
+            }
+
+            if ($standing === SpaceStanding::Outside) {
+                return CharacterBinding::LeftCampaign;
+            }
+
+            return $this->policy->canView($owner, $bound) ? CharacterBinding::Active : CharacterBinding::NoAccess;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return CharacterBinding::NoAccess;
+        }
+    }
+
+    /**
+     * The categories the person may tie a character to: those they may write in, and a
+     * campaign's space only while they are in its roster.
      *
      * @return list<Category>
      */
@@ -169,11 +206,15 @@ final readonly class CharacterRules
     {
         return $this->decideList(fn (): array => array_values(array_filter(
             $this->categories->all(),
-            fn (Category $category): bool => $this->policy->canWrite($user, $category),
+            fn (Category $category): bool => $this->policy->canWrite($user, $category)
+                && in_array($this->policy->spaceStanding($user, $category), [null, SpaceStanding::Member], true),
         )));
     }
 
-    private function boundCategory(Character $character): ?Category
+    /**
+     * The category a character is tied to, if it still exists.
+     */
+    public function boundCategory(Character $character): ?Category
     {
         $id = $character->categoryId();
 

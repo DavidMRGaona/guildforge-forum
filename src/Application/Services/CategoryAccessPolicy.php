@@ -17,6 +17,7 @@ use Modules\Forum\Application\Publications\PublicationAvailability;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\Enums\RosterScope;
+use Modules\Forum\Domain\Enums\SpaceStanding;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
@@ -140,6 +141,38 @@ final class CategoryAccessPolicy
                 && $this->reads($user, $category)
                 && $this->inRoster($user, $subject, RosterScope::Leaders);
         });
+    }
+
+    /**
+     * Where the user stands in a campaign's space (forum#108): in its roster (players and
+     * directors) or outside it, or the campaign gives no roster any more. Null for a category
+     * that is no campaign's space. Whoever moderates the whole forum stands where their roster
+     * puts them, like anyone else. A roster that cannot be read (reported) counts as gone.
+     */
+    public function spaceStanding(?Authenticatable $user, Category $category): ?SpaceStanding
+    {
+        $subject = $category->subject();
+        if (! $subject instanceof CategorySubject || $subject->type !== CampaignSpaceSync::TYPE) {
+            return null;
+        }
+
+        try {
+            $roster = $this->roster($subject);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return SpaceStanding::Gone;
+        }
+
+        if (! $roster instanceof PublicationRosterDTO) {
+            return SpaceStanding::Gone;
+        }
+
+        $userId = $user?->getAuthIdentifier();
+
+        return is_string($userId) && in_array(strtolower($userId), [...$roster->memberIds, ...$roster->leaderIds], true)
+            ? SpaceStanding::Member
+            : SpaceStanding::Outside;
     }
 
     /**

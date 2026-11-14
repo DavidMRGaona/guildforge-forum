@@ -137,4 +137,32 @@ describe('CharacterDialog', () => {
         expect(document.body.querySelector('[data-testid="character-category"]')).toBeNull();
         expect(field<HTMLInputElement>('character-name').value).toBe('Arwen');
     });
+
+    it('keeps the category of a paused character, shown but not pickable (forum#108)', async () => {
+        const wrapper = await opened({
+            start: {
+                name: 'Paul',
+                description: null,
+                categoryId: 'arrakis',
+                categoryName: 'La caída de Arrakis',
+                paused: true,
+                initials: 'P',
+                portraitUrl: null,
+                updateUrl: '/foro/personajes/c1',
+            },
+        });
+
+        const select = wrapper.getComponent(FormSelect);
+        expect(select.props('modelValue')).toBe('arrakis');
+        expect(select.props('options')).toContainEqual({
+            value: 'arrakis',
+            label: 'La caída de Arrakis (en pausa)',
+            disabled: true,
+        });
+        expect(document.body.textContent).toContain('Este personaje está en pausa.');
+
+        select.vm.$emit('update:modelValue', 'campanas');
+        await nextTick();
+        expect(document.body.textContent).not.toContain('Este personaje está en pausa.');
+    });
 });

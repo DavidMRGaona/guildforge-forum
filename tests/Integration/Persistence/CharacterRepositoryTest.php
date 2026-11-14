@@ -102,14 +102,15 @@ final class CharacterRepositoryTest extends ModuleTestCase
         $this->assertNull($this->characters->find($boromir->id()));
     }
 
-    public function test_deleting_the_category_a_character_is_tied_to_ties_it_to_none(): void
+    public function test_deleting_the_category_a_character_is_tied_to_keeps_it_tied(): void
     {
         $category = $this->aCategory('campanas');
         $character = $this->aCharacterOf($this->owner, boundTo: $category);
 
         app(CategoryRepositoryInterface::class)->delete($category->id());
 
-        $this->assertNull($this->characters->findOrFail($character->id())->categoryId());
+        // Untying it would make it usable anywhere: it stays tied and paused (forum#109)
+        $this->assertSame($category->id()->value, $this->characters->findOrFail($character->id())->categoryId()?->value);
     }
 
     public function test_a_shared_character_has_no_owner_and_is_listed_with_its_space(): void

@@ -46,11 +46,17 @@ const start = computed<CharacterDialogStart | null>(() =>
               name: editing.value.name,
               description: editing.value.description,
               categoryId: editing.value.categoryId,
+              categoryName: editing.value.categoryName,
+              paused: isPaused(editing.value),
               initials: editing.value.initials,
               portraitUrl: editing.value.portraitUrl,
               updateUrl: editing.value.actions.updateUrl,
           }
 );
+
+function isPaused(character: ForumOwnedCharacter): boolean {
+    return character.binding !== 'free' && character.binding !== 'active';
+}
 
 async function load(): Promise<void> {
     state.value = 'loading';
@@ -221,7 +227,20 @@ onMounted(() => {
                                     }}
                                 </span>
                                 <span
-                                    class="rounded-full bg-primary-light px-2 py-0.5 font-medium text-primary"
+                                    v-if="isPaused(character)"
+                                    class="rounded-full bg-warning-light px-2 py-0.5 font-medium text-warning"
+                                    data-testid="character-paused"
+                                >
+                                    {{ t('forum.characters.profile.pausedBadge') }}
+                                </span>
+                                <span
+                                    v-if="!isPaused(character) || character.categoryName"
+                                    class="rounded-full px-2 py-0.5 font-medium"
+                                    :class="
+                                        isPaused(character)
+                                            ? 'bg-muted text-base-secondary line-through'
+                                            : 'bg-primary-light text-primary'
+                                    "
                                 >
                                     {{
                                         character.categoryName ??
@@ -230,6 +249,14 @@ onMounted(() => {
                                             : t('forum.characters.profile.anyCategory'))
                                     }}
                                 </span>
+                            </p>
+                            <p
+                                v-if="isPaused(character)"
+                                class="mt-2 text-sm text-base-secondary"
+                                data-testid="character-paused-reason"
+                            >
+                                {{ t(`forum.characters.profile.paused.${character.binding}`) }}
+                                {{ t('forum.characters.profile.pausedHint') }}
                             </p>
                             <p
                                 v-if="character.description"

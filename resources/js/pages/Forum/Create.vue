@@ -9,6 +9,7 @@ import SpeakAsSelect from '../../components/characters/SpeakAsSelect.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import { sendJson } from '../../forum/api';
+import { categoryTreeOptions } from '../../forum/categoryOptions';
 import type {
     ForumCategoryOption,
     ForumEditorSettings,
@@ -52,13 +53,7 @@ const selected = computed(
 const canModerate = computed(() => selected.value?.canModerate === true);
 const topicsFull = computed(() => chosenTopics.value.length >= props.limits.topicsMax);
 
-function categoryLabel(category: ForumCategoryOption): string {
-    return category.parentName ? `${category.parentName} › ${category.name}` : category.name;
-}
-
-const categoryOptions = computed(() =>
-    props.categories.map((category) => ({ value: category.id, label: categoryLabel(category) }))
-);
+const categoryOptions = computed(() => categoryTreeOptions(props.categories));
 
 function chooseCategory(value: string | number | null): void {
     categoryId.value = value === null ? '' : String(value);

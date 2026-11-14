@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { Search } from '@lucide/vue';
-import { FormSelect } from '@/components/form';
+import { FormSelect, type SelectOption } from '@/components/form';
 import type { ForumSearchCategoryOption } from '../../types/forum';
 
 /**
@@ -41,10 +41,12 @@ watch(
 
 const prefix = props.idPrefix ?? 'forum-search';
 
-const categoryOptions = computed(() =>
+// Subcategories under their category, as a tree (forum#108)
+const categoryOptions = computed<SelectOption[]>(() =>
     (props.categories ?? []).map((option) => ({
         value: option.slug,
-        label: option.depth > 0 ? `— ${option.name}` : option.name,
+        label: option.name,
+        level: option.depth > 0 ? 1 : 0,
     }))
 );
 

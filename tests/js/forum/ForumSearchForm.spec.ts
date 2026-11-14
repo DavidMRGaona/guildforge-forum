@@ -60,8 +60,8 @@ describe('ForumSearchForm', () => {
         expect(select.props('id')).toBe('forum-search-category');
         expect(select.props('placeholder')).toBe('Todas las categorías');
         expect(select.props('options')).toEqual([
-            { value: 'general', label: 'General' },
-            { value: 'rol', label: '— Rol' },
+            { value: 'general', label: 'General', level: 0 },
+            { value: 'rol', label: 'Rol', level: 1 },
         ]);
     });
 

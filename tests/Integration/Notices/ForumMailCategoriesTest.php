@@ -79,7 +79,9 @@ final class ForumMailCategoriesTest extends ModuleTestCase
         $this->assertNotNull($slot);
         $this->assertSame('profile-sections', $slot->slot);
         $this->assertSame('components/profile/ForumPreferences.vue', $slot->component);
-        $this->assertSame([], $slot->dataKeys);
+        // It loads its own data: the page only hands it whether the forum is visible (its visibleKey)
+        $this->assertSame(['forumVisible'], $slot->dataKeys);
+        $this->assertSame('forumVisible', $slot->profileTab['visibleKey'] ?? null);
         $this->assertFileExists(dirname(__DIR__, 3).'/resources/js/'.$slot->component);
     }
 }

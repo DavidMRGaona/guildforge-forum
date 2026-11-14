@@ -1,21 +1,22 @@
 ---
 id: forum.panel.permissions
 title: Permisos del foro
-summary: Los seis permisos del foro, qué permite cada uno y cómo repartirlos entre roles.
+summary: Los siete permisos del foro, qué permite cada uno y cómo repartirlos entre roles.
 category: content
 audience: panel
 order: 160
-keywords: [permisos del foro, moderar todo el foro, gestionar categorías, configurar el foro, subir imágenes, imágenes de otros sitios, personajes, roles, equipo de moderación, rol de moderador, quién modera, permiso]
+keywords: [permisos del foro, moderar todo el foro, vista previa, ver el foro en vista previa, gestionar categorías, configurar el foro, subir imágenes, imágenes de otros sitios, personajes, roles, equipo de moderación, rol de moderador, quién modera, permiso]
 related: [forum.panel.categories, forum.panel.moderation, forum.panel.settings, core.panel.roles-and-permissions]
 conditions:
   permissions:
     any: ['roles.create', 'roles.update']
 ---
-El foro trae seis permisos. Ninguno se da a un rol por defecto: cada asociación los reparte entre los roles que crea (un equipo de moderación, quien lleva el foro…). La administración los tiene todos. Se marcan en el editor de roles, en la pestaña **Foro**.
+El foro trae siete permisos. Ninguno se da a un rol por defecto: cada asociación los reparte entre los roles que crea (un equipo de moderación, quien lleva el foro…). La administración los tiene todos. Se marcan en el editor de roles, en la pestaña **Foro**.
 
 | Permiso | Qué permite |
 |---------|-------------|
 | **Moderar todo el foro** | Ocultar, aprobar, mover, cerrar y fijar temas y mensajes en cualquier categoría; suspender; usar la página de moderación del panel. |
+| **Ver el foro en vista previa** | Entrar en el foro mientras su acceso está en **Solo vista previa**. Sin él, el foro no aparece en el sitio hasta que se abra. |
 | **Gestionar las categorías del foro** | Crear, editar, ordenar y borrar categorías, y decidir quién ve, escribe y modera en cada una. |
 | **Configurar el foro** | Cambiar los ajustes del foro. |
 | **Subir imágenes al foro** | Añadir imágenes a los mensajes, con los formatos y límites de los ajustes. |

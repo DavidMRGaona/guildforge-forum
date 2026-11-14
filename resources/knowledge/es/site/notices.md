@@ -7,6 +7,8 @@ audience: site
 order: 60
 keywords: [avisos, mensajes privados, notificaciones, correo, correos, campana, respuestas, menciones, citas, me gusta, temas nuevos, silenciar, silencio, resumen diario, dejar de recibir, demasiados correos, seguir, no me llegan]
 related: [forum.site.overview, forum.site.writing, forum.site.private-messages, core.account.mail-preferences, core.account.site-notifications]
+conditions:
+  capabilities: [forum.visible]
 ---
 El foro te avisa de lo que pasa en lo que sigues, en la campana de la cabecera y, según elijas, por correo. Esta guía explica qué avisos hay, cómo elegirlos y cómo callar un tema.
 

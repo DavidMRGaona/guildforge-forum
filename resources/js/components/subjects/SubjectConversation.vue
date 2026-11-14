@@ -6,6 +6,7 @@ import type { JSONContent } from '@tiptap/core';
 import ReplyBox from '../forum/ReplyBox.vue';
 import NewPostsNotice from '../live/NewPostsNotice.vue';
 import SubjectConversationThread from './SubjectConversationThread.vue';
+import { useForumVisibility } from '../../composables/useForumVisibility';
 import { useNewPosts } from '../../composables/useNewPosts';
 import { sendJson, subjectConversationUrl } from '../../forum/api';
 import { DISCUSSION_EVENTS, discussionChannel, useChannelFeed } from '../../live/channels';
@@ -32,6 +33,8 @@ type Answer = { conversation: ForumSubjectConversation | null };
 
 const { t } = useI18n();
 const headingId = useId();
+// A forum in preview the reader may not see: nothing is asked, nothing is drawn
+const forumVisible = useForumVisibility();
 
 const conversation = ref<ForumSubjectConversation | null>(null);
 const failed = ref(false);
@@ -94,6 +97,10 @@ const closedNotice = computed(() => {
 });
 
 async function load(): Promise<void> {
+    if (!forumVisible.value) {
+        return;
+    }
+
     const answer = await sendJson<Answer>(
         subjectConversationUrl(props.subjectType, props.subjectId),
         'GET'

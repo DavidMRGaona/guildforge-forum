@@ -7,6 +7,8 @@ audience: site
 order: 65
 keywords: [mensajes privados, escribir a alguien desde un mensaje, imágenes en mensajes privados, privado, privados, conversación, conversaciones, mensaje directo, escribir a alguien, bloquear, bloqueo, desbloquear, salir de la conversación, añadir a alguien, denunciar mensaje privado, límite de conversaciones, no puedo escribir]
 related: [forum.site.overview, forum.site.notices, forum.site.writing]
+conditions:
+  capabilities: [forum.visible]
 ---
 Con los mensajes privados hablas con otras personas de la comunidad sin salir de la web. Una conversación es de 2 a 10 personas y **solo la leen quienes están en ella**: nadie más, tampoco la moderación ni la administración del sitio.
 

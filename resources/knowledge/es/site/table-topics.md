@@ -8,7 +8,7 @@ order: 100
 keywords: [mesa, mesas, tema de la mesa, comentar una mesa, preguntas sobre una mesa, partida, plaza libre, cancelada, fecha nueva, tema automático, conversación de la mesa]
 related: [forum.site.overview, forum.site.notices, forum.site.campaign-spaces]
 conditions:
-  capabilities: [forum.offers_game_tables]
+  capabilities: [forum.visible, forum.offers_game_tables]
 ---
 Cada mesa que se publica en {{site_name}} tiene su propio tema en la categoría **Mesas** del foro. Es el sitio para preguntar al director, comentar la partida y ponerse de acuerdo.
 

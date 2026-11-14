@@ -8,7 +8,7 @@ order: 110
 keywords: [PNJ, personajes no jugadores, PNJ de la campaña, campaña, campañas, espacio de campaña, espacio privado, plantilla, dirección, director, jugadores de la campaña, solo lectura, campaña terminada, te han añadido, entrar al espacio, seguir la campaña]
 related: [forum.site.play-by-post, forum.site.characters, forum.site.notices, forum.site.table-topics]
 conditions:
-  capabilities: [forum.offers_campaigns]
+  capabilities: [forum.visible, forum.offers_campaigns]
 ---
 Cada campaña publicada tiene en el foro un tema en la categoría **Campañas** y, además, un **espacio** propio, privado, para quienes la juegan.
 

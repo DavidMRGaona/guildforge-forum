@@ -7,10 +7,10 @@ namespace Modules\Forum\Database\Seeders;
 use App\Domain\Navigation\Entities\MenuItem;
 use App\Domain\Navigation\Enums\LinkTarget;
 use App\Domain\Navigation\Enums\MenuLocation;
-use App\Domain\Navigation\Enums\MenuVisibility;
 use App\Domain\Navigation\Repositories\MenuItemRepositoryInterface;
 use App\Domain\Navigation\ValueObjects\MenuItemId;
 use Illuminate\Database\Seeder;
+use Modules\Forum\Application\Services\ForumMenuLink;
 
 /**
  * Adds «Foro» at the end of the header menu when the module is first enabled. It carries the
@@ -31,6 +31,9 @@ final class ForumMenuLinkSeeder extends Seeder
             }
         }
 
+        // Only for the preview while the forum is one
+        [$visibility, $permissions] = app(ForumMenuLink::class)->visibilityForNewLink();
+
         $menu->save(new MenuItem(
             id: MenuItemId::generate(),
             location: MenuLocation::Header,
@@ -41,8 +44,8 @@ final class ForumMenuLinkSeeder extends Seeder
             routeParams: [],
             icon: 'heroicon-o-chat-bubble-left-right',
             target: LinkTarget::Self,
-            visibility: MenuVisibility::Public,
-            permissions: [],
+            visibility: $visibility,
+            permissions: $permissions,
             sortOrder: $menu->maxSortOrder(MenuLocation::Header) + 10,
             isActive: true,
             module: 'forum',

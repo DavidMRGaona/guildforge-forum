@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Inertia\Inertia;
 use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
 use Modules\Forum\Application\Content\Contracts\NodeTypeInterface;
 use Modules\Forum\Application\Content\DocumentSchema;
@@ -74,6 +75,7 @@ use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
+use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Application\Services\HiddenRolls;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -104,11 +106,13 @@ use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
 use Modules\Forum\Infrastructure\Fetching\DnsHostResolver;
 use Modules\Forum\Infrastructure\Fetching\GuardedRemoteFetcher;
 use Modules\Forum\Infrastructure\Knowledge\EmbedsEnabledCapability;
+use Modules\Forum\Infrastructure\Knowledge\ForumVisibleCapability;
 use Modules\Forum\Infrastructure\Knowledge\ModeratesCapability;
 use Modules\Forum\Infrastructure\Knowledge\ModeratesForumCapability;
 use Modules\Forum\Infrastructure\Knowledge\OffersCampaignsCapability;
 use Modules\Forum\Infrastructure\Knowledge\OffersGameTablesCapability;
 use Modules\Forum\Infrastructure\Knowledge\UsesCharactersCapability;
+use Modules\Forum\Infrastructure\Listeners\ApplyForumAccessToMenuLink;
 use Modules\Forum\Infrastructure\Listeners\ForgetAnonymizedAccount;
 use Modules\Forum\Infrastructure\Listeners\NotifyModeratorsOfReport;
 use Modules\Forum\Infrastructure\Listeners\NotifyPostAuthorOfApproval;
@@ -184,7 +188,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     /**
      * Permission names, stored by the loader as "forum:<name>".
      */
-    private const array PERMISSIONS = ['forum.moderate', 'categories.manage', 'settings.manage', 'posts.upload_images', 'posts.external_images', 'characters.use'];
+    private const array PERMISSIONS = ['forum.moderate', 'forum.preview', 'categories.manage', 'settings.manage', 'posts.upload_images', 'posts.external_images', 'characters.use'];
 
     /**
      * Container tags for the post document's extra node and mark types: a feature that adds a
@@ -301,6 +305,12 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // A module enabled or updated may bring the sources «Mesas» and «Campañas» need (forum#49)
         Event::listen(ModuleEnabled::class, [SyncPublicationsOnModuleChange::class, 'handle']);
         Event::listen(ModuleUpdated::class, [SyncPublicationsOnModuleChange::class, 'handle']);
+        // Whether the site draws anything of the forum for this person (its slots and profile tabs)
+        Inertia::share('forumVisible', static fn (): bool => app(ForumVisibility::class)->isVisibleTo(auth()->user()));
+
+        // The menu link follows «Acceso al foro» from the moment the forum is enabled or updated
+        Event::listen(ModuleEnabled::class, [ApplyForumAccessToMenuLink::class, 'handle']);
+        Event::listen(ModuleUpdated::class, [ApplyForumAccessToMenuLink::class, 'handle']);
 
         // What moderation does is told to whom it concerns, after the commit
         Event::listen(ForumPostApproved::class, [NotifyPostAuthorOfApproval::class, 'handle']);
@@ -391,6 +401,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerKnowledgeCapabilities(): array
     {
         return [
+            ForumVisibleCapability::class,
             ModeratesForumCapability::class,
             ModeratesCapability::class,
             UsesCharactersCapability::class,
@@ -428,11 +439,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
                 module: $this->moduleName(),
                 order: 40,
                 props: [],
-                dataKeys: [],
+                // visibleKey is read from the slot's props, so it is listed too
+                dataKeys: ['forumVisible'],
                 profileTab: [
                     'tabId' => 'forum',
                     'icon' => 'cog',
                     'labelKey' => 'forum.preferences.tabLabel',
+                    // Hidden while the forum is a preview the person may not see
+                    'visibleKey' => 'forumVisible',
                 ],
             ),
             new SlotRegistrationDTO(
@@ -441,11 +455,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
                 module: $this->moduleName(),
                 order: 41,
                 props: [],
-                dataKeys: [],
+                // visibleKey is read from the slot's props, so it is listed too
+                dataKeys: ['forumVisible'],
                 profileTab: [
                     'tabId' => 'forum-characters',
                     'icon' => 'user',
                     'labelKey' => 'forum.characters.tabLabel',
+                    // Hidden while the forum is a preview the person may not see
+                    'visibleKey' => 'forumVisible',
                 ],
             ),
             new SlotRegistrationDTO(

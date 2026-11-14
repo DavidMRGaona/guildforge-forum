@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMenuBadge, useMenuBadges } from '@/composables/useMenuBadges';
 import ForumMenuPulse from '../../../resources/js/components/live/ForumMenuPulse.vue';
-import { signIn } from '../support/page';
+import { page, signIn } from '../support/page';
 
 const KEY = 'forum:forum.index';
 
@@ -41,6 +41,18 @@ afterEach(() => {
 });
 
 describe('ForumMenuPulse', () => {
+    it('asks nothing while the forum is a preview the person cannot see', async () => {
+        signIn();
+        page.props = { ...page.props, forumVisible: false };
+        const fetchMock = serve(3);
+        mount(ForumMenuPulse);
+
+        await tick(180_000);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(badge()).toBeUndefined();
+    });
+
     it('asks nothing without a session', async () => {
         const fetchMock = serve(3);
         mount(ForumMenuPulse);

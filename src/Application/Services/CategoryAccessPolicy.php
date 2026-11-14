@@ -70,17 +70,19 @@ final class CategoryAccessPolicy
         private readonly EmailVerificationPolicyInterface $emailVerification,
         private readonly ForumSuspensions $suspensions,
         private readonly PublicationAvailability $availability,
+        private readonly ForumVisibility $visibility,
     ) {}
 
     public function canView(?Authenticatable $user, Category $category): bool
     {
-        return $this->decide(fn (): bool => $this->moderatesForum($user) || $this->reads($user, $category));
+        // A forum in preview is nothing to whoever may not see it, a forum moderator included
+        return $this->decide(fn (): bool => $this->visibility->isVisibleTo($user) && ($this->moderatesForum($user) || $this->reads($user, $category)));
     }
 
     public function canWrite(?Authenticatable $user, Category $category): bool
     {
         return $this->decide(function () use ($user, $category): bool {
-            if (! $user instanceof Authenticatable || $this->emailVerification->mustVerify($user) || $this->suspensions->isBarred($user)) {
+            if (! $user instanceof Authenticatable || ! $this->visibility->isVisibleTo($user) || $this->emailVerification->mustVerify($user) || $this->suspensions->isBarred($user)) {
                 return false;
             }
 

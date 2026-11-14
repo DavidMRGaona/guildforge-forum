@@ -7,6 +7,8 @@ audience: site
 order: 20
 keywords: [editor, escribir, formato, negrita, cursiva, lista, cita, citar, mencionar, mención, arroba, enlace, código, borrador, editar mensaje, borrar mensaje, responder, encabezado, separador]
 related: [forum.site.images, forum.site.embeds, forum.site.notices, forum.site.overview]
+conditions:
+  capabilities: [forum.visible]
 ---
 El editor del foro sirve igual para abrir un tema, responder o editar un mensaje. Esta guía explica lo que puedes hacer con él.
 

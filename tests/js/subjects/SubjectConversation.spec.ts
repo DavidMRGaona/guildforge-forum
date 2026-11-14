@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SubjectConversation from '../../../resources/js/components/subjects/SubjectConversation.vue';
 import SubjectConversationThread from '../../../resources/js/components/subjects/SubjectConversationThread.vue';
 import type { ForumPost, ForumSubjectConversation } from '../../../resources/js/types/forum';
-import { signIn } from '../support/page';
+import { page, signIn } from '../support/page';
 
 const BASE = '/foro/fichas/game-table/table-1';
 
@@ -180,6 +180,15 @@ describe('SubjectConversation', () => {
         serve({ [BASE]: { body: { conversation: null } } });
 
         expect((await mountIt()).html()).toBe('<!--v-if-->');
+    });
+
+    it('asks nothing and draws nothing while the forum is a preview the reader cannot see', async () => {
+        signIn();
+        page.props = { ...page.props, forumVisible: false };
+        const fetchMock = serve({ [BASE]: { body: { conversation: aConversation() } } });
+
+        expect((await mountIt()).html()).toBe('<!--v-if-->');
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('says neutrally that it could not load, and tries again', async () => {

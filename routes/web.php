@@ -31,6 +31,7 @@ use Modules\Forum\Http\Controllers\RollController;
 use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
 use Modules\Forum\Http\Controllers\SuspensionController;
+use Modules\Forum\Http\Middleware\EnsureForumIsVisible;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +45,8 @@ use Modules\Forum\Http\Controllers\SuspensionController;
 
 Route::prefix('foro')
     ->name('forum.')
+    // While the forum is a preview, it does not exist for whoever may not see it
+    ->middleware(EnsureForumIsVisible::class)
     ->group(function (): void {
         // Public pages: what a reader may not read answers 404, never 403
         Route::get('/', ForumIndexController::class)->name('index');

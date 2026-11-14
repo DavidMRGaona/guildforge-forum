@@ -401,6 +401,19 @@ El foro sigue los eventos de cuentas del core (`UserAnonymized`, `UserDeactivate
 - **Cambio de nombre o avatar**: no hace falta nada. Los nombres se leen al pintar y no hay cachés. La única copia es el texto plano de los mensajes que mencionan a alguien, que dice lo que era verdad al escribirlo (como una cita).
 - `tests/Integration/Persistence/AccountDataCoverageTest.php` falla si hay una tabla o una columna de persona sin decidir en `tests/Support/ErasedTables.php`.
 
+## Acceso al foro
+
+El ajuste *Acceso al foro* (`access`) decide quién ve el foro en el sitio: **Solo vista previa** (por defecto; también para un valor que no se reconoce) o **Abierto a todo el sitio**. Lo decide una sola regla, `ForumVisibility::isVisibleTo()`: abierto, cuentan las reglas de cada categoría; en vista previa, solo quien tiene `forum:forum.preview` (la administración lo tiene siempre). Para el resto, también quien modera el foro, el foro no existe:
+
+- Todas las rutas de `/foro` (páginas, JSON, novedades, subidas) responden 404 (`EnsureForumIsVisible`).
+- `CategoryAccessPolicy::canView()` / `canWrite()` y la lectura de temas dicen que no, así que el buscador del sitio, los canales en tiempo real del tema y de la categoría, la conversación de las fichas y los anuncios de temas nuevos (que exigen que un invitado lea la categoría) se quedan sin nada. Los canales de la cuenta y de las conversaciones privadas también se niegan.
+- Ningún aviso sale (`shouldSend()` de cada uno) y sus categorías de correo no aparecen en el perfil (audiencia).
+- La web recibe `forumVisible` (prop compartida): las pestañas «Foro» y «Personajes» del perfil la usan como `visibleKey`, y la conversación de las fichas y el aviso del menú no piden nada.
+- Las guías del sitio exigen la capacidad `forum.visible`.
+- El enlace «Foro» del menú (`ForumMenuLink`) pasa a visibilidad por permiso con `forum:forum.preview` y, al abrir el foro, recupera la visibilidad que tenía (guardada en el ajuste `forum_menu_link_before_preview`). Se aplica al guardar los ajustes y al habilitar o actualizar el módulo, así que un sitio que ya tenía el foro lo deja en vista previa con esta versión. Un enlace nuevo nace con la visibilidad del acceso.
+
+El panel no cambia: categorías, moderación y ajustes siguen con sus permisos. Los temas automáticos de las publicaciones se siguen creando, ocultos hasta que se abra el foro. La suite del módulo arranca con el foro abierto (`FORUM_ACCESS_DEFAULT=open` en su `phpunit.xml`).
+
 ## Permisos
 
 Ninguno se concede solo: cada asociación los da a los roles que cree en el editor de roles. La administración los tiene todos.
@@ -408,6 +421,7 @@ Ninguno se concede solo: cada asociación los da a los roles que cree en el edit
 | Permiso | Para qué sirve |
 |---|---|
 | `forum:forum.moderate` | Moderar todo el foro, también desde el panel, y borrar temas |
+| `forum:forum.preview` | Ver el foro mientras su acceso está en «Solo vista previa» |
 | `forum:categories.manage` | Gestionar las categorías y quién ve y escribe en cada una |
 | `forum:settings.manage` | Cambiar los ajustes del foro |
 | `forum:posts.upload_images` | Subir imágenes a los mensajes |

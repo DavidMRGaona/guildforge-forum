@@ -8,6 +8,7 @@ order: 30
 keywords: [imagen, subir imagen, foto, adjuntar, archivo, png, jpeg, webp, gif, tamaño, peso, descripción de la imagen, texto alternativo, metadatos]
 related: [forum.site.writing, forum.site.external-images, forum.site.embeds]
 conditions:
+  capabilities: [forum.visible]
   permissions:
     all: ['forum:posts.upload_images']
 ---

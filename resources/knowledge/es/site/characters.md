@@ -8,7 +8,7 @@ order: 90
 keywords: [personaje, personajes, hablar como, retrato, avatar, nombre del personaje, descripción, retirar, recuperar, borrar personaje, escribir como, rol, interpretar, categoría del personaje]
 related: [forum.site.play-by-post, forum.site.campaign-spaces, forum.site.dice, forum.site.writing]
 conditions:
-  capabilities: [forum.uses_characters]
+  capabilities: [forum.visible, forum.uses_characters]
 ---
 Un personaje te deja escribir en el foro con otro nombre y otro rostro, como en una partida por foro. Detrás sigues siendo tú: en cada mensaje verás «por (tu nombre)».
 

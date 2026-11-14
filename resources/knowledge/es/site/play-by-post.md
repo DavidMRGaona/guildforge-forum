@@ -7,6 +7,8 @@ audience: site
 order: 70
 keywords: [partida por foro, jugar por foro, rol por foro, por turnos, mensaje a mensaje, fuera de personaje, aparte, ooc, narrador, director de juego, dm, master, escena]
 related: [forum.site.dice, forum.site.characters, forum.site.campaign-spaces, forum.site.writing]
+conditions:
+  capabilities: [forum.visible]
 ---
 Una partida por foro se juega por turnos, mensaje a mensaje, en un tema: el narrador describe la escena y cada jugador contesta cuando puede. El foro trae tres herramientas pensadas para eso.
 

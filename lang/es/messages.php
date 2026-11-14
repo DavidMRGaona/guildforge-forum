@@ -9,6 +9,8 @@ return [
         'forum' => [
             'moderate' => 'Moderar todo el foro',
             'moderate_description' => 'Ocultar, aprobar, mover, cerrar y fijar temas y mensajes en cualquier categoría.',
+            'preview' => 'Ver el foro en vista previa',
+            'preview_description' => 'Entrar en el foro mientras su acceso está en «Solo vista previa». Sin este permiso, el foro no aparece en el sitio hasta que se abra.',
         ],
         'categories' => [
             'manage' => 'Gestionar las categorías del foro',
@@ -78,6 +80,13 @@ return [
             'nobody' => 'Nadie',
             'everyone' => 'Cualquier cuenta con sesión',
             'permission' => 'Solo con el permiso «Tener personajes en el foro»',
+        ],
+        'access_section' => 'Acceso al foro',
+        'access_section_help' => 'Mientras preparas el foro, déjalo en vista previa: solo lo ve quien tenga el permiso «Ver el foro en vista previa» (la administración siempre). Para el resto no existe: ni el enlace del menú, ni sus páginas, ni la conversación de las fichas, ni sus avisos.',
+        'access' => 'Acceso al foro',
+        'access_options' => [
+            'preview' => 'Solo vista previa',
+            'open' => 'Abierto a todo el sitio',
         ],
         'subject_conversations' => 'Conversación en las fichas',
         'subject_conversations_help' => 'Cómo muestra cada ficha la conversación de su tema en el foro. Con «Solo lectura» se ven los últimos mensajes y se escribe en el foro. Las fichas de un módulo que se active más adelante empiezan sin conversación.',

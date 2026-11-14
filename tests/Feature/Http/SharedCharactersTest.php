@@ -339,6 +339,17 @@ final class SharedCharactersTest extends ModuleTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.0.isStarter', true)->where('posts.1.isStarter', false)->etc());
     }
 
+    public function test_a_shared_character_does_not_give_its_writer_away_by_their_avatar(): void
+    {
+        $this->director->forceFill(['avatar_public_id' => 'avatars/direccion'])->save();
+        $this->reply($this->director, $this->aSharedCharacterIn($this->space))->assertCreated();
+
+        foreach ([$this->player, $this->director] as $reader) {
+            $this->actingAs($reader)->get($this->discussionUrl())
+                ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.1.authorAvatarPublicId', null)->etc());
+        }
+    }
+
     public function test_the_lists_name_the_shared_character_not_the_account_behind_it(): void
     {
         $shared = $this->aSharedCharacterIn($this->space);

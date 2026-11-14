@@ -5,7 +5,8 @@ import type { ForumPost } from '../../../resources/js/types/forum';
 
 /**
  * «Mensaje privado» in the footer of a post (forum#88): only when the server gives where to
- * write, with the author's name in its accessible name and the text from the `sm` width up.
+ * write, with the author's name in its accessible name. An icon since the compact post
+ * (forum#119): its name shows as a tooltip.
  */
 function aPost(messageUrl: string | null): ForumPost {
     return {
@@ -66,7 +67,7 @@ describe('PostItem private message', () => {
         const link = wrapper.get('[data-testid="post-write-privately"]');
         expect(link.attributes('href')).toBe('/foro/conversaciones/nueva?para=author-1');
         expect(link.attributes('aria-label')).toBe('Escribir un mensaje privado a Jane Doe');
-        expect(link.text()).toBe('Mensaje privado');
+        expect(link.attributes('title')).toBe('Escribir un mensaje privado a Jane Doe');
     });
 
     it('offers nothing when the server gives no address', () => {

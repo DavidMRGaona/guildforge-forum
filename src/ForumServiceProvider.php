@@ -321,8 +321,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // Accounts (core#461). Anonymizing forgets what only mattered to the person and closes their
         // characters. Deactivating and restoring need no listener: the forum stores nothing about
         // them, it asks the account every time (ForumSuspensions::isBarred). A change of name or
-        // avatar (UserProfileUpdated) needs none either: names are read from the account when
-        // painting, no avatar of an author is shown and nothing is cached. The one copy of a name,
+        // avatar (UserProfileUpdated) needs none either: names and avatars are read from the account
+        // when painting and nothing is cached. The one copy of a name,
         // the plain text of a post that mentions someone, says what was true when it was written,
         // like a quotation does; only anonymizing writes it again.
         Event::listen(UserAnonymized::class, [ForgetAnonymizedAccount::class, 'handle']);

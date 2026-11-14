@@ -313,6 +313,8 @@ final readonly class ForumPresenter
             ...array_filter($shown),
             ...array_keys($mentioned),
         ])));
+        // Read from the account each time (never copied), only for authors the reader may know
+        $avatars = $this->accounts->avatarsOf(array_values(array_unique(array_filter($shown))));
 
         $items = [];
         foreach ($posts as $index => $post) {
@@ -325,6 +327,8 @@ final readonly class ForumPresenter
                 'number' => $number,
                 'authorId' => $shown[$index],
                 'authorName' => $shown[$index] === null ? null : ($names[$shown[$index]] ?? null),
+                // A post in character shows the character's portrait, never the account's avatar
+                'authorAvatarPublicId' => $shown[$index] === null || $content->character instanceof Character ? null : ($avatars[$shown[$index]] ?? null),
                 'isStarter' => $shown[$index] !== null && $shown[$index] === $discussion->authorId(),
                 'status' => $post->status()->value,
                 'html' => $content->html,

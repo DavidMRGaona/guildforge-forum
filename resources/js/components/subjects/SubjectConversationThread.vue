@@ -41,7 +41,10 @@ watch(
 </script>
 
 <template>
-    <div ref="list" class="space-y-4">
+    <div
+        ref="list"
+        class="divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
+    >
         <PostItem
             v-for="post in posts"
             :key="post.id"

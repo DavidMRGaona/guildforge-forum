@@ -119,7 +119,6 @@ export default {
             revealFailed: 'The roll could not be revealed. Try again.',
         },
         posts: {
-            writePrivately: 'Private message',
             writePrivatelyTo: 'Write a private message to {name}',
             moved: {
                 to: 'One post moved to | {count} posts moved to',

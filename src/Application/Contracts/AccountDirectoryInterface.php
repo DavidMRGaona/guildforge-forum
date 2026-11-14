@@ -30,6 +30,16 @@ interface AccountDirectoryInterface
     public function mentionable(array $accountIds): array;
 
     /**
+     * The profile avatars (the stored public id) of those accounts that are active (neither
+     * deactivated nor anonymized) and have one. Read when painting, never copied, so a changed
+     * or removed avatar shows at once and erasing an account leaves nothing behind.
+     *
+     * @param  list<string>  $accountIds
+     * @return array<string, string> by account id
+     */
+    public function avatarsOf(array $accountIds): array;
+
+    /**
      * The account with that id, while it is active (neither deactivated nor anonymized).
      */
     public function active(string $accountId): ?Authenticatable;

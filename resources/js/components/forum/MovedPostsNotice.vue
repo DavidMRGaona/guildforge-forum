@@ -27,7 +27,7 @@ const numbers = computed(() =>
 
 <template>
     <p
-        class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed border-default bg-muted px-4 py-3 text-sm text-base-secondary"
+        class="flex flex-wrap items-center gap-x-2 gap-y-1 bg-muted px-4 py-3 text-sm text-base-secondary"
         data-testid="moved-posts"
     >
         <CornerDownRight class="h-4 w-4 shrink-0" aria-hidden="true" />

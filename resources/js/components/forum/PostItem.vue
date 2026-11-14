@@ -3,10 +3,11 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { Link } from '@inertiajs/vue3';
-import { Flag, Link2, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
+import { Flag, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import LikeButton from './LikeButton.vue';
+import PostAvatar from './PostAvatar.vue';
 import ModerationDialog, { type ModerationDialogFields } from '../moderation/ModerationDialog.vue';
 import ModerationMenu, { type ModerationMenuItem } from '../moderation/ModerationMenu.vue';
 import ReportDialog from '../moderation/ReportDialog.vue';
@@ -298,6 +299,13 @@ async function moderate(action: PostAction, fields: ModerationDialogFields): Pro
     }
 }
 
+/** Every action button: 44 px for a finger */
+const actionClass =
+    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-md text-sm text-base-secondary hover:bg-muted hover:text-base-primary';
+/** Dimmed where a mouse can bring them back (hover or focus within the post); always full on touch */
+const secondaryClass =
+    '[@media(hover:hover)]:opacity-60 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100';
+
 const anchor = computed(() =>
     props.post.number === null ? `post-${props.post.id}` : `post-${props.post.number}`
 );
@@ -305,6 +313,16 @@ const isPlaceholder = computed(() => props.post.html === null);
 const showsLikes = computed(
     () =>
         props.post.status === 'visible' && (props.post.likes.canLike || props.post.likes.count > 0)
+);
+/** Whether the post shows its row of actions (the row also gives the post its bottom room) */
+const hasFooter = computed(
+    () =>
+        !editing.value &&
+        (((props.canQuote || props.post.canEdit || props.post.canDelete || showsLikes.value) &&
+            props.post.html !== null) ||
+            moderationItems.value.length > 0 ||
+            (props.post.reportUrl !== null && !reported.value) ||
+            Boolean(props.post.messageUrl))
 );
 
 function quote(): void {
@@ -366,33 +384,54 @@ async function remove(): Promise<void> {
     <article
         :id="anchor"
         tabindex="-1"
-        class="scroll-mt-24 rounded-lg border bg-surface focus:outline-none"
-        :class="focused ? 'border-primary ring-2 ring-primary-500/40' : 'border-default'"
+        class="group scroll-mt-24 px-4 pt-3 focus:outline-none sm:grid sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-4"
+        :class="[
+            hasFooter ? 'pb-1' : 'pb-3',
+            focused ? 'ring-2 ring-inset ring-primary-500/40' : '',
+        ]"
         :data-post-number="post.number ?? undefined"
         :data-post-url="post.url ?? undefined"
         :aria-labelledby="`${anchor}-author`"
     >
-        <header
-            class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-default px-4 py-3"
-        >
+        <!-- The side column: a character's portrait, or the account's profile avatar -->
+        <div class="hidden sm:block">
             <CharacterAvatar
                 v-if="post.character"
+                size="xl"
                 :initials="post.character.initials"
                 :portrait-url="post.character.portraitUrl"
             />
-            <span
+            <PostAvatar
                 v-else
-                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary"
-                aria-hidden="true"
-            >
-                {{ (post.authorName ?? '?').charAt(0).toUpperCase() }}
-            </span>
-            <div class="min-w-0 flex-1">
-                <template v-if="post.character">
-                    <!-- The badge wraps below a long name instead of being cut with it -->
+                size="xl"
+                :public-id="post.authorAvatarPublicId ?? null"
+                :name="post.authorName"
+            />
+        </div>
+
+        <div class="min-w-0">
+            <header class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                <!-- Avatar and name always share a line: a long name is cut, never pushed below -->
+                <div class="flex min-w-0 flex-1 items-center gap-2" data-testid="post-author">
+                    <!-- On phones the avatar moves to the author line, leaving the width to the text -->
+                    <CharacterAvatar
+                        v-if="post.character"
+                        class="sm:hidden"
+                        size="sm"
+                        :initials="post.character.initials"
+                        :portrait-url="post.character.portraitUrl"
+                    />
+                    <PostAvatar
+                        v-else
+                        class="sm:hidden"
+                        size="sm"
+                        :public-id="post.authorAvatarPublicId ?? null"
+                        :name="post.authorName"
+                    />
                     <p
+                        v-if="post.character"
                         :id="`${anchor}-author`"
-                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
+                        class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                         data-testid="post-character"
                     >
                         <span class="min-w-0 truncate">{{ post.character.name }}</span>
@@ -404,59 +443,26 @@ async function remove(): Promise<void> {
                         </span>
                     </p>
                     <p
-                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
-                        data-testid="post-character-player"
+                        v-else
+                        :id="`${anchor}-author`"
+                        class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                     >
-                        <span
-                            v-if="post.character.isShared"
-                            class="shrink-0 rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"
-                            data-testid="post-character-shared"
-                        >
-                            {{
-                                post.authorName === null
-                                    ? t('forum.characters.shared.hiddenAuthor')
-                                    : t('forum.characters.shared.badge')
-                            }}
-                        </span>
-                        <!-- A shared PNJ names its writer only to whoever may know -->
-                        <span
-                            v-if="!post.character.isShared || post.authorName !== null"
-                            class="min-w-0 truncate"
-                            >{{
-                                post.character.isShared
-                                    ? t('forum.characters.shared.writtenBy', {
-                                          name: post.authorName,
-                                      })
-                                    : t('forum.characters.playedBy', {
-                                          name: post.authorName ?? t('forum.posts.deletedAccount'),
-                                      })
-                            }}</span
-                        >
-
+                        <span class="min-w-0 truncate">{{
+                            post.authorName ?? t('forum.posts.deletedAccount')
+                        }}</span>
                         <span
                             v-if="post.isStarter"
-                            class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                            class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
                         >
                             {{ t('forum.posts.starter') }}
                         </span>
                     </p>
-                </template>
+                </div>
+                <!-- Date, «editado» and «pendiente» wrap on narrow screens instead of widening the page -->
                 <p
-                    v-else
-                    :id="`${anchor}-author`"
-                    class="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
+                    class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 text-xs text-base-muted"
+                    data-testid="post-meta"
                 >
-                    <span class="min-w-0 truncate">{{
-                        post.authorName ?? t('forum.posts.deletedAccount')
-                    }}</span>
-                    <span
-                        v-if="post.isStarter"
-                        class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
-                    >
-                        {{ t('forum.posts.starter') }}
-                    </span>
-                </p>
-                <p class="text-xs text-base-muted">
                     <time :datetime="post.publishedAt ?? undefined">{{ post.publishedLabel }}</time>
                     <span v-if="post.editedLabel">
                         · {{ t('forum.posts.edited', { at: post.editedLabel }) }}</span
@@ -464,282 +470,323 @@ async function remove(): Promise<void> {
                     <span v-if="post.status === 'pending'">
                         · {{ t('forum.posts.pendingBadge') }}</span
                     >
+                    <a
+                        v-if="post.url && post.number"
+                        :href="post.url"
+                        class="inline-flex items-center justify-center rounded-md px-1 font-medium text-base-muted hover:text-primary pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
+                        :aria-label="t('forum.posts.permalink', { number: post.number })"
+                        >#{{ post.number }}</a
+                    >
                 </p>
-            </div>
-            <a
-                v-if="post.url && post.number"
-                :href="post.url"
-                class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-md text-sm text-base-muted hover:text-primary"
-                :aria-label="t('forum.posts.permalink', { number: post.number })"
+            </header>
+            <p
+                v-if="post.character"
+                class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
+                data-testid="post-character-player"
             >
-                <Link2 class="h-4 w-4" aria-hidden="true" />
-                <span>#{{ post.number }}</span>
-            </a>
-        </header>
+                <span
+                    v-if="post.character.isShared"
+                    class="shrink-0 rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary"
+                    data-testid="post-character-shared"
+                >
+                    {{
+                        post.authorName === null
+                            ? t('forum.characters.shared.hiddenAuthor')
+                            : t('forum.characters.shared.badge')
+                    }}
+                </span>
+                <!-- A shared PNJ names its writer only to whoever may know -->
+                <span
+                    v-if="!post.character.isShared || post.authorName !== null"
+                    class="min-w-0 truncate"
+                    >{{
+                        post.character.isShared
+                            ? t('forum.characters.shared.writtenBy', {
+                                  name: post.authorName,
+                              })
+                            : t('forum.characters.playedBy', {
+                                  name: post.authorName ?? t('forum.posts.deletedAccount'),
+                              })
+                    }}</span
+                >
 
-        <div class="px-4 py-3">
-            <template v-if="editing">
-                <SpeakAsSelect
-                    v-if="isOwn && characters"
-                    v-model="speaker"
-                    class="mb-2"
-                    :picker="characters"
-                    :current="post.character"
-                    :disabled="saving"
-                />
-                <PostEditor
-                    :label="t('forum.posts.editLabel', { number: post.number ?? '' })"
-                    :model-value="post.document"
-                    :draft-key="`forum-edit-${post.id}`"
-                    :mentions-url="mentionsUrl"
-                    :upload-url="editor.uploadUrl"
-                    :max-images="editor.maxImages"
-                    :image-types="editor.imageTypes"
-                    :external-image-url="editor.externalImageUrl"
-                    :external-image-hosts="editor.externalImageHosts"
-                    :embed-url="editor.embedUrl"
-                    :embed-services="editor.embedServices"
-                    :mention-names="mentionNames"
-                    :submit-label="t('forum.posts.saveEdit')"
-                    :submitting="saving"
-                    :error="error"
-                    @submit="save"
+                <span
+                    v-if="post.isStarter"
+                    class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                >
+                    {{ t('forum.posts.starter') }}
+                </span>
+            </p>
+
+            <div class="mt-1">
+                <template v-if="editing">
+                    <SpeakAsSelect
+                        v-if="isOwn && characters"
+                        v-model="speaker"
+                        class="mb-2"
+                        :picker="characters"
+                        :current="post.character"
+                        :disabled="saving"
+                    />
+                    <PostEditor
+                        :label="t('forum.posts.editLabel', { number: post.number ?? '' })"
+                        :model-value="post.document"
+                        :draft-key="`forum-edit-${post.id}`"
+                        :mentions-url="mentionsUrl"
+                        :upload-url="editor.uploadUrl"
+                        :max-images="editor.maxImages"
+                        :image-types="editor.imageTypes"
+                        :external-image-url="editor.externalImageUrl"
+                        :external-image-hosts="editor.externalImageHosts"
+                        :embed-url="editor.embedUrl"
+                        :embed-services="editor.embedServices"
+                        :mention-names="mentionNames"
+                        :submit-label="t('forum.posts.saveEdit')"
+                        :submitting="saving"
+                        :error="error"
+                        @submit="save"
+                    />
+                    <button
+                        type="button"
+                        class="mt-2 inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-base-secondary hover:bg-muted"
+                        @click="editing = false"
+                    >
+                        {{ t('forum.posts.cancelEdit') }}
+                    </button>
+                </template>
+                <template v-else>
+                    <p
+                        v-if="post.placeholder && isPlaceholder"
+                        class="text-sm italic text-base-muted"
+                    >
+                        {{ post.placeholder }}
+                    </p>
+                    <p
+                        v-else-if="post.placeholder"
+                        class="mb-2 text-xs font-medium text-base-muted"
+                    >
+                        {{ post.placeholder }}
+                    </p>
+                    <p
+                        v-if="post.hiddenReason"
+                        class="mb-2 text-xs text-base-muted"
+                        data-testid="post-hidden-reason"
+                    >
+                        {{ t('forum.moderation.post.hiddenReason', { reason: post.hiddenReason }) }}
+                    </p>
+                    <p v-if="reported" role="status" class="mb-2 text-xs text-base-muted">
+                        {{ t('forum.reports.sent') }}
+                    </p>
+                    <p v-if="suspended" role="status" class="mb-2 text-xs text-base-muted">
+                        {{ t('forum.suspensions.done') }}
+                    </p>
+                    <!-- Rendered by the server from the stored document, with every text escaped -->
+                    <!-- eslint-disable vue/no-v-html -->
+                    <div
+                        v-if="post.html !== null"
+                        ref="body"
+                        class="forum-post prose dark:prose-invert max-w-none break-words text-base-primary"
+                        v-html="post.html"
+                    />
+                    <!-- eslint-enable vue/no-v-html -->
+                    <p v-if="error" role="alert" class="mt-2 text-sm text-red-600">{{ error }}</p>
+                </template>
+            </div>
+
+            <footer v-if="hasFooter" class="-ml-2 mt-1 flex flex-wrap items-center gap-0.5">
+                <LikeButton
+                    v-if="showsLikes"
+                    class="mr-auto"
+                    :likes="post.likes"
+                    :post-id="post.id"
+                    :post-number="post.number"
                 />
                 <button
+                    v-if="canQuote && post.status === 'visible'"
                     type="button"
-                    class="mt-2 inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-base-secondary hover:bg-muted"
-                    @click="editing = false"
+                    :class="[actionClass, 'px-3', { 'ml-auto': !showsLikes }]"
+                    :aria-label="t('forum.posts.quote')"
+                    @click="quote"
                 >
-                    {{ t('forum.posts.cancelEdit') }}
+                    <Quote class="h-4 w-4" aria-hidden="true" />
+                    {{ t('forum.posts.quote') }}
                 </button>
-            </template>
-            <template v-else>
-                <p v-if="post.placeholder && isPlaceholder" class="text-sm italic text-base-muted">
-                    {{ post.placeholder }}
-                </p>
-                <p v-else-if="post.placeholder" class="mb-2 text-xs font-medium text-base-muted">
-                    {{ post.placeholder }}
-                </p>
-                <p
-                    v-if="post.hiddenReason"
-                    class="mb-2 text-xs text-base-muted"
-                    data-testid="post-hidden-reason"
+                <!-- Secondary actions: dimmed until the post is hovered or holds the focus, where a mouse is -->
+                <Link
+                    v-if="post.messageUrl"
+                    :href="post.messageUrl"
+                    :class="[actionClass, secondaryClass]"
+                    :aria-label="
+                        t('forum.posts.writePrivatelyTo', {
+                            name: post.authorName ?? t('forum.posts.deletedAccount'),
+                        })
+                    "
+                    :title="
+                        t('forum.posts.writePrivatelyTo', {
+                            name: post.authorName ?? t('forum.posts.deletedAccount'),
+                        })
+                    "
+                    data-secondary
+                    data-testid="post-write-privately"
                 >
-                    {{ t('forum.moderation.post.hiddenReason', { reason: post.hiddenReason }) }}
-                </p>
-                <p v-if="reported" role="status" class="mb-2 text-xs text-base-muted">
-                    {{ t('forum.reports.sent') }}
-                </p>
-                <p v-if="suspended" role="status" class="mb-2 text-xs text-base-muted">
-                    {{ t('forum.suspensions.done') }}
-                </p>
-                <!-- Rendered by the server from the stored document, with every text escaped -->
-                <!-- eslint-disable vue/no-v-html -->
-                <div
-                    v-if="post.html !== null"
-                    ref="body"
-                    class="forum-post prose dark:prose-invert max-w-none break-words text-base-primary"
-                    v-html="post.html"
+                    <Mail class="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <button
+                    v-if="post.canEdit && post.document && post.updateUrl"
+                    type="button"
+                    :class="[actionClass, secondaryClass]"
+                    :aria-label="t('forum.posts.edit')"
+                    :title="t('forum.posts.edit')"
+                    data-secondary
+                    @click="editing = true"
+                >
+                    <Pencil class="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                    v-if="post.canDelete && post.deleteUrl"
+                    type="button"
+                    :class="[actionClass, secondaryClass]"
+                    :aria-label="t('forum.posts.delete')"
+                    :title="t('forum.posts.delete')"
+                    data-secondary
+                    @click="confirmDelete = true"
+                >
+                    <Trash2 class="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                    v-if="post.reportUrl && !reported"
+                    type="button"
+                    :class="[actionClass, secondaryClass]"
+                    :aria-label="t('forum.reports.action')"
+                    :title="t('forum.reports.action')"
+                    data-secondary
+                    data-testid="post-report"
+                    @click="reporting = true"
+                >
+                    <Flag class="h-4 w-4" aria-hidden="true" />
+                </button>
+                <ModerationMenu
+                    :class="secondaryClass"
+                    :items="moderationItems"
+                    :label="t('forum.moderation.post.menu')"
+                    :busy="moderationBusy"
+                    @select="selectModeration"
                 />
-                <!-- eslint-enable vue/no-v-html -->
-                <p v-if="error" role="alert" class="mt-2 text-sm text-red-600">{{ error }}</p>
-            </template>
-        </div>
+            </footer>
 
-        <footer
-            v-if="
-                !editing &&
-                (((canQuote || post.canEdit || post.canDelete || showsLikes) &&
-                    post.html !== null) ||
-                    moderationItems.length > 0 ||
-                    (post.reportUrl !== null && !reported) ||
-                    Boolean(post.messageUrl))
-            "
-            class="flex flex-wrap items-center justify-end gap-1 border-t border-default px-2 py-1"
-        >
-            <LikeButton
-                v-if="showsLikes"
-                class="mr-auto"
-                :likes="post.likes"
-                :post-id="post.id"
-                :post-number="post.number"
-            />
-            <ModerationMenu
-                :items="moderationItems"
-                :label="t('forum.moderation.post.menu')"
-                :busy="moderationBusy"
-                @select="selectModeration"
-            />
-            <Link
-                v-if="post.messageUrl"
-                :href="post.messageUrl"
-                class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
-                :aria-label="
-                    t('forum.posts.writePrivatelyTo', {
-                        name: post.authorName ?? t('forum.posts.deletedAccount'),
-                    })
-                "
+            <ModerationDialog
+                v-model="moderationOpen"
                 :title="
-                    t('forum.posts.writePrivatelyTo', {
-                        name: post.authorName ?? t('forum.posts.deletedAccount'),
-                    })
+                    moderating === 'reject'
+                        ? t('forum.moderation.post.rejectTitle')
+                        : t('forum.moderation.post.hideTitle')
                 "
-                data-testid="post-write-privately"
-            >
-                <Mail class="h-4 w-4" aria-hidden="true" />
-                <span class="max-sm:sr-only">{{ t('forum.posts.writePrivately') }}</span>
-            </Link>
-            <button
-                v-if="post.reportUrl && !reported"
-                type="button"
-                class="inline-flex min-h-[44px] items-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
-                data-testid="post-report"
-                @click="reporting = true"
-            >
-                <Flag class="h-4 w-4" aria-hidden="true" />
-                {{ t('forum.reports.action') }}
-            </button>
-            <button
-                v-if="canQuote && post.status === 'visible'"
-                type="button"
-                class="inline-flex min-h-[44px] items-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
-                @click="quote"
-            >
-                <Quote class="h-4 w-4" aria-hidden="true" />
-                {{ t('forum.posts.quote') }}
-            </button>
-            <button
-                v-if="post.canEdit && post.document && post.updateUrl"
-                type="button"
-                class="inline-flex min-h-[44px] items-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
-                @click="editing = true"
-            >
-                <Pencil class="h-4 w-4" aria-hidden="true" />
-                {{ t('forum.posts.edit') }}
-            </button>
-            <button
-                v-if="post.canDelete && post.deleteUrl"
-                type="button"
-                class="inline-flex min-h-[44px] items-center gap-1 rounded-md px-3 text-sm text-base-secondary hover:bg-muted hover:text-base-primary"
-                @click="confirmDelete = true"
-            >
-                <Trash2 class="h-4 w-4" aria-hidden="true" />
-                {{ t('forum.posts.delete') }}
-            </button>
-        </footer>
+                :message="
+                    moderating === 'reject'
+                        ? t('forum.moderation.post.rejectMessage')
+                        : t('forum.moderation.post.hideMessage')
+                "
+                :confirm-label="
+                    moderating === 'reject'
+                        ? t('forum.moderation.post.reject')
+                        : t('forum.moderation.post.hide')
+                "
+                :danger="moderating === 'reject'"
+                ask-reason
+                :reason-max="moderating === 'reject' ? reasonMax : hiddenReasonMax"
+                :confirmation="
+                    moderating === 'reject' ? t('forum.moderation.post.rejectConfirmation') : null
+                "
+                :busy="moderationBusy"
+                :error="moderationError"
+                @confirm="(fields) => moderating && moderate(moderating, fields)"
+            />
 
-        <ModerationDialog
-            v-model="moderationOpen"
-            :title="
-                moderating === 'reject'
-                    ? t('forum.moderation.post.rejectTitle')
-                    : t('forum.moderation.post.hideTitle')
-            "
-            :message="
-                moderating === 'reject'
-                    ? t('forum.moderation.post.rejectMessage')
-                    : t('forum.moderation.post.hideMessage')
-            "
-            :confirm-label="
-                moderating === 'reject'
-                    ? t('forum.moderation.post.reject')
-                    : t('forum.moderation.post.hide')
-            "
-            :danger="moderating === 'reject'"
-            ask-reason
-            :reason-max="moderating === 'reject' ? reasonMax : hiddenReasonMax"
-            :confirmation="
-                moderating === 'reject' ? t('forum.moderation.post.rejectConfirmation') : null
-            "
-            :busy="moderationBusy"
-            :error="moderationError"
-            @confirm="(fields) => moderating && moderate(moderating, fields)"
-        />
+            <ModerationDialog
+                v-model="characterDialogOpen"
+                :title="
+                    characterAction === 'delete'
+                        ? t('forum.characters.moderation.deleteTitle', {
+                              name: post.character?.name ?? '',
+                          })
+                        : t('forum.characters.moderation.retireTitle', {
+                              name: post.character?.name ?? '',
+                          })
+                "
+                :message="
+                    characterAction === 'delete'
+                        ? t('forum.characters.moderation.deleteMessage')
+                        : t('forum.characters.moderation.retireMessage')
+                "
+                :confirm-label="
+                    characterAction === 'delete'
+                        ? t('forum.characters.moderation.delete')
+                        : t('forum.characters.moderation.retire')
+                "
+                :danger="characterAction === 'delete'"
+                :confirmation="
+                    characterAction === 'delete'
+                        ? t('forum.characters.moderation.deleteConfirmation')
+                        : null
+                "
+                :busy="characterBusy"
+                :error="characterError"
+                @confirm="moderateCharacter"
+            />
 
-        <ModerationDialog
-            v-model="characterDialogOpen"
-            :title="
-                characterAction === 'delete'
-                    ? t('forum.characters.moderation.deleteTitle', {
-                          name: post.character?.name ?? '',
-                      })
-                    : t('forum.characters.moderation.retireTitle', {
-                          name: post.character?.name ?? '',
-                      })
-            "
-            :message="
-                characterAction === 'delete'
-                    ? t('forum.characters.moderation.deleteMessage')
-                    : t('forum.characters.moderation.retireMessage')
-            "
-            :confirm-label="
-                characterAction === 'delete'
-                    ? t('forum.characters.moderation.delete')
-                    : t('forum.characters.moderation.retire')
-            "
-            :danger="characterAction === 'delete'"
-            :confirmation="
-                characterAction === 'delete'
-                    ? t('forum.characters.moderation.deleteConfirmation')
-                    : null
-            "
-            :busy="characterBusy"
-            :error="characterError"
-            @confirm="moderateCharacter"
-        />
+            <CharacterDialog
+                v-if="post.character?.actions"
+                v-model="editingCharacter"
+                :form="characters ?? fallbackForm"
+                :start="{
+                    name: post.character.name,
+                    description: post.character.description,
+                    categoryId: null,
+                    initials: post.character.initials,
+                    portraitUrl: post.character.portraitUrl,
+                    updateUrl: post.character.actions.updateUrl,
+                }"
+                :chooses-category="false"
+                @saved="emit('changed')"
+            />
 
-        <CharacterDialog
-            v-if="post.character?.actions"
-            v-model="editingCharacter"
-            :form="characters ?? fallbackForm"
-            :start="{
-                name: post.character.name,
-                description: post.character.description,
-                categoryId: null,
-                initials: post.character.initials,
-                portraitUrl: post.character.portraitUrl,
-                updateUrl: post.character.actions.updateUrl,
-            }"
-            :chooses-category="false"
-            @saved="emit('changed')"
-        />
+            <ReportDialog
+                v-if="post.reportUrl"
+                v-model="reporting"
+                :report-url="post.reportUrl"
+                :post-number="post.number"
+                @reported="reported = true"
+            />
 
-        <ReportDialog
-            v-if="post.reportUrl"
-            v-model="reporting"
-            :report-url="post.reportUrl"
-            :post-number="post.number"
-            @reported="reported = true"
-        />
+            <SuspendDialog
+                v-if="canSuspendAuthor && suspendUrl && post.authorId"
+                v-model="suspending"
+                :suspend-url="suspendUrl"
+                :user-id="post.authorId"
+                :user-name="post.authorName"
+                @suspended="suspended = true"
+            />
 
-        <SuspendDialog
-            v-if="canSuspendAuthor && suspendUrl && post.authorId"
-            v-model="suspending"
-            :suspend-url="suspendUrl"
-            :user-id="post.authorId"
-            :user-name="post.authorName"
-            @suspended="suspended = true"
-        />
+            <ModerationDialog
+                v-model="revealOpen"
+                :title="t('forum.rolls.revealTitle')"
+                :message="t('forum.rolls.revealMessage', { roll: rollToReveal?.label ?? '' })"
+                :confirm-label="t('forum.rolls.reveal')"
+                :confirmation="t('forum.rolls.revealConfirmation')"
+                :busy="revealBusy"
+                :error="revealError"
+                @confirm="revealRoll"
+            />
 
-        <ModerationDialog
-            v-model="revealOpen"
-            :title="t('forum.rolls.revealTitle')"
-            :message="t('forum.rolls.revealMessage', { roll: rollToReveal?.label ?? '' })"
-            :confirm-label="t('forum.rolls.reveal')"
-            :confirmation="t('forum.rolls.revealConfirmation')"
-            :busy="revealBusy"
-            :error="revealError"
-            @confirm="revealRoll"
-        />
-
-        <ConfirmDialog
-            v-model="confirmDelete"
-            :title="t('forum.posts.deleteTitle')"
-            :message="t('forum.posts.deleteMessage')"
-            :confirm-label="t('forum.posts.delete')"
-            :cancel-label="t('common.cancel')"
-            confirm-variant="danger"
-            @confirm="remove"
-        />
+            <ConfirmDialog
+                v-model="confirmDelete"
+                :title="t('forum.posts.deleteTitle')"
+                :message="t('forum.posts.deleteMessage')"
+                :confirm-label="t('forum.posts.delete')"
+                :cancel-label="t('common.cancel')"
+                confirm-variant="danger"
+                @confirm="remove"
+            />
+        </div>
     </article>
 </template>

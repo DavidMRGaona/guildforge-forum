@@ -40,8 +40,10 @@ function aPost(overrides: Partial<ForumPost> = {}): ForumPost {
     };
 }
 
+const wrappers: VueWrapper[] = [];
+
 function mounted(post: ForumPost, canQuote = true): VueWrapper {
-    return mount(PostItem, {
+    const wrapper = mount(PostItem, {
         attachTo: document.body,
         props: {
             post,
@@ -60,6 +62,9 @@ function mounted(post: ForumPost, canQuote = true): VueWrapper {
             mentionNames: {},
         },
     });
+    wrappers.push(wrapper);
+
+    return wrapper;
 }
 
 /** Selects some text of the post's body and lets the selection settle */
@@ -88,6 +93,8 @@ beforeEach(() => {
 
 afterEach(() => {
     window.getSelection()?.removeAllRanges();
+    // Unmounted before the page is emptied: the teleported button lives in the body
+    wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
     document.body.innerHTML = '';
     vi.useRealTimers();
 });
@@ -108,6 +115,17 @@ describe('quoting a selection with the floating button', () => {
         expect(floatingButton()).toBeNull();
     });
 
+    it('places the button next to the selection', async () => {
+        const wrapper = mounted(aPost());
+        select(wrapper, 'abordaje');
+        await wrapper.vm.$nextTick();
+        await vi.waitFor(() => {
+            expect(floatingButton()!.style.top).not.toBe('');
+        });
+
+        expect(floatingButton()!.style.left).not.toBe('');
+    });
+
     it('offers nothing for a selection that takes in a drawn label', async () => {
         const wrapper = mounted(aPost());
         select(wrapper, 'Cargar contenido');
@@ -121,7 +139,7 @@ describe('quoting a selection with the floating button', () => {
         select(forbidden, 'abordaje');
         await forbidden.vm.$nextTick();
         expect(floatingButton()).toBeNull();
-        forbidden.unmount();
+        wrappers.splice(wrappers.indexOf(forbidden), 1)[0]!.unmount();
 
         const hidden = mounted(aPost({ status: 'hidden' }));
         select(hidden, 'abordaje');

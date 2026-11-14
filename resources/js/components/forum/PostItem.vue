@@ -84,8 +84,15 @@ const selection = useSelectionQuote(body, {
         props.post.html !== null,
     fits: (text: string) => quoteFits(props.post.quoteText ?? '', text),
 });
-const selectionButton = selection.floating;
 const selectionVisible = selection.visible;
+
+/**
+ * Hands the teleported button to the composable. A function ref: the string form was never set
+ * on the teleported button in the browser, so the button stayed unplaced at the top corner.
+ */
+function setSelectionButton(element: unknown): void {
+    selection.floating.value = element instanceof HTMLElement ? element : null;
+}
 const revealOpen = computed({
     get: () => rollToReveal.value !== null,
     set: (open: boolean) => {
@@ -813,7 +820,7 @@ async function remove(): Promise<void> {
             <Teleport to="body">
                 <button
                     v-if="selectionVisible"
-                    ref="selectionButton"
+                    :ref="setSelectionButton"
                     type="button"
                     class="fixed left-0 top-0 z-50 inline-flex min-h-[44px] items-center gap-1 rounded-md border border-default bg-surface px-3 text-sm font-medium text-base-primary shadow-lg hover:bg-muted"
                     :aria-label="t('forum.posts.quoteSelection')"

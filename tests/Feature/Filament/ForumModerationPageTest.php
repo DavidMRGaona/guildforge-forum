@@ -19,6 +19,7 @@ use Livewire\Livewire;
 use Modules\Forum\Application\Conversations\ConversationReportService;
 use Modules\Forum\Application\Conversations\ConversationService;
 use Modules\Forum\Application\Services\ForumModeration;
+use Modules\Forum\Application\Services\MemberTitleService;
 use Modules\Forum\Application\Services\ReportService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\ModerationAction;
@@ -179,6 +180,21 @@ final class ForumModerationPageTest extends ModuleTestCase
             ->assertTableColumnFormattedStateSet('action', 'Mensajes separados', ModerationLogModel::query()->where('action', ModerationAction::DiscussionSplit->value)->sole())
             ->assertTableColumnStateSet('details', '2 mensajes (2, 3) a «Otro asunto» (tema 2)', ModerationLogModel::query()->where('action', ModerationAction::DiscussionSplit->value)->sole())
             ->assertTableColumnStateSet('details', '2 mensajes a «Destino» (tema 3)', ModerationLogModel::query()->where('action', ModerationAction::DiscussionMerged->value)->sole());
+    }
+
+    public function test_the_history_says_how_a_title_changed(): void
+    {
+        $moderator = $this->panelUser([self::MODERATE]);
+        $this->actingAs($moderator);
+        $person = UserModel::factory()->create();
+        app(MemberTitleService::class)->change($moderator, $person->id, 'Bardo');
+        app(MemberTitleService::class)->change($moderator, $person->id, null);
+        $entries = ModerationLogModel::query()->where('action', ModerationAction::TitleChanged->value)->orderBy('id')->get();
+
+        Livewire::test(ForumModerationPage::class)->set('activeTab', ForumModerationPage::TAB_HISTORY)
+            ->assertTableColumnFormattedStateSet('action', 'Título cambiado', $entries[0])
+            ->assertTableColumnStateSet('details', 'De «sin título» a «Bardo»', $entries[0])
+            ->assertTableColumnStateSet('details', 'De «Bardo» a «sin título»', $entries[1]);
     }
 
     public function test_a_link_opens_its_tab(): void

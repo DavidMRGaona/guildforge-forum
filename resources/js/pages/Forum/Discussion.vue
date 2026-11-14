@@ -370,6 +370,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                             :hidden-reason-max="moderation?.limits.hiddenReasonMax"
                             :reason-max="moderation?.limits.reasonMax"
                             :suspend-url="moderation?.suspendUrl ?? null"
+                            :title-url="moderation?.titleUrl ?? null"
                             :viewer-id="user?.id ?? null"
                             @quote="onQuote"
                             @changed="refresh"

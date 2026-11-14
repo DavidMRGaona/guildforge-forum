@@ -23,6 +23,7 @@ use Modules\Forum\Application\Services\DiscussionStarter;
 use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumRedirects;
+use Modules\Forum\Application\Services\MemberTitleService;
 use Modules\Forum\Application\Services\SuspensionService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -65,6 +66,7 @@ final class DiscussionController extends Controller
         private readonly ForumModeration $moderation,
         private readonly CategoryRepositoryInterface $categories,
         private readonly SuspensionService $suspensionService,
+        private readonly MemberTitleService $titles,
         private readonly ModerationProps $moderationProps,
         private readonly PrivateMessageLinks $messageLinks,
         private readonly CharacterPresenter $characters,
@@ -154,6 +156,7 @@ final class DiscussionController extends Controller
         return [
             'queueUrl' => route('forum.moderation.index'),
             'suspendUrl' => $this->suspensionService->canSuspend($moderator) ? route('forum.suspensions.store') : null,
+            'titleUrl' => $this->titles->canChange($moderator) ? route('forum.titles.store') : null,
             'actionsUrl' => route('forum.moderation.discussions', ['discussion' => $discussion->id()->value]),
             'splitUrl' => $restructures ? route('forum.moderation.discussions.split', ['discussion' => $discussion->id()->value]) : null,
             'mergeUrl' => $restructures ? route('forum.moderation.discussions.merge', ['discussion' => $discussion->id()->value]) : null,

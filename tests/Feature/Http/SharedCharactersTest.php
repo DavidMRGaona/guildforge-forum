@@ -18,6 +18,7 @@ use Inertia\Testing\AssertableInertia;
 use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\DefaultCategoriesInstaller;
+use Modules\Forum\Application\Services\MemberTitleService;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -337,6 +338,17 @@ final class SharedCharactersTest extends ModuleTestCase
 
         $this->actingAs($this->player)->get($this->discussionUrl())
             ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.0.isStarter', true)->where('posts.1.isStarter', false)->etc());
+    }
+
+    public function test_a_shared_character_does_not_give_its_writer_away_by_their_title(): void
+    {
+        app(MemberTitleService::class)->change($this->moderator, $this->director->id, 'Narradora');
+        $this->reply($this->director, $this->aSharedCharacterIn($this->space))->assertCreated();
+
+        foreach ([$this->player, $this->director] as $reader) {
+            $this->actingAs($reader)->get($this->discussionUrl())
+                ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.1.authorTitle', null)->etc());
+        }
     }
 
     public function test_a_shared_character_does_not_give_its_writer_away_by_their_avatar(): void

@@ -312,6 +312,7 @@ final class AccountErasureTest extends ModuleTestCase
             'id' => (string) Str::uuid(), 'post_id' => $this->othersPost->id()->value, 'reporter_id' => $id,
             'reason' => 'spam', 'created_at' => '2026-11-11 10:00:00',
         ]);
+        DB::table('forum_member_titles')->insert(['user_id' => $id, 'title' => 'Bardo', 'created_at' => '2026-11-11 10:00:00', 'updated_at' => '2026-11-11 10:00:00']);
 
         // Private conversations (forum#18): one with someone else, a start, blocks both ways and a report
         $someone = UserModel::factory()->create();

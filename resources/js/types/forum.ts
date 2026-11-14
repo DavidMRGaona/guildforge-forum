@@ -129,6 +129,8 @@ export interface ForumPost {
     authorName: string | null;
     /** The author's profile avatar (Cloudinary public id); null in character, without one or for an account no longer active */
     authorAvatarPublicId?: string | null;
+    /** The title moderation gave the author; null in character, without one or for an account no longer active */
+    authorTitle?: string | null;
     isStarter: boolean;
     status: ForumPostStatus;
     html: string | null;
@@ -215,6 +217,8 @@ export interface ForumDiscussionModeration {
     queueUrl: string;
     /** Only for whoever moderates the whole forum */
     suspendUrl: string | null;
+    /** Only for whoever moderates the whole forum: giving people a title */
+    titleUrl?: string | null;
     actionsUrl: string;
     /** Only for whoever moderates the whole forum */
     deleteUrl: string | null;

@@ -18,6 +18,7 @@ use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
 use Modules\Forum\Http\Controllers\ForumSearchController;
 use Modules\Forum\Http\Controllers\LiveUpdatesController;
+use Modules\Forum\Http\Controllers\MemberTitleController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\ModerationController;
 use Modules\Forum\Http\Controllers\ModerationQueueController;
@@ -149,6 +150,7 @@ Route::prefix('foro')
                 Route::post('mensajes/{post}/denuncias/resolver', [ReportController::class, 'resolve'])
                     ->whereUuid('post')
                     ->name('reports.resolve');
+                Route::post('titulos', [MemberTitleController::class, 'store'])->name('titles.store');
                 Route::post('suspensiones', [SuspensionController::class, 'store'])->name('suspensions.store');
                 Route::delete('suspensiones/{suspension}', [SuspensionController::class, 'destroy'])
                     ->whereUuid('suspension')

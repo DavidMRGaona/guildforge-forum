@@ -278,6 +278,18 @@ export default {
                 generic: 'No se ha podido hacer. Recarga la página e inténtalo de nuevo.',
             },
         },
+        titles: {
+            set: 'Poner título',
+            change: 'Cambiar título',
+            remove: 'Quitar título',
+            dialogTitle: 'Título de {name}',
+            label: 'Título',
+            hint: 'Hasta 30 caracteres. Se ve junto a su nombre en todo el foro.',
+            save: 'Guardar título',
+            errors: {
+                save: 'No se ha podido guardar el título. Inténtalo de nuevo.',
+            },
+        },
         reports: {
             action: 'Denunciar',
             title: 'Denunciar el mensaje {number}',

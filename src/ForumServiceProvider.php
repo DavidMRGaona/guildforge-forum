@@ -92,6 +92,7 @@ use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ExternalImageCopyRepositoryInterface;
+use Modules\Forum\Domain\Repositories\MemberTitleRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
@@ -134,6 +135,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiceR
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentEmbedCardRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentExternalImageCopyRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentMemberTitleRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
@@ -213,6 +215,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(DiscussionRepositoryInterface::class, EloquentDiscussionRepository::class);
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
         $this->app->bind(PostRevisionRepositoryInterface::class, EloquentPostRevisionRepository::class);
+        $this->app->bind(MemberTitleRepositoryInterface::class, EloquentMemberTitleRepository::class);
         $this->app->bind(DiceRollRepositoryInterface::class, EloquentDiceRollRepository::class);
         $this->app->bind(CharacterRepositoryInterface::class, EloquentCharacterRepository::class);
         $this->app->bind(CharacterPortraitStorageInterface::class, CloudinaryCharacterPortraitStorage::class);

@@ -777,6 +777,10 @@ final class ForumModerationPage extends Page implements HasTable
             ModerationAction::UserSuspended->value => is_string($details['ends_at'] ?? null)
                 ? __('forum::messages.moderation.details.until', ['date' => app(TimezoneServiceInterface::class)->format(new DateTimeImmutable($details['ends_at']))])
                 : __('forum::messages.moderation.details.no_end'),
+            ModerationAction::TitleChanged->value => __('forum::messages.moderation.details.title', [
+                'from' => is_string($details['from'] ?? null) ? $details['from'] : __('forum::messages.moderation.details.no_title'),
+                'to' => is_string($details['to'] ?? null) ? $details['to'] : __('forum::messages.moderation.details.no_title'),
+            ]),
             ModerationAction::CharacterEdited->value,
             ModerationAction::CharacterRetired->value,
             ModerationAction::CharacterRestored->value => __('forum::messages.moderation.details.character', ['name' => (string) ($details['character_name'] ?? '')]),

@@ -12,6 +12,7 @@ use Modules\Forum\Application\Contracts\MentionTextsInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Conversations\ConversationService;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
+use Modules\Forum\Domain\Repositories\MemberTitleRepositoryInterface;
 
 /**
  * What the forum does when an account is anonymized (core#461), all in one transaction and safe
@@ -28,6 +29,7 @@ use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
  * - Private conversations: the person leaves every one (the others read that they left, and a
  *   conversation nobody is left in goes); their messages stay, with the anonymous name. Their
  *   blocks (made and received), their starts and the reports they made go.
+ * - Their forum title goes: it only said something about them while they had an account.
  * - Kept as moderation history: the reports their posts received, their suspensions and the log.
  * - The forum's system account is never touched from here; if the core anonymizes it, the forum
  *   makes a new one when it next needs it.
@@ -41,6 +43,7 @@ final readonly class AccountErasure
         private MentionTextsInterface $mentions,
         private ConversationParticipantsInterface $participants,
         private ConversationService $conversations,
+        private MemberTitleRepositoryInterface $titles,
     ) {}
 
     public function forget(string $accountId): void
@@ -54,6 +57,7 @@ final readonly class AccountErasure
                 $this->conversations->leaveAs($accountId, $conversationId);
             }
             $this->engagement->forget($accountId);
+            $this->titles->forget($accountId);
             $this->mentions->refreshFor($accountId);
             $this->closeCharacters($accountId, new DateTimeImmutable);
         });

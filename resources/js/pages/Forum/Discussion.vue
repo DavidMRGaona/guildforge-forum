@@ -336,39 +336,47 @@ async function send(document: JSONContent, characterId: string | null): Promise<
         </nav>
 
         <div ref="list" class="space-y-4">
-            <template v-for="entry in entries" :key="entry.key">
-                <MovedPostsNotice v-if="entry.moved" :moved="entry.moved" />
-                <div v-else-if="entry.post" class="space-y-2">
-                    <FormCheckbox
-                        v-if="choosing && choosable(entry.post)"
-                        class="w-full rounded-md border border-default bg-surface px-3 py-3 hover:bg-muted"
-                        :model-value="selection.has(entry.post.number ?? 0)"
-                        data-testid="split-pick"
-                        @update:model-value="selection.toggle(entry.post.number ?? 0)"
-                    >
-                        <span class="text-base-primary">{{
-                            t('forum.moderation.discussion.splitPick', {
-                                number: entry.post.number,
-                            })
-                        }}</span>
-                    </FormCheckbox>
-                    <PostItem
-                        :post="entry.post"
-                        :focused="entry.post.number !== null && entry.post.number === focusNumber"
-                        :can-quote="reply.canPost"
-                        :editor="reply"
-                        :characters="reply.characters ?? null"
-                        :mentions-url="reply.mentionsUrl"
-                        :mention-names="allMentionNames"
-                        :hidden-reason-max="moderation?.limits.hiddenReasonMax"
-                        :reason-max="moderation?.limits.reasonMax"
-                        :suspend-url="moderation?.suspendUrl ?? null"
-                        :viewer-id="user?.id ?? null"
-                        @quote="onQuote"
-                        @changed="refresh"
-                    />
-                </div>
-            </template>
+            <!-- One block of posts divided by lines (no menu may be clipped: no overflow-hidden) -->
+            <div
+                v-if="entries.length > 0"
+                class="divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
+            >
+                <template v-for="entry in entries" :key="entry.key">
+                    <MovedPostsNotice v-if="entry.moved" :moved="entry.moved" />
+                    <div v-else-if="entry.post">
+                        <FormCheckbox
+                            v-if="choosing && choosable(entry.post)"
+                            class="w-full border-b border-default bg-muted px-4 py-3 hover:bg-muted"
+                            :model-value="selection.has(entry.post.number ?? 0)"
+                            data-testid="split-pick"
+                            @update:model-value="selection.toggle(entry.post.number ?? 0)"
+                        >
+                            <span class="text-base-primary">{{
+                                t('forum.moderation.discussion.splitPick', {
+                                    number: entry.post.number,
+                                })
+                            }}</span>
+                        </FormCheckbox>
+                        <PostItem
+                            :post="entry.post"
+                            :focused="
+                                entry.post.number !== null && entry.post.number === focusNumber
+                            "
+                            :can-quote="reply.canPost"
+                            :editor="reply"
+                            :characters="reply.characters ?? null"
+                            :mentions-url="reply.mentionsUrl"
+                            :mention-names="allMentionNames"
+                            :hidden-reason-max="moderation?.limits.hiddenReasonMax"
+                            :reason-max="moderation?.limits.reasonMax"
+                            :suspend-url="moderation?.suspendUrl ?? null"
+                            :viewer-id="user?.id ?? null"
+                            @quote="onQuote"
+                            @changed="refresh"
+                        />
+                    </div>
+                </template>
+            </div>
             <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
             <TypingNotice v-if="isLastPage" :people="typing.people.value" />
             <MergedNotice :target="live.mergedInto.value" />

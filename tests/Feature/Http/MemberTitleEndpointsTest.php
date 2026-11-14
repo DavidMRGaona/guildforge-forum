@@ -9,6 +9,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Entities\Category;
@@ -20,6 +21,7 @@ use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\ModerationLogModel;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -149,7 +151,10 @@ final class MemberTitleEndpointsTest extends ModuleTestCase
             ->assertOk();
     }
 
-    private function setTitle(?string $title): \Illuminate\Testing\TestResponse
+    /**
+     * @return TestResponse<Response>
+     */
+    private function setTitle(?string $title): TestResponse
     {
         return $this->actingAs($this->moderator)->postJson(route('forum.titles.store'), ['user' => $this->person->id, 'title' => $title]);
     }

@@ -89,7 +89,7 @@ final class MemberTitleRepositoryTest extends ModuleTestCase
         }
 
         DB::enableQueryLog();
-        $this->titles()->titlesOf($people->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all());
+        $this->titles()->titlesOf(array_values($people->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all()));
         $queries = DB::getQueryLog();
         DB::disableQueryLog();
 

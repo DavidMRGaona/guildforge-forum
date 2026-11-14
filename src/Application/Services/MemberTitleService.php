@@ -58,15 +58,16 @@ final readonly class MemberTitleService
         }
 
         $wanted = MemberTitle::fromInput($title);
+        $moderatorId = ForumBrowser::accountId($moderator) ?? throw ForumActionDeniedException::because('give someone a forum title');
 
-        return DB::transaction(function () use ($moderator, $userId, $wanted): ?MemberTitle {
+        return DB::transaction(function () use ($moderator, $moderatorId, $userId, $wanted): ?MemberTitle {
             $current = $this->titles->find($userId);
             if ($current?->value === $wanted?->value) {
                 return $current;
             }
 
             if ($wanted instanceof MemberTitle) {
-                $this->titles->save($userId, $wanted, ForumBrowser::accountId($moderator), CarbonImmutable::now());
+                $this->titles->save($userId, $wanted, $moderatorId, CarbonImmutable::now());
             } else {
                 $this->titles->forget($userId);
             }

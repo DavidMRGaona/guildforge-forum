@@ -18,6 +18,7 @@ use Modules\Forum\Http\Controllers\ForumIndexController;
 use Modules\Forum\Http\Controllers\ForumPreferencesController;
 use Modules\Forum\Http\Controllers\ForumSearchController;
 use Modules\Forum\Http\Controllers\LiveUpdatesController;
+use Modules\Forum\Http\Controllers\MemberTitleController;
 use Modules\Forum\Http\Controllers\MentionCandidatesController;
 use Modules\Forum\Http\Controllers\ModerationController;
 use Modules\Forum\Http\Controllers\ModerationQueueController;
@@ -30,7 +31,6 @@ use Modules\Forum\Http\Controllers\ReportController;
 use Modules\Forum\Http\Controllers\RollController;
 use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
-use Modules\Forum\Http\Controllers\MemberTitleController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 use Modules\Forum\Http\Middleware\EnsureForumIsVisible;
 

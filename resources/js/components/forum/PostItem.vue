@@ -314,6 +314,16 @@ const showsLikes = computed(
     () =>
         props.post.status === 'visible' && (props.post.likes.canLike || props.post.likes.count > 0)
 );
+/** Whether the post shows its row of actions (the row also gives the post its bottom room) */
+const hasFooter = computed(
+    () =>
+        !editing.value &&
+        (((props.canQuote || props.post.canEdit || props.post.canDelete || showsLikes.value) &&
+            props.post.html !== null) ||
+            moderationItems.value.length > 0 ||
+            (props.post.reportUrl !== null && !reported.value) ||
+            Boolean(props.post.messageUrl))
+);
 
 function quote(): void {
     // The post's stored text, not what is drawn: rolls, asides and embeds add labels and buttons
@@ -374,8 +384,11 @@ async function remove(): Promise<void> {
     <article
         :id="anchor"
         tabindex="-1"
-        class="group scroll-mt-24 px-4 pb-1 pt-3 focus:outline-none sm:grid sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-4"
-        :class="focused ? 'ring-2 ring-inset ring-primary-500/40' : ''"
+        class="group scroll-mt-24 px-4 pt-3 focus:outline-none sm:grid sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-4"
+        :class="[
+            hasFooter ? 'pb-1' : 'pb-3',
+            focused ? 'ring-2 ring-inset ring-primary-500/40' : '',
+        ]"
         :data-post-number="post.number ?? undefined"
         :data-post-url="post.url ?? undefined"
         :aria-labelledby="`${anchor}-author`"
@@ -398,67 +411,69 @@ async function remove(): Promise<void> {
 
         <div class="min-w-0">
             <header class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                <!-- On phones the avatar moves to the author line, leaving the width to the text -->
-                <CharacterAvatar
-                    v-if="post.character"
-                    class="sm:hidden"
-                    size="sm"
-                    :initials="post.character.initials"
-                    :portrait-url="post.character.portraitUrl"
-                />
-                <PostAvatar
-                    v-else
-                    class="sm:hidden"
-                    size="sm"
-                    :public-id="post.authorAvatarPublicId ?? null"
-                    :name="post.authorName"
-                />
-                <p
-                    v-if="post.character"
-                    :id="`${anchor}-author`"
-                    class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
-                    data-testid="post-character"
-                >
-                    <!-- The badge wraps below a long name instead of being cut with it -->
-                    <span class="min-w-0 truncate">{{ post.character.name }}</span>
-                    <span
-                        v-if="post.character.isRetired"
-                        class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                <!-- Avatar and name always share a line: a long name is cut, never pushed below -->
+                <div class="flex min-w-0 flex-1 items-center gap-2" data-testid="post-author">
+                    <!-- On phones the avatar moves to the author line, leaving the width to the text -->
+                    <CharacterAvatar
+                        v-if="post.character"
+                        class="sm:hidden"
+                        size="sm"
+                        :initials="post.character.initials"
+                        :portrait-url="post.character.portraitUrl"
+                    />
+                    <PostAvatar
+                        v-else
+                        class="sm:hidden"
+                        size="sm"
+                        :public-id="post.authorAvatarPublicId ?? null"
+                        :name="post.authorName"
+                    />
+                    <p
+                        v-if="post.character"
+                        :id="`${anchor}-author`"
+                        class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
+                        data-testid="post-character"
                     >
-                        {{ t('forum.characters.retiredBadge') }}
-                    </span>
-                </p>
-                <p
-                    v-else
-                    :id="`${anchor}-author`"
-                    class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-base-primary"
-                >
-                    <span class="min-w-0 truncate">{{
-                        post.authorName ?? t('forum.posts.deletedAccount')
-                    }}</span>
-                    <span
-                        v-if="post.isStarter"
-                        class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                        <span class="min-w-0 truncate">{{ post.character.name }}</span>
+                        <span
+                            v-if="post.character.isRetired"
+                            class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                        >
+                            {{ t('forum.characters.retiredBadge') }}
+                        </span>
+                    </p>
+                    <p
+                        v-else
+                        :id="`${anchor}-author`"
+                        class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                     >
-                        {{ t('forum.posts.starter') }}
-                    </span>
-                </p>
-                <p class="ml-auto flex shrink-0 items-center gap-x-2 text-xs text-base-muted">
-                    <span>
-                        <time :datetime="post.publishedAt ?? undefined">{{
-                            post.publishedLabel
-                        }}</time>
-                        <span v-if="post.editedLabel">
-                            · {{ t('forum.posts.edited', { at: post.editedLabel }) }}</span
+                        <span class="min-w-0 truncate">{{
+                            post.authorName ?? t('forum.posts.deletedAccount')
+                        }}</span>
+                        <span
+                            v-if="post.isStarter"
+                            class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
                         >
-                        <span v-if="post.status === 'pending'">
-                            · {{ t('forum.posts.pendingBadge') }}</span
-                        >
-                    </span>
+                            {{ t('forum.posts.starter') }}
+                        </span>
+                    </p>
+                </div>
+                <!-- Date, «editado» and «pendiente» wrap on narrow screens instead of widening the page -->
+                <p
+                    class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 text-xs text-base-muted"
+                    data-testid="post-meta"
+                >
+                    <time :datetime="post.publishedAt ?? undefined">{{ post.publishedLabel }}</time>
+                    <span v-if="post.editedLabel">
+                        · {{ t('forum.posts.edited', { at: post.editedLabel }) }}</span
+                    >
+                    <span v-if="post.status === 'pending'">
+                        · {{ t('forum.posts.pendingBadge') }}</span
+                    >
                     <a
                         v-if="post.url && post.number"
                         :href="post.url"
-                        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md font-medium text-base-muted hover:text-primary sm:min-h-0 sm:min-w-0"
+                        class="inline-flex items-center justify-center rounded-md px-1 font-medium text-base-muted hover:text-primary pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
                         :aria-label="t('forum.posts.permalink', { number: post.number })"
                         >#{{ post.number }}</a
                     >
@@ -578,17 +593,7 @@ async function remove(): Promise<void> {
                 </template>
             </div>
 
-            <footer
-                v-if="
-                    !editing &&
-                    (((canQuote || post.canEdit || post.canDelete || showsLikes) &&
-                        post.html !== null) ||
-                        moderationItems.length > 0 ||
-                        (post.reportUrl !== null && !reported) ||
-                        Boolean(post.messageUrl))
-                "
-                class="-ml-2 mt-1 flex flex-wrap items-center gap-0.5"
-            >
+            <footer v-if="hasFooter" class="-ml-2 mt-1 flex flex-wrap items-center gap-0.5">
                 <LikeButton
                     v-if="showsLikes"
                     class="mr-auto"

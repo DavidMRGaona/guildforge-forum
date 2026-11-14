@@ -158,4 +158,55 @@ describe('a compact post', () => {
         expect(label('Escribir un mensaje privado a Jane Doe')).toBeDefined();
         expect(label('Citar')).toBeUndefined();
     });
+
+    it('lets the date, «editado» and «pendiente» wrap instead of widening the page', () => {
+        const meta = mounted(aPost({ editedLabel: '12/11/2026 10:05', status: 'pending' })).get(
+            '[data-testid="post-meta"]'
+        );
+
+        expect(meta.classes()).not.toContain('shrink-0');
+        expect(meta.classes()).toContain('flex-wrap');
+        expect(meta.classes()).toContain('min-w-0');
+    });
+
+    it('keeps the phone avatar on the same line as the name', () => {
+        const wrapper = mounted(aPost({ authorName: 'Un nombre bastante largo para un móvil' }));
+
+        const group = wrapper.get('[data-testid="post-author"]');
+        expect(group.find('[data-testid="post-avatar"]').exists()).toBe(true);
+        expect(group.find('p').text()).toContain('Un nombre bastante largo');
+        expect(group.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'flex-1']));
+        expect(group.classes()).not.toContain('flex-wrap');
+    });
+
+    it('leaves room under a post that has no actions', () => {
+        const wrapper = mount(PostItem, {
+            props: {
+                post: aPost(),
+                focused: false,
+                canQuote: false,
+                editor: {
+                    uploadUrl: null,
+                    maxImages: 10,
+                    imageTypes: ['image/png'],
+                    externalImageUrl: null,
+                    externalImageHosts: [],
+                    embedUrl: null,
+                    embedServices: [],
+                },
+                mentionsUrl: null,
+                mentionNames: {},
+            },
+        });
+
+        expect(wrapper.find('footer').exists()).toBe(false);
+        expect(wrapper.get('article').classes()).toContain('pb-3');
+    });
+
+    it('sizes the permalink for a finger by pointer, not by width', () => {
+        const permalink = mounted(aPost()).get('header a[href="/foro/t/7-partida/2"]');
+
+        expect(permalink.classes()).toContain('pointer-coarse:min-h-[44px]');
+        expect(permalink.classes().some((name) => name.startsWith('sm:min-'))).toBe(false);
+    });
 });

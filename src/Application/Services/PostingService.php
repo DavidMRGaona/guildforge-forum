@@ -73,7 +73,7 @@ final readonly class PostingService
         $discussion = $this->readableDiscussion($author, $discussionId);
         $this->assertCanPost($author, $discussion);
 
-        $body = $this->bodies->fromInput($document, $author);
+        $body = $this->bodies->fromInput($document, $author, discussionId: $discussionId);
         $category = $this->categories->find($discussion->categoryId());
         if (! $category instanceof Category) {
             throw DiscussionNotFoundException::withId($discussionId->value);
@@ -111,7 +111,7 @@ final readonly class PostingService
         $this->assertCanPost($author, $discussion);
 
         $post = $this->posts->findOrFail($postId);
-        $body = $this->bodies->fromInput($document, $author, $post->body());
+        $body = $this->bodies->fromInput($document, $author, $post->body(), $post->discussionId());
         $category = $this->categories->find($discussion->categoryId());
         if (! $category instanceof Category) {
             throw PostNotFoundException::withId($postId->value);

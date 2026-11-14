@@ -28,6 +28,9 @@ final class DocumentLimits
 
     public const int MAX_QUOTES = 10;
 
+    /** References to other posts (#12): more typed than this stay as text */
+    public const int MAX_REFERENCES = 30;
+
     /** Dice rolls per post (the rest of their limits live in Domain\Dice\Limits) */
     public const int MAX_ROLLS = Limits::MAX_ROLLS_PER_POST;
 

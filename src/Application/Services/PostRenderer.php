@@ -8,10 +8,12 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Content\Nodes\EmbedNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
+use Modules\Forum\Application\Content\Nodes\PostReferenceNode;
 use Modules\Forum\Application\Content\Nodes\RollNode;
 use Modules\Forum\Application\Content\PostDocument;
 use Modules\Forum\Application\Content\Rendering\DocumentRenderer;
 use Modules\Forum\Application\Content\Rendering\QuoteSource;
+use Modules\Forum\Application\Content\Rendering\ReferenceView;
 use Modules\Forum\Application\Content\Rendering\RenderContext;
 use Modules\Forum\Application\Content\Rendering\RollView;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
@@ -20,6 +22,7 @@ use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Domain\Entities\DiceRoll;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiceRollRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
@@ -137,15 +140,17 @@ final readonly class PostRenderer
     {
         $mention = (new MentionNode)->name();
         $quote = (new PostQuoteNode)->name();
+        $reference = (new PostReferenceNode)->name();
         $roll = (new RollNode)->name();
         $embed = (new EmbedNode)->name();
         $accountIds = [];
         $postIds = [];
+        $referencedIds = [];
         $rollIds = [];
         $embeds = [];
 
         foreach ($bodies as $body) {
-            $found = $this->renderer->attributesOf($body->document, [$mention, $quote, $roll, $embed]);
+            $found = $this->renderer->attributesOf($body->document, [$mention, $quote, $reference, $roll, $embed]);
             foreach ($found[$embed] ?? [] as $attributes) {
                 $embeds[] = $attributes;
             }
@@ -155,18 +160,87 @@ final readonly class PostRenderer
             foreach ($found[$quote] ?? [] as $attributes) {
                 $postIds[] = AccountId::normalize(is_string($attributes['postId'] ?? null) ? $attributes['postId'] : '');
             }
+            foreach ($found[$reference] ?? [] as $attributes) {
+                $referencedIds[] = AccountId::normalize(is_string($attributes['postId'] ?? null) ? $attributes['postId'] : '');
+            }
             foreach ($found[$roll] ?? [] as $attributes) {
                 $rollIds[] = is_string($attributes['rollId'] ?? null) ? $attributes['rollId'] : null;
             }
         }
 
+        $quoted = $this->distinct($postIds);
+        $referenced = $this->distinct($referencedIds);
+        // Quoted and referenced posts are looked up together, once
+        $found = $this->lookUp(array_values(array_unique([...$quoted, ...$referenced])), $reader);
+
         return new RenderContext(
             accountNames: $this->accounts->namesOf($this->distinct($accountIds)),
-            quotes: $this->quoteSources($this->distinct($postIds), $reader),
+            quotes: $this->quoteSources(array_intersect_key($found['readable'], array_flip($quoted))),
             imageUrl: fn (string $path): ?string => $this->images->url($path),
             rolls: $this->rollViews($this->distinct($rollIds), $reader, $offerReveal),
             embeds: $this->embedViews->for($embeds),
+            references: $this->referenceViews($referenced, $found),
         );
+    }
+
+    /**
+     * The posts among the ids that exist, and those the reader may read with their discussion.
+     *
+     * @param  list<string>  $postIds
+     * @return array{found: array<string, Post>, readable: array<string, array{Post, Discussion}>}
+     */
+    private function lookUp(array $postIds, ?Authenticatable $reader): array
+    {
+        if ($postIds === []) {
+            return ['found' => [], 'readable' => []];
+        }
+
+        /** @var array<string, Discussion|null> $discussions */
+        $discussions = [];
+        $found = [];
+        $readable = [];
+        foreach ($this->posts->findMany(array_map(PostId::fromString(...), $postIds)) as $post) {
+            $found[$post->id()->value] = $post;
+            $discussionId = $post->discussionId()->value;
+            if (! array_key_exists($discussionId, $discussions)) {
+                $discussion = $this->discussions->find(DiscussionId::fromString($discussionId));
+                $discussions[$discussionId] = $discussion instanceof Discussion && $this->access->canRead($reader, $discussion) ? $discussion : null;
+            }
+
+            $discussion = $discussions[$discussionId];
+            if ($discussion instanceof Discussion && $post->isVisible()) {
+                $readable[$post->id()->value] = [$post, $discussion];
+            }
+        }
+
+        return ['found' => $found, 'readable' => $readable];
+    }
+
+    /**
+     * A referenced post the reader may read shows where it is; any other that exists shows only
+     * its number. One that is gone has no view (it shows as unknown).
+     *
+     * @param  list<string>  $postIds
+     * @param  array{found: array<string, Post>, readable: array<string, array{Post, Discussion}>}  $found
+     * @return array<string, ReferenceView>
+     */
+    private function referenceViews(array $postIds, array $found): array
+    {
+        $views = [];
+        foreach ($postIds as $postId) {
+            $post = $found['found'][$postId] ?? null;
+            if (! $post instanceof Post) {
+                continue;
+            }
+
+            $readable = $found['readable'][$postId] ?? null;
+            $url = $readable === null ? null : $this->links->urlFor($post, $readable[1]);
+            $views[$postId] = $url === null
+                ? new ReferenceView($post->number()?->value)
+                : new ReferenceView($post->number()?->value, $url, $this->links->previewUrlFor($post), $readable[1]->title()->value);
+        }
+
+        return $views;
     }
 
     /**
@@ -179,32 +253,16 @@ final readonly class PostRenderer
     }
 
     /**
-     * @param  list<string>  $postIds
+     * @param  array<string, array{Post, Discussion}>  $readable  the quoted posts the reader may read
      * @return array<string, QuoteSource>
      */
-    private function quoteSources(array $postIds, ?Authenticatable $reader): array
+    private function quoteSources(array $readable): array
     {
-        if ($postIds === []) {
+        if ($readable === []) {
             return [];
         }
 
-        /** @var array<string, Discussion|null> $discussions */
-        $discussions = [];
-        $readable = [];
-        foreach ($this->posts->findMany(array_map(PostId::fromString(...), $postIds)) as $post) {
-            $discussionId = $post->discussionId()->value;
-            if (! array_key_exists($discussionId, $discussions)) {
-                $discussion = $this->discussions->find(DiscussionId::fromString($discussionId));
-                $discussions[$discussionId] = $discussion instanceof Discussion && $this->access->canRead($reader, $discussion) ? $discussion : null;
-            }
-
-            $discussion = $discussions[$discussionId];
-            if ($discussion instanceof Discussion && $post->isVisible()) {
-                $readable[] = [$post, $discussion];
-            }
-        }
-
-        $names = $this->accounts->namesOf($this->distinct(array_map(static fn (array $pair): ?string => $pair[0]->authorId(), $readable)));
+        $names = $this->accounts->namesOf($this->distinct(array_values(array_map(static fn (array $pair): ?string => $pair[0]->authorId(), $readable))));
         // A post that speaks as a shared character is quoted under its name, never its author's
         $shared = [];
         foreach ($this->characters->findMany(array_values(array_filter(array_map(static fn (array $pair): ?CharacterId => $pair[0]->characterId(), $readable)))) as $character) {

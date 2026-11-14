@@ -28,4 +28,9 @@ final readonly class DiscussionPostLinks implements PostLinksInterface
 
         return $this->urls->discussion($discussion, $number);
     }
+
+    public function previewUrlFor(Post $post): string
+    {
+        return route('forum.posts.preview', ['post' => $post->id()->value]);
+    }
 }

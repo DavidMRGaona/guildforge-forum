@@ -12,6 +12,7 @@ import ModerationDialog, { type ModerationDialogFields } from '../moderation/Mod
 import ModerationMenu, { type ModerationMenuItem } from '../moderation/ModerationMenu.vue';
 import ReportDialog from '../moderation/ReportDialog.vue';
 import SuspendDialog from '../moderation/SuspendDialog.vue';
+import TitleDialog from '../moderation/TitleDialog.vue';
 import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
@@ -51,10 +52,19 @@ const props = withDefaults(
         /** For whoever moderates the whole forum: suspending the author from this post */
         suspendUrl?: string | null;
         viewerId?: string | null;
+        /** For whoever moderates the whole forum: giving the author a title */
+        titleUrl?: string | null;
         /** «Hablar como» for the reader's own posts; null when characters are off for them */
         characters?: ForumCharacterPicker | null;
     }>(),
-    { hiddenReasonMax: 300, reasonMax: 500, suspendUrl: null, viewerId: null, characters: null }
+    {
+        hiddenReasonMax: 300,
+        reasonMax: 500,
+        suspendUrl: null,
+        titleUrl: null,
+        viewerId: null,
+        characters: null,
+    }
 );
 
 const emit = defineEmits<{
@@ -170,7 +180,7 @@ const canSuspendAuthor = computed(
 
 const moderationItems = computed<ModerationMenuItem[]>(() => {
     if (props.post.moderationUrl === null) {
-        return characterItems.value;
+        return [...titleItems.value, ...characterItems.value];
     }
     const items: ModerationMenuItem[] = [];
     switch (props.post.status) {
@@ -193,8 +203,39 @@ const moderationItems = computed<ModerationMenuItem[]>(() => {
         items.push({ key: 'suspend', label: t('forum.moderation.post.suspend'), danger: true });
     }
 
-    return [...items, ...characterItems.value];
+    return [...items, ...titleItems.value, ...characterItems.value];
 });
+
+/** Giving the author a title, for whoever moderates the whole forum */
+const titleItems = computed<ModerationMenuItem[]>(() => {
+    if (!props.titleUrl || props.post.authorId === null) {
+        return [];
+    }
+
+    return props.post.authorTitle
+        ? [
+              { key: 'title-change', label: t('forum.titles.change') },
+              { key: 'title-remove', label: t('forum.titles.remove') },
+          ]
+        : [{ key: 'title-set', label: t('forum.titles.set') }];
+});
+const titling = ref(false);
+
+async function removeTitle(): Promise<void> {
+    if (!props.titleUrl || props.post.authorId === null) {
+        return;
+    }
+    const answer = await sendJson(props.titleUrl, 'POST', {
+        user: props.post.authorId,
+        title: null,
+    });
+    if (answer.ok) {
+        emit('changed');
+
+        return;
+    }
+    error.value = answer.message ?? t('forum.titles.errors.save');
+}
 
 /** What whoever moderates the post's character may do with it */
 const characterItems = computed<ModerationMenuItem[]>(() => {
@@ -278,6 +319,16 @@ function selectModeration(key: string): void {
         characterAction.value = key === 'character-retire' ? 'retire' : 'delete';
         characterError.value = null;
         characterDialogOpen.value = true;
+
+        return;
+    }
+    if (key === 'title-set' || key === 'title-change') {
+        titling.value = true;
+
+        return;
+    }
+    if (key === 'title-remove') {
+        void removeTitle();
 
         return;
     }
@@ -484,6 +535,13 @@ async function remove(): Promise<void> {
                         <span class="min-w-0 truncate">{{
                             post.authorName ?? t('forum.posts.deletedAccount')
                         }}</span>
+                        <!-- Given by moderation; escaped like any text -->
+                        <span
+                            v-if="post.authorTitle"
+                            class="min-w-0 truncate text-xs font-normal text-base-secondary"
+                            data-testid="post-author-title"
+                            >{{ post.authorTitle }}</span
+                        >
                         <span
                             v-if="post.isStarter"
                             class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
@@ -790,6 +848,16 @@ async function remove(): Promise<void> {
                 :report-url="post.reportUrl"
                 :post-number="post.number"
                 @reported="reported = true"
+            />
+
+            <TitleDialog
+                v-if="titleUrl && post.authorId"
+                v-model="titling"
+                :title-url="titleUrl"
+                :user-id="post.authorId"
+                :user-name="post.authorName"
+                :current="post.authorTitle ?? null"
+                @saved="emit('changed')"
             />
 
             <SuspendDialog

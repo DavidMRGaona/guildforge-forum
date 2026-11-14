@@ -277,6 +277,18 @@ export default {
                 generic: 'It could not be done. Reload the page and try again.',
             },
         },
+        titles: {
+            set: 'Give a title',
+            change: 'Change title',
+            remove: 'Remove title',
+            dialogTitle: 'Title of {name}',
+            label: 'Title',
+            hint: 'Up to 30 characters. It shows next to their name across the forum.',
+            save: 'Save title',
+            errors: {
+                save: 'The title could not be saved. Try again.',
+            },
+        },
         reports: {
             action: 'Report',
             title: 'Report post {number}',

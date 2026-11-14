@@ -1,8 +1,11 @@
-import { computePosition, flip, offset, shift } from '@floating-ui/dom';
+import { computePosition, flip, hide as hideMiddleware, offset, shift } from '@floating-ui/dom';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 
 /** How long the selection must stay still before the button shows: never while dragging */
 const SETTLE_MS = 150;
+/** Room between selection and button: with a finger, enough to clear the selection's handles */
+const GAP_MOUSE = 8;
+const GAP_TOUCH = 24;
 
 export interface SelectionQuoteOptions {
     /** Whether the post may be quoted right now (visible, the reader may reply, not editing) */
@@ -57,20 +60,27 @@ export function useSelectionQuote(
         ) {
             return null;
         }
-        const { anchorNode, focusNode } = selection;
+        const whole = selection.getRangeAt(0);
+        if (!container.contains(whole.startContainer)) {
+            return null;
+        }
+        // A triple click on the last paragraph ends the range at the start of what follows the
+        // body: cut it at the body's end, and take it only if that leaves out no text (a range
+        // that reaches into another post does)
+        const range = whole.cloneRange();
+        if (!container.contains(whole.endContainer)) {
+            range.setEnd(container, container.childNodes.length);
+        }
+        const selected = range.toString().trim();
         if (
-            anchorNode === null ||
-            focusNode === null ||
-            !container.contains(anchorNode) ||
-            !container.contains(focusNode)
+            selected === '' ||
+            selected !== selection.toString().trim() ||
+            !options.fits(selected)
         ) {
             return null;
         }
-        const selected = selection.toString().trim();
 
-        return selected !== '' && options.fits(selected)
-            ? { text: selected, range: selection.getRangeAt(0) }
-            : null;
+        return { text: selected, range };
     }
 
     function settle(): void {
@@ -114,15 +124,29 @@ export function useSelectionQuote(
             typeof window.matchMedia === 'function' &&
             window.matchMedia('(pointer: coarse)').matches;
         void computePosition(
-            { getBoundingClientRect: () => current.getBoundingClientRect() },
+            {
+                getBoundingClientRect: () => current.getBoundingClientRect(),
+                contextElement: body.value ?? undefined,
+            },
             element,
             {
                 placement: touch ? 'bottom' : 'top',
                 strategy: 'fixed',
-                middleware: [offset(8), flip(), shift({ padding: 8 })],
+                middleware: [
+                    offset(touch ? GAP_TOUCH : GAP_MOUSE),
+                    flip(),
+                    shift({ padding: 8 }),
+                    hideMiddleware(),
+                ],
             }
-        ).then(({ x, y }) => {
-            Object.assign(element.style, { left: `${x}px`, top: `${y}px` });
+        ).then(({ x, y, middlewareData }) => {
+            // Out of sight while the selection is scrolled out of view
+            const hidden = middlewareData.hide?.referenceHidden === true;
+            Object.assign(element.style, {
+                left: `${x}px`,
+                top: `${y}px`,
+                visibility: hidden ? 'hidden' : 'visible',
+            });
         });
     }
 
@@ -133,6 +157,14 @@ export function useSelectionQuote(
     }
 
     watch(floating, () => place());
+
+    // Opening the editor or drawing the post again removes the selected text without any
+    // selectionchange event: check again whenever the post stops being quotable or changes
+    watch([(): boolean => options.enabled(), body], (): void => {
+        if (visible.value && read() === null) {
+            hide();
+        }
+    });
 
     onMounted(() => {
         document.addEventListener('selectionchange', onSelectionChange);

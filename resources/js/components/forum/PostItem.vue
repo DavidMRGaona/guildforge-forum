@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { Link } from '@inertiajs/vue3';
@@ -85,6 +85,11 @@ const selection = useSelectionQuote(body, {
     fits: (text: string) => quoteFits(props.post.quoteText ?? '', text),
 });
 const selectionVisible = selection.visible;
+// The post drawn again (edited, moderated, reloaded): what was selected is no longer there
+watch(
+    () => props.post.html,
+    () => selection.hide()
+);
 
 /**
  * Hands the teleported button to the composable. A function ref: the string form was never set

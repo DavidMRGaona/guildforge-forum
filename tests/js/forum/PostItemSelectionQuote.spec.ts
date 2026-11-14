@@ -156,9 +156,24 @@ describe('quoting a selection with the floating button', () => {
             })
         );
         select(wrapper, 'abordaje');
+        await wrapper.vm.$nextTick();
+        expect(floatingButton()).not.toBeNull();
+        // Opening the editor removes the selected text without any selectionchange event
         await wrapper.get('button[aria-label="Editar"]').trigger('click');
-        document.dispatchEvent(new Event('selectionchange'));
-        vi.advanceTimersByTime(150);
+        await wrapper.vm.$nextTick();
+
+        expect(floatingButton()).toBeNull();
+    });
+
+    it('drops the button when the post is drawn again with other text', async () => {
+        const wrapper = mounted(aPost());
+        select(wrapper, 'abordaje');
+        await wrapper.vm.$nextTick();
+        expect(floatingButton()).not.toBeNull();
+
+        await wrapper.setProps({
+            post: aPost({ html: '<p>Texto nuevo</p>', quoteText: 'Texto nuevo' }),
+        });
         await wrapper.vm.$nextTick();
 
         expect(floatingButton()).toBeNull();

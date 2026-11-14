@@ -59,8 +59,14 @@ final class SubjectConversationController extends Controller
         $olderBefore = $conversation->olderBefore();
         $signedIn = $user instanceof Authenticatable;
         ['posts' => $posts, 'mentionNames' => $mentionNames] = $this->presenter->posts($discussion, $conversation->posts, $conversation->contents);
+        $readOnly = $conversation->isReadOnly();
+        if ($readOnly) {
+            // Editing and deleting happen in the forum: the page only reads
+            $posts = array_map(static fn (array $post): array => [...$post, 'canEdit' => false, 'canDelete' => false, 'document' => null, 'updateUrl' => null, 'deleteUrl' => null], $posts);
+        }
 
         return [
+            'mode' => $conversation->mode->value,
             'discussion' => [
                 'id' => $discussionId,
                 'number' => $discussion->number(),
@@ -84,7 +90,7 @@ final class SubjectConversationController extends Controller
             'reply' => [
                 'canPost' => $conversation->canPost,
                 'postUrl' => route('forum.posts.store', ['discussion' => $discussionId]),
-                'mentionsUrl' => $signedIn ? route('forum.mentions.index', ['discussion' => $discussionId]) : null,
+                'mentionsUrl' => $signedIn && ! $readOnly ? route('forum.mentions.index', ['discussion' => $discussionId]) : null,
                 ...$this->editor->for($user),
                 'suspension' => $this->moderationProps->suspensionNotice($user),
             ],

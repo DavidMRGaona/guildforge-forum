@@ -8,6 +8,7 @@ use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 
 /**
@@ -177,6 +178,15 @@ final readonly class ForumSettings implements ForumSettingsInterface
         $stored = config("modules.settings.forum.embed_cookie_categories.{$service}");
 
         return is_string($stored) && preg_match(self::COOKIE_CATEGORY_PATTERN, $stored) === 1 ? $stored : self::DEFAULT_EMBED_COOKIE_CATEGORY;
+    }
+
+    public function subjectConversationMode(string $type): SubjectConversationMode
+    {
+        $stored = config('modules.settings.forum.subject_conversations');
+        $mode = is_array($stored) ? ($stored[$type] ?? null) : null;
+
+        // Shown only when the site chose how: an unknown value hides it rather than opening a reply box
+        return is_string($mode) ? (SubjectConversationMode::tryFrom($mode) ?? SubjectConversationMode::Hidden) : SubjectConversationMode::Hidden;
     }
 
     private function pageSize(string $key): int

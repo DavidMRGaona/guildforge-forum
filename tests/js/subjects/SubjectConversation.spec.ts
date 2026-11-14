@@ -41,6 +41,7 @@ function aConversation(
     overrides: Partial<ForumSubjectConversation> = {}
 ): ForumSubjectConversation {
     return {
+        mode: 'reply',
         discussion: {
             id: 'discussion-1',
             number: 7,
@@ -322,5 +323,48 @@ describe('SubjectConversation', () => {
             'Todavía no hay comentarios. Puedes ser la primera persona en escribir.'
         );
         expect(wrapper.find('[role="textbox"]').exists()).toBe(true);
+    });
+
+    describe('read only', () => {
+        it('shows the last posts with nothing to write, quote or sign in for', async () => {
+            signIn();
+            serve({ [BASE]: { body: { conversation: aConversation({ mode: 'read' }) } } });
+            const wrapper = await mountIt();
+
+            expect(wrapper.findAll('article')).toHaveLength(5);
+            expect(wrapper.find('a[href="/foro/t/7-partida"]').text()).toBe(
+                'Ver conversación completa'
+            );
+            expect(wrapper.find('[role="textbox"]').exists()).toBe(false);
+            expect(wrapper.find('form').exists()).toBe(false);
+            expect(wrapper.text()).not.toContain('para comentar');
+            expect(wrapper.findComponent(SubjectConversationThread).props('canQuote')).toBe(false);
+        });
+
+        it('says in one line that there are no posts yet and leads to the forum', async () => {
+            signIn();
+            serve({
+                [BASE]: {
+                    body: {
+                        conversation: aConversation({
+                            mode: 'read',
+                            posts: [],
+                            olderCount: 0,
+                            olderNext: 0,
+                            olderUrl: null,
+                        }),
+                    },
+                },
+            });
+            const wrapper = await mountIt();
+
+            expect(wrapper.find('h2').text()).toBe('Conversación');
+            const line = wrapper.get('[data-testid="subject-conversation-empty"]');
+            expect(line.text()).toContain('Todavía no hay mensajes');
+            expect(line.get('a[href="/foro/t/7-partida"]').text()).toBe('Comentar en el foro');
+            // The line already leads there: no second link next to the heading
+            expect(wrapper.findAll('a[href="/foro/t/7-partida"]')).toHaveLength(1);
+            expect(wrapper.find('[role="textbox"]').exists()).toBe(false);
+        });
     });
 });

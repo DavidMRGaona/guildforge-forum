@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Unit;
 
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -139,5 +140,36 @@ final class ForumSettingsTest extends TestCase
         $this->assertSame('marketing', $settings->embedCookieCategory('x'));
         $this->assertSame('marketing', $settings->embedCookieCategory('vimeo'));
         $this->assertSame('marketing', $settings->embedCookieCategory('reddit'));
+    }
+
+    public function test_record_pages_show_no_conversation_until_the_site_chooses(): void
+    {
+        config(['modules.settings.forum' => []]);
+
+        $this->assertSame(SubjectConversationMode::Hidden, (new ForumSettings)->subjectConversationMode('event'));
+    }
+
+    public function test_each_record_type_has_its_own_conversation_mode(): void
+    {
+        config(['modules.settings.forum' => ['subject_conversations' => ['event' => 'read', 'game-table' => 'reply', 'campaign' => 'hidden']]]);
+        $settings = new ForumSettings;
+
+        $this->assertSame(SubjectConversationMode::Read, $settings->subjectConversationMode('event'));
+        $this->assertSame(SubjectConversationMode::Reply, $settings->subjectConversationMode('game-table'));
+        $this->assertSame(SubjectConversationMode::Hidden, $settings->subjectConversationMode('campaign'));
+        // A type a later module brings starts hidden
+        $this->assertSame(SubjectConversationMode::Hidden, $settings->subjectConversationMode('tournament'));
+    }
+
+    public function test_an_unreadable_conversation_mode_hides_the_conversation(): void
+    {
+        config(['modules.settings.forum' => ['subject_conversations' => ['event' => 'everything', 'game-table' => 1]]]);
+        $settings = new ForumSettings;
+
+        $this->assertSame(SubjectConversationMode::Hidden, $settings->subjectConversationMode('event'));
+        $this->assertSame(SubjectConversationMode::Hidden, $settings->subjectConversationMode('game-table'));
+
+        config(['modules.settings.forum' => ['subject_conversations' => 'reply']]);
+        $this->assertSame(SubjectConversationMode::Hidden, (new ForumSettings)->subjectConversationMode('event'));
     }
 }

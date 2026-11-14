@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Filament;
 
+use App\Application\Modules\Services\ModuleSettingsStoreInterface;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Filament\Clusters\SettingsCluster;
 use App\Filament\Pages\KnowledgeBasePage;
 use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
@@ -13,8 +15,10 @@ use Filament\Forms\Components\CheckboxList;
 use Livewire\Livewire;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\InteractsWithModulePanel;
 use Tests\Support\Modules\ModuleTestCase;
 
@@ -178,6 +182,52 @@ final class ForumSettingsPageTest extends ModuleTestCase
             ->set('data.embed_cookie_categories.x', "videos\n")
             ->call('save')
             ->assertHasErrors(['data.embed_cookie_categories.x']);
+    }
+
+    public function test_each_record_type_with_a_source_chooses_how_its_page_shows_the_conversation(): void
+    {
+        app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        $page = Livewire::test(ForumSettingsPage::class)
+            ->assertSet('data.subject_conversations.event', 'hidden')
+            ->assertSet('data.subject_conversations.game-table', 'hidden')
+            ->assertFormFieldExists('subject_conversations.event')
+            ->assertFormFieldExists('subject_conversations.game-table')
+            // No source offers campaigns here: nothing to choose for them
+            ->assertFormFieldDoesNotExist('subject_conversations.campaign');
+
+        $page->set('data.subject_conversations.event', 'read')
+            ->set('data.subject_conversations.game-table', 'reply')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $settings = app(ForumSettingsInterface::class);
+        $this->assertSame(SubjectConversationMode::Read, $settings->subjectConversationMode('event'));
+        $this->assertSame(SubjectConversationMode::Reply, $settings->subjectConversationMode('game-table'));
+    }
+
+    public function test_a_type_whose_module_is_off_keeps_its_saved_mode(): void
+    {
+        app(ModuleSettingsStoreInterface::class)->store('forum', ['subject_conversations' => ['campaign' => 'reply']]);
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.subject_conversations.event', 'read')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(['campaign' => 'reply', 'event' => 'read'], app(ModuleSettingsStoreInterface::class)->stored('forum')['subject_conversations'] ?? null);
+    }
+
+    public function test_an_unknown_conversation_mode_is_refused(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.subject_conversations.event', 'everything')
+            ->call('save')
+            ->assertHasErrors(['data.subject_conversations.event']);
     }
 
     public function test_saving_is_refused_without_the_permission(): void

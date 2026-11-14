@@ -15,7 +15,8 @@ import type { ForumPost, ForumSubjectConversation } from '../../types/forum';
 /**
  * The conversation of a record (a game table, a campaign, an event), in the core's
  * `subject-discussion` slot of its page: its last posts, earlier ones on demand, and a reply
- * box. It is asked for once the page is drawn, so the page never waits for the forum: nothing
+ * box (read only: no reply box, and a line leading to the forum while there are no posts; the
+ * site chooses per type, and a type it hides answers no conversation). It is asked for once the page is drawn, so the page never waits for the forum: nothing
  * shows while it loads. A record without a discussion, or with one the reader may not read,
  * shows nothing; a failed request, a neutral notice that offers to try again.
  */
@@ -83,6 +84,8 @@ const tracking = computed(() => {
 
     return lowest <= FIRST_SHOWN || (loaded.lastReadNumber ?? 0) >= lowest - 1;
 });
+
+const readOnly = computed(() => conversation.value?.mode === 'read');
 
 const closedNotice = computed(() => {
     const reason = conversation.value?.discussion.closedReason ?? null;
@@ -194,6 +197,7 @@ watch(() => [props.subjectType, props.subjectId], load);
                 {{ t('forum.subjects.title') }}
             </h2>
             <Link
+                v-if="!readOnly || live.posts.value.length > 0"
                 :href="conversation.discussion.url"
                 class="inline-flex min-h-[44px] items-center text-sm font-medium text-primary hover:underline"
             >
@@ -229,6 +233,20 @@ watch(() => [props.subjectType, props.subjectId], load);
             @quote="onQuote"
             @changed="load"
         />
+        <p
+            v-else-if="readOnly"
+            data-testid="subject-conversation-empty"
+            class="flex flex-wrap items-center gap-x-2 text-sm text-base-secondary"
+        >
+            {{ t('forum.subjects.emptyReadOnlyMode') }}
+            <span aria-hidden="true">·</span>
+            <Link
+                :href="conversation.discussion.url"
+                class="inline-flex min-h-[44px] items-center font-medium text-primary hover:underline"
+            >
+                {{ t('forum.subjects.commentInForum') }}
+            </Link>
+        </p>
         <p v-else class="text-sm text-base-secondary">
             {{
                 conversation.reply.canPost
@@ -240,6 +258,7 @@ watch(() => [props.subjectType, props.subjectId], load);
         <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
 
         <ReplyBox
+            v-if="!readOnly"
             ref="reply"
             :reply="conversation.reply"
             :draft-key="`forum-reply-${conversation.discussion.id}`"

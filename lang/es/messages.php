@@ -79,6 +79,18 @@ return [
             'everyone' => 'Cualquier cuenta con sesión',
             'permission' => 'Solo con el permiso «Tener personajes en el foro»',
         ],
+        'subject_conversations' => 'Conversación en las fichas',
+        'subject_conversations_help' => 'Cómo muestra cada ficha la conversación de su tema en el foro. Con «Solo lectura» se ven los últimos mensajes y se escribe en el foro. Las fichas de un módulo que se active más adelante empiezan sin conversación.',
+        'subject_conversation_options' => [
+            'hidden' => 'No mostrar',
+            'read' => 'Solo lectura',
+            'reply' => 'Leer y responder',
+        ],
+        'subject_types' => [
+            'event' => 'Eventos',
+            'game-table' => 'Mesas sueltas',
+            'campaign' => 'Campañas',
+        ],
         'announced_categories_help' => 'Solo aparecen las categorías que se leen sin sesión. Las de mesas, campañas y eventos se anuncian con su publicación. Sin ninguna marcada, no se anuncia nada.',
     ],
 

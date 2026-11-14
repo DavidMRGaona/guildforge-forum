@@ -455,6 +455,7 @@ final class HiddenRollsTest extends ModuleTestCase
         $record->announce($discussion->id(), $opening->id(), $facts->toArray(), $facts->isLive());
         app(SubjectDiscussionRepositoryInterface::class)->save($record);
         $this->hiddenReply($discussion)->assertCreated();
+        config(['modules.settings.forum.subject_conversations' => ['game-table' => 'reply']]);
 
         $this->assertWithheld((string) $this->actingAs($this->reader)->getJson('/foro/fichas/game-table/table-1')->assertOk()->getContent());
         $this->assertStringContainsString(self::RESULT, (string) $this->actingAs($this->thrower)->getJson('/foro/fichas/game-table/table-1')->assertOk()->json('conversation.posts.0.html'));

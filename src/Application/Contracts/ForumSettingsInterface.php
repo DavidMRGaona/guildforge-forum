@@ -6,6 +6,7 @@ namespace Modules\Forum\Application\Contracts;
 
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 
 interface ForumSettingsInterface
 {
@@ -75,4 +76,10 @@ interface ForumSettingsInterface
 
     /** The cookie category whose consent loads the service's player without a click */
     public function embedCookieCategory(string $service): string;
+
+    /**
+     * How a record's page of this publication type shows its conversation; hidden for a type
+     * the site never chose (one a later module brings) and for anything unreadable.
+     */
+    public function subjectConversationMode(string $type): SubjectConversationMode;
 }

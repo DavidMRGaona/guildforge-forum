@@ -466,6 +466,8 @@ export default {
             olderError: 'The previous posts could not be loaded. Please try again.',
             empty: 'No comments yet. You can be the first to write.',
             emptyReadOnly: 'No comments yet.',
+            emptyReadOnlyMode: 'No posts yet',
+            commentInForum: 'Comment in the forum',
             replyLabel: 'Your comment',
             send: 'Post comment',
             signInToComment: 'to comment.',

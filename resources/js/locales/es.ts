@@ -469,6 +469,8 @@ export default {
             olderError: 'No se han podido cargar los mensajes anteriores. Inténtalo de nuevo.',
             empty: 'Todavía no hay comentarios. Puedes ser la primera persona en escribir.',
             emptyReadOnly: 'Todavía no hay comentarios.',
+            emptyReadOnlyMode: 'Todavía no hay mensajes',
+            commentInForum: 'Comentar en el foro',
             replyLabel: 'Tu comentario',
             send: 'Publicar comentario',
             signInToComment: 'para comentar.',

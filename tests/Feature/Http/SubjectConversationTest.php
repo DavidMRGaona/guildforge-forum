@@ -22,6 +22,7 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -47,6 +48,8 @@ final class SubjectConversationTest extends ModuleTestCase
 
         $this->useUtcStorage();
         app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
+        // Pages show no conversation until the site chooses how: these tests read and reply
+        config(['modules.settings.forum.subject_conversations' => ['game-table' => 'reply', 'campaign' => 'reply']]);
         $this->public = $this->aCategoryFor(CategoryAudience::everyone(), 'mesas');
     }
 
@@ -98,7 +101,8 @@ final class SubjectConversationTest extends ModuleTestCase
 
         $response = $this->getJson('/foro/fichas/game-table/table-1')->assertOk();
 
-        $response->assertJsonPath('conversation.discussion.id', $discussion->id()->value)
+        $response->assertJsonPath('conversation.mode', 'reply')
+            ->assertJsonPath('conversation.discussion.id', $discussion->id()->value)
             ->assertJsonPath('conversation.discussion.url', '/foro/t/'.$discussion->number().'-partida-del-viernes')
             ->assertJsonPath('conversation.discussion.isClosed', false)
             ->assertJsonPath('conversation.discussion.closedReason', null)
@@ -231,6 +235,66 @@ final class SubjectConversationTest extends ModuleTestCase
             ->assertJsonPath('conversation.reply.canPost', false);
         $this->getJson('/foro/fichas/game-table/moderated-1')
             ->assertJsonPath('conversation.discussion.closedReason', 'moderation');
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function hiddenSettings(): iterable
+    {
+        yield 'chosen' => [['game-table' => 'hidden']];
+        yield 'never chosen for the type' => [['event' => 'reply']];
+        yield 'nothing saved' => [null];
+        yield 'an unknown value' => [['game-table' => 'everything']];
+    }
+
+    #[DataProvider('hiddenSettings')]
+    public function test_a_type_whose_conversation_is_not_shown_answers_nothing(mixed $setting): void
+    {
+        [$discussion] = $this->aSubjectDiscussion('table-1', $this->public);
+        $this->aReply($discussion, '2026-11-10 10:02:00');
+        config(['modules.settings.forum.subject_conversations' => $setting]);
+
+        $this->actingAs($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM))
+            ->getJson('/foro/fichas/game-table/table-1')
+            ->assertOk()
+            ->assertExactJson(['conversation' => null]);
+        $this->getJson('/foro/fichas/game-table/table-1?antes=3')->assertExactJson(['conversation' => null]);
+    }
+
+    public function test_read_only_shows_the_posts_but_nothing_to_write_with(): void
+    {
+        [$discussion] = $this->aSubjectDiscussion('table-1', $this->public);
+        $author = $this->anAccount();
+        app(ForumWriter::class)->reply($discussion->id(), PostId::generate(), strtolower($author->id), self::aBody('Me apunto'), new DateTimeImmutable('2026-11-10 10:05:00'), false);
+        config(['modules.settings.forum.subject_conversations' => ['game-table' => 'read']]);
+
+        $this->actingAs($author)
+            ->getJson('/foro/fichas/game-table/table-1')
+            ->assertOk()
+            ->assertJsonPath('conversation.mode', 'read')
+            ->assertJsonPath('conversation.discussion.url', '/foro/t/'.$discussion->number().'-partida-del-viernes')
+            ->assertJsonCount(1, 'conversation.posts')
+            // Writing, quoting and editing happen in the forum
+            ->assertJsonPath('conversation.reply.canPost', false)
+            ->assertJsonPath('conversation.reply.mentionsUrl', null)
+            ->assertJsonPath('conversation.posts.0.canEdit', false)
+            ->assertJsonPath('conversation.posts.0.canDelete', false)
+            ->assertJsonPath('conversation.posts.0.updateUrl', null)
+            ->assertJsonPath('conversation.posts.0.deleteUrl', null)
+            // Reading still moves the mark
+            ->assertJsonPath('conversation.readUrl', route('forum.discussions.read', ['discussion' => $discussion->id()->value]));
+    }
+
+    public function test_each_type_follows_its_own_setting(): void
+    {
+        $this->aSubjectDiscussion('table-1', $this->public);
+        config(['modules.settings.forum.subject_conversations' => ['game-table' => 'reply', 'campaign' => 'hidden']]);
+
+        $this->actingAs($this->anAccount())
+            ->getJson('/foro/fichas/game-table/table-1')
+            ->assertJsonPath('conversation.mode', 'reply')
+            ->assertJsonPath('conversation.reply.canPost', true);
     }
 
     /**

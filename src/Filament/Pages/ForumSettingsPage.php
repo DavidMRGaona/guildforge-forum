@@ -7,6 +7,7 @@ namespace Modules\Forum\Filament\Pages;
 use App\Application\Modules\Services\ModuleContextServiceInterface;
 use App\Application\Modules\Services\ModuleManagerServiceInterface;
 use App\Application\Modules\Services\ModuleSettingsStoreInterface;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Domain\Modules\ValueObjects\ModuleName;
 use App\Filament\Clusters\SettingsCluster;
 use App\Filament\Concerns\ChecksPermissions;
@@ -30,9 +31,11 @@ use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Enums\CharacterAccessMode;
 use Modules\Forum\Domain\Enums\PostImageType;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
+use Throwable;
 
 /**
  * The forum settings, open to forum:settings.manage (admins hold every permission), in the
@@ -83,7 +86,18 @@ final class ForumSettingsPage extends Page implements HasForms
     {
         // The shipped defaults with the saved values on top, so keys added by a release show
         // their defaults instead of loading empty and being saved off
-        $this->form->fill($settingsStore->effective('forum', $moduleContext->modulePath('forum')));
+        $state = $settingsStore->effective('forum', $moduleContext->modulePath('forum'));
+
+        // Each offered type shows what applies to it: hidden until chosen, and for an unknown value
+        $modes = is_array($state['subject_conversations'] ?? null) ? $state['subject_conversations'] : [];
+        foreach (array_keys($this->subjectTypes()) as $type) {
+            $mode = $modes[$type] ?? null;
+            $known = is_string($mode) ? SubjectConversationMode::tryFrom($mode) : null;
+            $modes[$type] = ($known ?? SubjectConversationMode::Hidden)->value;
+        }
+        $state['subject_conversations'] = $modes;
+
+        $this->form->fill($state);
     }
 
     public function form(Schema $schema): Schema
@@ -107,6 +121,23 @@ final class ForumSettingsPage extends Page implements HasForms
                             ->default(ForumSettings::DEFAULT_POSTS_PER_MINUTE),
                         $this->boundedField('discussions_per_hour', ForumSettings::MIN_DISCUSSIONS_PER_HOUR, ForumSettings::MAX_DISCUSSIONS_PER_HOUR, ForumSettings::DEFAULT_DISCUSSIONS_PER_HOUR)
                             ->helperText(__('forum::messages.settings.discussions_per_hour_help', ['min' => ForumSettings::MIN_DISCUSSIONS_PER_HOUR, 'max' => ForumSettings::MAX_DISCUSSIONS_PER_HOUR])),
+                    ]),
+                Section::make(__('forum::messages.settings.subject_conversations'))
+                    ->description(__('forum::messages.settings.subject_conversations_help'))
+                    ->schema([
+                        Grid::make(['default' => 1, 'sm' => 2, '2xl' => 3])
+                            ->schema(array_map(
+                                fn (string $type, string $label): Select => Select::make("subject_conversations.{$type}")
+                                    ->label($label)
+                                    ->options($this->subjectConversationOptions())
+                                    ->native(false)
+                                    ->selectablePlaceholder(false)
+                                    ->required()
+                                    ->in(array_keys($this->subjectConversationOptions()))
+                                    ->default(SubjectConversationMode::Hidden->value),
+                                array_keys($this->subjectTypes()),
+                                $this->subjectTypes(),
+                            )),
                     ]),
                 Section::make(__('forum::messages.settings.announcements'))
                     ->description(__('forum::messages.settings.announcements_help'))
@@ -224,8 +255,15 @@ final class ForumSettingsPage extends Page implements HasForms
         // Livewire methods can be called without the page's button
         abort_unless(self::canAccess(), 403);
 
-        // Keys this page does not show keep their stored values
-        $moduleManager->updateSettings(new ModuleName('forum'), array_merge($settingsStore->stored('forum'), $this->form->getState()));
+        // Keys this page does not show keep their stored values, and so do the conversation
+        // modes of types no source offers now (their module is off): they apply again when it is on
+        $stored = $settingsStore->stored('forum');
+        $state = $this->form->getState();
+        $state['subject_conversations'] = array_merge(
+            is_array($stored['subject_conversations'] ?? null) ? $stored['subject_conversations'] : [],
+            is_array($state['subject_conversations'] ?? null) ? $state['subject_conversations'] : [],
+        );
+        $moduleManager->updateSettings(new ModuleName('forum'), array_merge($stored, $state));
 
         Notification::make()
             ->title(__('forum::messages.settings.saved'))
@@ -264,6 +302,45 @@ final class ForumSettingsPage extends Page implements HasForms
         }
 
         return $options;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function subjectConversationOptions(): array
+    {
+        $options = [];
+        foreach (SubjectConversationMode::cases() as $mode) {
+            $options[$mode->value] = $mode->label();
+        }
+
+        return $options;
+    }
+
+    /**
+     * The publication types some source offers now (only their pages exist), named in the forum's
+     * words when it knows them and by their type otherwise. A registry that fails offers none.
+     *
+     * @return array<string, string>
+     */
+    private function subjectTypes(): array
+    {
+        try {
+            $types = array_keys(app(PublicationSourceRegistryInterface::class)->sources());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        $labels = [];
+        foreach ($types as $type) {
+            $key = "forum::messages.settings.subject_types.{$type}";
+            $label = __($key);
+            $labels[$type] = is_string($label) && $label !== $key ? $label : $type;
+        }
+
+        return $labels;
     }
 
     /**

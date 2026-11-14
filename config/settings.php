@@ -41,6 +41,9 @@ return [
     ],
     // Who may have characters and write as them: nobody, everyone (signed in) or permission (forum:characters.use)
     'characters_access' => 'everyone',
+    // How each record page shows its conversation, by publication type (event, game-table, campaign…):
+    // hidden, read (last posts, writing in the forum) or reply. A type not listed shows none
+    'subject_conversations' => [],
     // Categories whose new discussions are announced on the site's channels (ids; only those guests can read)
     'announced_categories' => [],
 ];

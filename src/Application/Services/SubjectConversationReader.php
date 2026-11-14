@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use InvalidArgumentException;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\DTOs\SubjectClosedReason;
 use Modules\Forum\Application\DTOs\SubjectConversationDTO;
 use Modules\Forum\Application\Publications\PublicationAvailability;
@@ -16,6 +17,7 @@ use Modules\Forum\Application\Publications\PublicationFacts;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\SubjectDiscussion;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\SubjectDiscussionRepositoryInterface;
@@ -28,7 +30,8 @@ use Modules\Forum\Domain\ValueObjects\PublicationKey;
  * of its publication's discussion, read with the forum's own rules. A record without a
  * discussion, one the reader may not read, or of a type no active source offers (its module
  * is off) has none (null), whatever the reason, so the page cannot tell a private discussion
- * from a missing one.
+ * from a missing one. Neither has a type whose pages the site chose to show without one (the
+ * setting `subject_conversations`, hidden until chosen); read only, nobody may post from the page.
  */
 final readonly class SubjectConversationReader
 {
@@ -50,6 +53,7 @@ final readonly class SubjectConversationReader
         private PostContentPresenter $presenter,
         private DiscussionReadsInterface $reads,
         private PublicationAvailability $availability,
+        private ForumSettingsInterface $settings,
     ) {}
 
     /**
@@ -63,7 +67,8 @@ final readonly class SubjectConversationReader
             return null;
         }
 
-        if (! $this->availability->offers($key->type)) {
+        $mode = $this->settings->subjectConversationMode($key->type);
+        if ($mode === SubjectConversationMode::Hidden || ! $this->availability->offers($key->type)) {
             return null;
         }
 
@@ -108,8 +113,9 @@ final readonly class SubjectConversationReader
             olderCount: $olderCount,
             highestNumber: $this->posts->highestNumber($discussionId)->value ?? 0,
             lastReadNumber: $readerId === null ? null : $this->reads->readThrough($readerId, $discussionId, $discussion->categoryId()),
-            canPost: $this->posting->canPost($reader, $discussion),
+            canPost: $mode === SubjectConversationMode::Reply && $this->posting->canPost($reader, $discussion),
             closedReason: $this->closedReason($discussion, $record),
+            mode: $mode,
         );
     }
 

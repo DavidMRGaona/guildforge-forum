@@ -7,11 +7,16 @@ namespace Modules\Forum\Domain\Exceptions;
 use DomainException;
 
 /**
- * A report or a suspension that cannot be (a note too long, an end before its start), or a
+ * A report, a suspension or a title that cannot be (a note too long, an end before its start), or a
  * change to one in the wrong state (resolving a report twice, lifting a suspension twice).
  */
 final class InvalidModerationRecordException extends DomainException
 {
+    public static function invalidTitle(int $max): self
+    {
+        return new self("A title is one line of at most {$max} characters.");
+    }
+
     public static function noteTooLong(int $max): self
     {
         return new self("A report's note is limited to {$max} characters.");

@@ -19,7 +19,8 @@ use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
  *
  * - Posts and discussions stay: they belong to other people's conversations. They show the
  *   site's anonymous name because the forum reads names from the account when it paints, and so
- *   do the mentions of the person; no avatar is ever shown next to a post.
+ *   do the mentions of the person. Their avatar is read from the account too, and the forum shows
+ *   none for an anonymized account.
  * - Gone: likes, follows, reading marks, preferences and the reports the person filed. The core
  *   already removed their notices, mail choices and muted discussions.
  * - Characters lose their description and portrait, and are retired by moderation, so nobody can

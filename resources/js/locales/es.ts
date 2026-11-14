@@ -120,7 +120,6 @@ export default {
             revealFailed: 'No se ha podido revelar la tirada. Inténtalo de nuevo.',
         },
         posts: {
-            writePrivately: 'Mensaje privado',
             writePrivatelyTo: 'Escribir un mensaje privado a {name}',
             moved: {
                 to: 'Un mensaje movido a | {count} mensajes movidos a',

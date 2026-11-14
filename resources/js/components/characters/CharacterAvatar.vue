@@ -10,7 +10,7 @@ const props = withDefaults(
     defineProps<{
         initials: string;
         portraitUrl: string | null;
-        size?: 'sm' | 'md' | 'lg';
+        size?: 'sm' | 'md' | 'lg' | 'xl';
     }>(),
     { size: 'md' }
 );
@@ -21,6 +21,7 @@ const box = computed(
             sm: 'h-7 w-7 text-xs',
             md: 'h-10 w-10 text-sm',
             lg: 'h-16 w-16 text-lg',
+            xl: 'h-[72px] w-[72px] text-2xl',
         })[props.size]
 );
 </script>

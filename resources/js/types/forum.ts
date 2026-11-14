@@ -127,6 +127,8 @@ export interface ForumPost {
     number: number | null;
     authorId: string | null;
     authorName: string | null;
+    /** The author's profile avatar (Cloudinary public id); null in character, without one or for an account no longer active */
+    authorAvatarPublicId?: string | null;
     isStarter: boolean;
     status: ForumPostStatus;
     html: string | null;

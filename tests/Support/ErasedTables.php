@@ -73,6 +73,7 @@ final class ErasedTables
             'forum_subject_discussions',
             'forum_dice_rolls',
             'forum_post_redirects',
+            'forum_post_references',
             'forum_discussion_redirects',
             // Copies of images from other sites: an address and a stored file, nobody's
             'forum_external_images',

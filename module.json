@@ -1,7 +1,7 @@
 {
   "name": "forum",
   "displayName": "Foro",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "repository": "DavidMRGaona/guildforge-forum",
   "namespace": "Modules\\Forum",
   "provider": "ForumServiceProvider",

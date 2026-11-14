@@ -305,6 +305,8 @@ export type ForumSubjectClosedReason = 'cancelled' | 'withdrawn' | 'moderation' 
 
 /** The conversation a record's page shows (SubjectConversationController) */
 export interface ForumSubjectConversation {
+    /** Read only: the last posts and a way to the forum, nothing to write, quote or edit */
+    mode: 'read' | 'reply';
     discussion: {
         id: string;
         number: number;

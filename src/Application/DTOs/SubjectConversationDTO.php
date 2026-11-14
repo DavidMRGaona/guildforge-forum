@@ -6,6 +6,7 @@ namespace Modules\Forum\Application\DTOs;
 
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\ValueObjects\PublicationKey;
 
 /**
@@ -19,6 +20,7 @@ final readonly class SubjectConversationDTO
      * @param  list<PostContentDTO>  $contents  what each of those posts shows to the reader, in the same order
      * @param  int  $olderCount  how many numbered posts come before the run (the forum's opening post aside)
      * @param  int|null  $lastReadNumber  the reader's mark; null for guests
+     * @param  SubjectConversationMode  $mode  read or reply (a hidden one is never built)
      */
     public function __construct(
         public PublicationKey $key,
@@ -30,7 +32,14 @@ final readonly class SubjectConversationDTO
         public ?int $lastReadNumber,
         public bool $canPost,
         public ?SubjectClosedReason $closedReason,
+        public SubjectConversationMode $mode,
     ) {}
+
+    /** Read only: the page offers no reply box, quoting or editing */
+    public function isReadOnly(): bool
+    {
+        return $this->mode === SubjectConversationMode::Read;
+    }
 
     /**
      * The number earlier posts are asked before: the lowest numbered post of the run.

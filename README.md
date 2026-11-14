@@ -73,6 +73,7 @@ Cada partida suelta, campaña y evento publicados tiene su tema en el foro sin q
   - Se reconoce solo por su id, guardado en el ajuste `forum_system_account_id`, nunca por su dirección: una cuenta que alguien registre no se toma por ella. Si se borra o se anonimiza desde el panel, se crea otra la siguiente vez que haga falta.
   - Nunca recibe nada ni se puede mencionar: lo que avise a personas (menciones, seguimiento, «me gusta», citas, correo, resumen diario) la salta con `SystemAccountInterface::isSystemAccount()`.
   - Desinstalar el módulo con sus datos borra el ajuste.
+- **Conversación en las fichas**: las fichas que ponen la ranura `subject-discussion` del core (eventos, mesas sueltas y campañas) piden la conversación de su tema a `GET /foro/fichas/<tipo>/<id>` cuando ya están pintadas. El ajuste *Conversación en las fichas* (`subject_conversations`, un valor por tipo) decide cómo se ve: **No mostrar** (por defecto, también para un tipo que traiga un módulo más adelante o un valor que no se reconoce), **Solo lectura** (últimos mensajes y enlace al tema; sin editor, citas ni edición, y sin mensajes una línea «Todavía no hay mensajes · Comentar en el foro») o **Leer y responder**. Con «No mostrar» la ruta responde `{"conversation": null}`, igual que un tema que no existe. El panel solo ofrece los tipos con fuente activa; el valor de un tipo sin fuente se conserva al guardar.
 - **Quién cerró el tema**: cada tema sabe si lo cerró el propio foro (`closed_by_system`). Cerrarlo o abrirlo a mano lo borra, así que el foro nunca abre lo que cerró la moderación.
 
 ## Espacios de campaña
@@ -109,7 +110,7 @@ El foro nunca pregunta qué módulos hay ni importa nada de ellos: decide por lo
 | Temas automáticos de eventos | Fuente `event` (del core) | Siempre está |
 | Espacios de campaña | Fuente `campaign` con roster (`PublicationRosterInterface`) | Se ocultan con «Campañas»; sin roster solo entra la moderación del foro |
 | Etiquetas de sistema de juego | `topics` de las publicaciones | No llegan etiquetas nuevas; las de los temas ocultos no salen en los filtros |
-| Conversación en las fichas | Ranura `subject-discussion` y la fuente del tipo | Solo la pintan las páginas que existen; sin fuente, `/foro/fichas/<tipo>/<id>` no devuelve nada |
+| Conversación en las fichas | Ranura `subject-discussion` y la fuente del tipo | Solo la pintan las páginas que existen; sin fuente, `/foro/fichas/<tipo>/<id>` no devuelve nada y el ajuste del tipo no se ofrece |
 | Incrustaciones (#21) | Los servicios, ninguno: su lista es del foro. El consentimiento, `hasCookieConsent()` (cookie-consent) | Se incrustan igual; sin el módulo de cookies, cada reproductor pide un clic antes de cargarse |
 | Anuncio de temas nuevos | Evento `ForumDiscussionStarted` (lo escucha channel-notifications) | El evento se lanza igual y nadie lo atiende |
 

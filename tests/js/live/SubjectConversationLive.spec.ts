@@ -42,6 +42,7 @@ function aConversation(
     overrides: Partial<ForumSubjectConversation> = {}
 ): ForumSubjectConversation {
     return {
+        mode: 'reply',
         discussion: {
             id: 'discussion-1',
             number: 7,

@@ -1,11 +1,11 @@
 ---
 id: forum.panel.settings
 title: Ajustes del foro
-summary: Tamaños de página, límites de publicación, imágenes, incrustaciones con cookies, avisos de temas nuevos y personajes.
+summary: Tamaños de página, límites de publicación, conversación en las fichas, imágenes, incrustaciones con cookies, avisos de temas nuevos y personajes.
 category: content
 audience: panel
 order: 180
-keywords: [ajustes del foro, configuración del foro, temas por página, mensajes por página, mensajes por minuto, temas por hora, imágenes, formatos, peso máximo, sitios permitidos, imgur, incrustaciones, youtube, vimeo, cookies, categoría de cookies, consentimiento, avisos de temas nuevos, telegram, personajes, quién puede tener personajes]
+keywords: [ajustes del foro, configuración del foro, temas por página, mensajes por página, mensajes por minuto, temas por hora, conversación en las fichas, comentarios en eventos, solo lectura, imágenes, formatos, peso máximo, sitios permitidos, imgur, incrustaciones, youtube, vimeo, cookies, categoría de cookies, consentimiento, avisos de temas nuevos, telegram, personajes, quién puede tener personajes]
 related: [forum.panel.categories, forum.panel.permissions, forum.site.images, forum.site.external-images, forum.site.embeds, forum.site.characters]
 conditions:
   permissions:
@@ -19,6 +19,16 @@ Los ajustes del foro están en **Sistema** → **Configuración** → **Foro**. 
 
 - **Temas por página** y **Mensajes por página**: cuántos se muestran de una vez en las listas y en los temas.
 - **Mensajes por minuto y persona** y **Temas por hora y persona**: para frenar el exceso de mensajes. Quien se pasa espera antes de volver a publicar y se le dice cuánto. Cada tema cuenta también como mensaje.
+
+## Conversación en las fichas
+
+Las fichas de eventos, mesas sueltas y campañas pueden mostrar la conversación de su tema en el foro. Cada tipo de ficha tiene su selector, y solo salen los tipos cuyo módulo está activo:
+
+- **No mostrar**: la ficha no enseña la conversación. Es el valor de partida, también para las fichas de un módulo que se active más adelante.
+- **Solo lectura**: se ven los últimos mensajes y **Ver conversación completa**, sin cuadro para escribir. Si todavía no hay mensajes, sale una línea con **Comentar en el foro**.
+- **Leer y responder**: los últimos mensajes y un cuadro para comentar desde la propia ficha.
+
+Si desactivas un módulo, su valor se guarda y vuelve a aplicarse al activarlo.
 
 ## Imágenes
 
@@ -52,4 +62,5 @@ Al activar un servicio, el sitio autoriza a sus reproductores en la política de
 
 - **Un campo no deja guardar**: cada uno muestra su rango; corrige el que esté marcado en rojo.
 - **Un servicio aparece pero no carga su contenido**: revisa su **Categoría de cookies** y que el banner de cookies tenga esa categoría.
+- **Una ficha no muestra la conversación**: revisa el valor de su tipo en **Conversación en las fichas**. Tampoco sale si la ficha aún no tiene tema en el foro o si quien la mira no puede leer su categoría.
 - **No veo estos ajustes**: hace falta el permiso **Configurar el foro**.

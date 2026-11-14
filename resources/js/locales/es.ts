@@ -141,6 +141,7 @@ export default {
             pendingBadge: 'pendiente de aprobación',
             permalink: 'Enlace al mensaje {number}',
             quote: 'Citar',
+            quoteSelection: 'Citar lo seleccionado',
             edit: 'Editar',
             editLabel: 'Editar el mensaje {number}',
             saveEdit: 'Guardar cambios',

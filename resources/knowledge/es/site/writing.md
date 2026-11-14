@@ -22,7 +22,7 @@ Para enviar sin coger el ratón, pulsa Ctrl + Intro.
 
 ## Citar un mensaje
 
-Pulsa **Citar** debajo del mensaje al que respondes. La cita lleva el nombre de quien escribió y un enlace al mensaje, y a su autor le llega un aviso. El foro comprueba que lo citado es de verdad del mensaje original, y un mensaje puede llevar hasta 10 citas.
+Pulsa **Citar** debajo del mensaje al que respondes. Para citar solo una parte, selecciona ese trozo del mensaje y pulsa el botón **Citar** que aparece encima (en el móvil, debajo). La cita lleva el nombre de quien escribió y un enlace al mensaje, y a su autor le llega un aviso. El foro comprueba que lo citado es de verdad del mensaje original, y un mensaje puede llevar hasta 10 citas.
 
 ## Mencionar a alguien
 

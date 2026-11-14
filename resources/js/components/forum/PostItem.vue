@@ -539,6 +539,7 @@ async function remove(): Promise<void> {
                         <span
                             v-if="post.authorTitle"
                             class="min-w-0 truncate text-xs font-normal text-base-secondary"
+                            :title="post.authorTitle"
                             data-testid="post-author-title"
                             >{{ post.authorTitle }}</span
                         >

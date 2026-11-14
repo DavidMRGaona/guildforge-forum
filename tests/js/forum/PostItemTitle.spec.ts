@@ -86,6 +86,14 @@ describe('a post author title', () => {
         expect(wrapper.get('[data-testid="post-author"]').text()).toContain('Jane Doe');
     });
 
+    it('offers the whole title as a tooltip, since a long one is cut', () => {
+        const title = mounted(aPost({ authorTitle: 'Guardián de las reglas oficial' })).get(
+            '[data-testid="post-author-title"]'
+        );
+
+        expect(title.attributes('title')).toBe('Guardián de las reglas oficial');
+    });
+
     it('shows no title in character', () => {
         const wrapper = mounted(
             aPost({

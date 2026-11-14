@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Authorization\Services\AuthorizationServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\ModerationAction;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
@@ -91,7 +93,7 @@ final class MemberTitleEndpointsTest extends ModuleTestCase
     public function test_a_category_moderator_cannot(): void
     {
         $role = RoleModel::query()->create(['name' => 'tablemasters', 'display_name' => 'Tablemasters']);
-        app(CategoryRepositoryInterface::class)->save(new Category(
+        app(CategoryRepositoryInterface::class)->save($category = new Category(
             CategoryId::generate(),
             'Rol',
             new CategorySlug('rol'),
@@ -103,7 +105,9 @@ final class MemberTitleEndpointsTest extends ModuleTestCase
         ));
         $keeper = $this->anAccount();
         $keeper->roles()->attach($role->id);
+        app(AuthorizationServiceInterface::class)->invalidateCacheFor($keeper);
 
+        $this->assertTrue(app(CategoryAccessPolicy::class)->canModerate($keeper, $category), 'the keeper must moderate the category');
         $this->actingAs($keeper)->postJson(route('forum.titles.store'), ['user' => $this->person->id, 'title' => 'Bardo'])
             ->assertForbidden();
         $this->assertSame(0, DB::table('forum_member_titles')->count());

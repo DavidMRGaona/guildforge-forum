@@ -141,6 +141,7 @@ export default {
             pendingBadge: 'awaiting approval',
             permalink: 'Link to post {number}',
             quote: 'Quote',
+            quoteSelection: 'Quote the selection',
             edit: 'Edit',
             editLabel: 'Edit post {number}',
             saveEdit: 'Save changes',

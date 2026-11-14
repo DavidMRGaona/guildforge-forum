@@ -1,6 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { useSelectionQuote } from '../../../resources/js/composables/useSelectionQuote';
 
 interface Options {
@@ -14,7 +14,7 @@ type Watched = ReturnType<typeof useSelectionQuote>;
 function watching(options: Options = {}): { wrapper: VueWrapper; watched: () => Watched } {
     let watched: Watched | null = null;
     const Host = defineComponent({
-        setup() {
+        setup(): () => VNode {
             const body = ref<HTMLElement | null>(null);
             watched = useSelectionQuote(body, {
                 enabled: () => options.enabled ?? true,

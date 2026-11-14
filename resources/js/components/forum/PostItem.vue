@@ -19,6 +19,7 @@ import { quoteFits } from '../../editor/extensions/PostQuote';
 import { revealRollUrl, sendJson } from '../../forum/api';
 import { useEmbeds } from '../../composables/useEmbeds';
 import { useRollReveals } from '../../composables/useRollReveals';
+import { useSelectionQuote } from '../../composables/useSelectionQuote';
 import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
 
 type PostAction = 'hide' | 'show' | 'approve' | 'reject';
@@ -73,6 +74,18 @@ useEmbeds(body, () => props.post.html);
 
 // «Revelar» on a hidden roll: confirmed twice, then the page reads the post again
 const { asked: rollToReveal } = useRollReveals(body);
+
+// «Citar» floating over a selection of the post's text that the server would take as its words
+const selection = useSelectionQuote(body, {
+    enabled: () =>
+        props.canQuote &&
+        props.post.status === 'visible' &&
+        !editing.value &&
+        props.post.html !== null,
+    fits: (text: string) => quoteFits(props.post.quoteText ?? '', text),
+});
+const selectionButton = selection.floating;
+const selectionVisible = selection.visible;
 const revealOpen = computed({
     get: () => rollToReveal.value !== null,
     set: (open: boolean) => {
@@ -324,6 +337,15 @@ const hasFooter = computed(
             (props.post.reportUrl !== null && !reported.value) ||
             Boolean(props.post.messageUrl))
 );
+
+/** Quotes what the floating button was offered for: the selection as it settled */
+function quoteSelection(): void {
+    const text = selection.text.value;
+    selection.hide();
+    if (text !== '') {
+        emit('quote', { postId: props.post.id, text });
+    }
+}
 
 function quote(): void {
     // The post's stored text, not what is drawn: rolls, asides and embeds add labels and buttons
@@ -787,6 +809,23 @@ async function remove(): Promise<void> {
                 confirm-variant="danger"
                 @confirm="remove"
             />
+            <!-- Outside the list, so no container clips it; placed by useSelectionQuote -->
+            <Teleport to="body">
+                <button
+                    v-if="selectionVisible"
+                    ref="selectionButton"
+                    type="button"
+                    class="fixed left-0 top-0 z-50 inline-flex min-h-[44px] items-center gap-1 rounded-md border border-default bg-surface px-3 text-sm font-medium text-base-primary shadow-lg hover:bg-muted"
+                    :aria-label="t('forum.posts.quoteSelection')"
+                    data-testid="selection-quote"
+                    @pointerdown.prevent
+                    @mousedown.prevent
+                    @click="quoteSelection"
+                >
+                    <Quote class="h-4 w-4" aria-hidden="true" />
+                    {{ t('forum.posts.quote') }}
+                </button>
+            </Teleport>
         </div>
     </article>
 </template>

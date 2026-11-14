@@ -51,7 +51,20 @@ final class MemberTitleTest extends TestCase
             'carriage return' => ["Lanzador\rde dados"],
             'bell' => ["Bardo\u{0007}"],
             'tab' => ["Bardo\tJefe"],
+            'line separator' => ["Lanzador\u{2028}de dados"],
+            'paragraph separator' => ["Lanzador\u{2029}de dados"],
+            'right-to-left override' => ["\u{202E}Bardo"],
+            'right-to-left isolate' => ["\u{2067}Bardo"],
+            'invalid utf-8' => ["Bardo\xFF\xFE"],
         ];
+    }
+
+    public function test_it_keeps_emoji_sequences(): void
+    {
+        // Joined with zero-width joiners and a variation selector, which are not controls
+        $title = 'Familia 👩‍👩‍👧 y ❤️';
+
+        $this->assertSame($title, MemberTitle::fromInput($title)?->value);
     }
 
     public function test_it_keeps_markup_as_text(): void

@@ -208,7 +208,8 @@ const moderationItems = computed<ModerationMenuItem[]>(() => {
 
 /** Giving the author a title, for whoever moderates the whole forum */
 const titleItems = computed<ModerationMenuItem[]>(() => {
-    if (!props.titleUrl || props.post.authorId === null) {
+    // In character the title is left out, so the menu could not tell whether the person holds one
+    if (!props.titleUrl || props.post.authorId === null || props.post.character) {
         return [];
     }
 

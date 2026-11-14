@@ -14,6 +14,13 @@ final readonly class MemberTitle
 {
     public const int MAX_LENGTH = 30;
 
+    /**
+     * Controls, line and paragraph separators, and the marks that turn the direction of the text
+     * around it (embeddings, overrides, isolates): a title stays one plain line. Joiners and
+     * variation selectors are left alone, since emoji sequences need them.
+     */
+    private const string FORBIDDEN = '/[\p{Cc}\p{Zl}\p{Zp}\x{061C}\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u';
+
     private function __construct(
         public string $value,
     ) {}
@@ -21,7 +28,8 @@ final readonly class MemberTitle
     /**
      * The title typed, trimmed; null when nothing is left, which means no title.
      *
-     * @throws InvalidModerationRecordException for a title too long or with a line break or control character
+     * @throws InvalidModerationRecordException for a title that is not UTF-8, too long, or holds a
+     *                                          line break, a control or a direction mark
      */
     public static function fromInput(?string $input): ?self
     {
@@ -29,7 +37,10 @@ final readonly class MemberTitle
         if ($value === '') {
             return null;
         }
-        if (mb_strlen($value) > self::MAX_LENGTH || preg_match('/\p{Cc}/u', $value) === 1) {
+        // Checked first: on text that is not UTF-8 the pattern fails (false), which must not pass
+        if (! mb_check_encoding($value, 'UTF-8')
+            || mb_strlen($value) > self::MAX_LENGTH
+            || preg_match(self::FORBIDDEN, $value) !== 0) {
             throw InvalidModerationRecordException::invalidTitle(self::MAX_LENGTH);
         }
 

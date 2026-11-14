@@ -141,6 +141,30 @@ describe('a post author title', () => {
         expect(titled).not.toContain('moderation-title-set');
     });
 
+    it('offers no title change on a post written in character', () => {
+        // The title is left out in character, so the menu could not tell what the person holds
+        const keys = menuKeys(
+            mounted(
+                aPost({
+                    authorTitle: null,
+                    character: {
+                        id: 'character-1',
+                        name: 'Arwen',
+                        initials: 'AR',
+                        portraitUrl: null,
+                        description: null,
+                        isRetired: false,
+                        isShared: false,
+                        actions: null,
+                    },
+                }),
+                '/foro/titulos'
+            )
+        );
+
+        expect(keys.filter((key) => key.startsWith('moderation-title'))).toEqual([]);
+    });
+
     it('offers nothing for a post without a known author', () => {
         expect(menuKeys(mounted(aPost({ authorId: null }), '/foro/titulos'))).toEqual([]);
     });

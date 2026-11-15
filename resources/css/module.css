@@ -711,16 +711,8 @@ a.forum-ref[aria-expanded='true'] {
     color: var(--color-text-muted);
 }
 
-/* The topic starter's posts (PostItem.vue sets data-starter and the 3 px primary border): a
- * very light tint of the primary colour. --color-primary-light is pale in the light theme and
- * deep in the dark one, so the text keeps its contrast in both, and the focus ring
- * (a box-shadow) stays visible on top of a background. */
-article[data-starter='true'] {
-    background-color: color-mix(in srgb, var(--color-primary-light) 25%, transparent);
-}
-
 /* The list that holds the posts is rounded without overflow-hidden (no menu may be clipped), so
- * the starter's border and tint would stick out of its corners: round the outer corners of the
+ * the starter's border would stick out of its corners: round the outer corners of the
  * first and the last post, one pixel less than the list so they sit inside its own border.
  * The post is the list's child, or the only post of a wrapper that is. */
 .forum-post-list > :first-child:is(article[data-starter='true']),

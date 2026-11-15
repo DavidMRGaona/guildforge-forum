@@ -517,7 +517,6 @@ async function remove(): Promise<void> {
         :class="[
             hasFooter ? 'pb-1' : 'pb-3',
             // The 3 px border is taken from the left padding, so the content never shifts.
-            // Its tint lives in module.css (`[data-starter]`)
             post.isStarter ? 'border-l-[3px] border-primary pl-[13px] pr-4' : 'px-4',
             focused ? 'ring-2 ring-inset ring-primary-500/40' : '',
         ]"

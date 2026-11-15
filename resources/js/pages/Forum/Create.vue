@@ -7,6 +7,7 @@ import { FormCheckbox, FormSelect } from '@/components/form';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SpeakAsSelect from '../../components/characters/SpeakAsSelect.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
+import PublicNameGate from '../../components/forum/PublicNameGate.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import { sendJson } from '../../forum/api';
 import { categoryTreeOptions } from '../../forum/categoryOptions';
@@ -160,140 +161,147 @@ async function submit(document: JSONContent): Promise<void> {
         />
 
         <!-- Not a <form>: the editor holds a form of its own (its link field) -->
-        <div v-else class="space-y-6">
-            <div>
-                <label for="forum-title" class="block text-sm font-medium text-base-primary">{{
-                    t('forum.create.titleLabel')
-                }}</label>
-                <input
-                    id="forum-title"
-                    v-model="title"
-                    type="text"
-                    required
-                    :maxlength="limits.titleMax"
-                    autocomplete="off"
-                    class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    :aria-invalid="errors.title ? 'true' : 'false'"
-                    :aria-describedby="errors.title ? 'forum-title-error' : 'forum-title-help'"
-                    @keydown.enter.prevent="postEditor?.focus()"
-                />
-                <p
-                    v-if="errors.title"
-                    id="forum-title-error"
-                    role="alert"
-                    class="mt-1 text-sm text-red-600"
-                >
-                    {{ errors.title }}
-                </p>
-                <p v-else id="forum-title-help" class="mt-1 text-sm text-base-muted">
-                    {{
-                        t('forum.create.titleHelp', { min: limits.titleMin, max: limits.titleMax })
-                    }}
-                </p>
-            </div>
+        <PublicNameGate v-else>
+            <div class="space-y-6">
+                <div>
+                    <label for="forum-title" class="block text-sm font-medium text-base-primary">{{
+                        t('forum.create.titleLabel')
+                    }}</label>
+                    <input
+                        id="forum-title"
+                        v-model="title"
+                        type="text"
+                        required
+                        :maxlength="limits.titleMax"
+                        autocomplete="off"
+                        class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        :aria-invalid="errors.title ? 'true' : 'false'"
+                        :aria-describedby="errors.title ? 'forum-title-error' : 'forum-title-help'"
+                        @keydown.enter.prevent="postEditor?.focus()"
+                    />
+                    <p
+                        v-if="errors.title"
+                        id="forum-title-error"
+                        role="alert"
+                        class="mt-1 text-sm text-red-600"
+                    >
+                        {{ errors.title }}
+                    </p>
+                    <p v-else id="forum-title-help" class="mt-1 text-sm text-base-muted">
+                        {{
+                            t('forum.create.titleHelp', {
+                                min: limits.titleMin,
+                                max: limits.titleMax,
+                            })
+                        }}
+                    </p>
+                </div>
 
-            <div>
-                <label for="forum-category" class="block text-sm font-medium text-base-primary">{{
-                    t('forum.create.categoryLabel')
-                }}</label>
-                <FormSelect
-                    id="forum-category"
-                    class="mt-1"
-                    :model-value="categoryId"
-                    :options="categoryOptions"
-                    :placeholder="t('forum.create.categoryPlaceholder')"
-                    :error="errors.category ?? ''"
-                    :described-by="errors.category ? 'forum-category-error' : undefined"
-                    @update:model-value="chooseCategory"
-                />
-                <p
-                    v-if="errors.category"
-                    id="forum-category-error"
-                    role="alert"
-                    class="mt-1 text-sm text-red-600"
-                >
-                    {{ errors.category }}
-                </p>
-            </div>
+                <div>
+                    <label
+                        for="forum-category"
+                        class="block text-sm font-medium text-base-primary"
+                        >{{ t('forum.create.categoryLabel') }}</label
+                    >
+                    <FormSelect
+                        id="forum-category"
+                        class="mt-1"
+                        :model-value="categoryId"
+                        :options="categoryOptions"
+                        :placeholder="t('forum.create.categoryPlaceholder')"
+                        :error="errors.category ?? ''"
+                        :described-by="errors.category ? 'forum-category-error' : undefined"
+                        @update:model-value="chooseCategory"
+                    />
+                    <p
+                        v-if="errors.category"
+                        id="forum-category-error"
+                        role="alert"
+                        class="mt-1 text-sm text-red-600"
+                    >
+                        {{ errors.category }}
+                    </p>
+                </div>
 
-            <fieldset v-if="topics.length > 0">
-                <legend class="text-sm font-medium text-base-primary">
-                    {{ t('forum.create.topicsLabel') }}
-                </legend>
-                <p class="text-sm text-base-muted">
-                    {{ t('forum.create.topicsHelp', { max: limits.topicsMax }) }}
-                </p>
-                <div class="mt-2 flex flex-wrap gap-2">
+                <fieldset v-if="topics.length > 0">
+                    <legend class="text-sm font-medium text-base-primary">
+                        {{ t('forum.create.topicsLabel') }}
+                    </legend>
+                    <p class="text-sm text-base-muted">
+                        {{ t('forum.create.topicsHelp', { max: limits.topicsMax }) }}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <FormCheckbox
+                            v-for="topic in topics"
+                            :key="topic.key"
+                            class="min-h-[44px] rounded-full border border-default px-3 py-2.5 has-[:checked]:border-primary has-[:checked]:bg-primary-light"
+                            :model-value="chosenTopics.includes(topic.key)"
+                            :label="topic.label"
+                            :disabled="topicsFull && !chosenTopics.includes(topic.key)"
+                            @update:model-value="toggleTopic(topic.key, $event)"
+                        />
+                    </div>
+                    <p v-if="errors.topics" role="alert" class="mt-1 text-sm text-red-600">
+                        {{ errors.topics }}
+                    </p>
+                </fieldset>
+
+                <fieldset v-if="canModerate" class="space-y-2">
+                    <legend class="text-sm font-medium text-base-primary">
+                        {{ t('forum.create.moderationLabel') }}
+                    </legend>
                     <FormCheckbox
-                        v-for="topic in topics"
-                        :key="topic.key"
-                        class="min-h-[44px] rounded-full border border-default px-3 py-2.5 has-[:checked]:border-primary has-[:checked]:bg-primary-light"
-                        :model-value="chosenTopics.includes(topic.key)"
-                        :label="topic.label"
-                        :disabled="topicsFull && !chosenTopics.includes(topic.key)"
-                        @update:model-value="toggleTopic(topic.key, $event)"
+                        v-model="pinned"
+                        class="w-full py-3"
+                        :label="t('forum.create.pinned')"
+                    />
+                    <FormCheckbox
+                        v-model="closed"
+                        class="w-full py-3"
+                        :label="t('forum.create.closed')"
+                    />
+                    <p v-if="errors.moderation" role="alert" class="text-sm text-red-600">
+                        {{ errors.moderation }}
+                    </p>
+                </fieldset>
+
+                <div>
+                    <p id="forum-first-post" class="mb-1 text-sm font-medium text-base-primary">
+                        {{ t('forum.create.firstPostLabel') }}
+                    </p>
+                    <SpeakAsSelect
+                        v-if="characters"
+                        v-model="speaker"
+                        class="mb-2"
+                        :picker="characters"
+                        :category-id="categoryId === '' ? null : categoryId"
+                        :disabled="sending"
+                    />
+                    <PostEditor
+                        ref="postEditor"
+                        :label="t('forum.create.firstPostLabel')"
+                        draft-key="forum-new-discussion"
+                        :upload-url="editor.uploadUrl"
+                        :max-images="editor.maxImages"
+                        :image-types="editor.imageTypes"
+                        :external-image-url="editor.externalImageUrl"
+                        :external-image-hosts="editor.externalImageHosts"
+                        :embed-url="editor.embedUrl"
+                        :embed-services="editor.embedServices"
+                        :submit-label="t('forum.create.submit')"
+                        :submitting="sending"
+                        :error="postError"
+                        @submit="submit"
                     />
                 </div>
-                <p v-if="errors.topics" role="alert" class="mt-1 text-sm text-red-600">
-                    {{ errors.topics }}
-                </p>
-            </fieldset>
 
-            <fieldset v-if="canModerate" class="space-y-2">
-                <legend class="text-sm font-medium text-base-primary">
-                    {{ t('forum.create.moderationLabel') }}
-                </legend>
-                <FormCheckbox
-                    v-model="pinned"
-                    class="w-full py-3"
-                    :label="t('forum.create.pinned')"
-                />
-                <FormCheckbox
-                    v-model="closed"
-                    class="w-full py-3"
-                    :label="t('forum.create.closed')"
-                />
-                <p v-if="errors.moderation" role="alert" class="text-sm text-red-600">
-                    {{ errors.moderation }}
-                </p>
-            </fieldset>
-
-            <div>
-                <p id="forum-first-post" class="mb-1 text-sm font-medium text-base-primary">
-                    {{ t('forum.create.firstPostLabel') }}
-                </p>
-                <SpeakAsSelect
-                    v-if="characters"
-                    v-model="speaker"
-                    class="mb-2"
-                    :picker="characters"
-                    :category-id="categoryId === '' ? null : categoryId"
-                    :disabled="sending"
-                />
-                <PostEditor
-                    ref="postEditor"
-                    :label="t('forum.create.firstPostLabel')"
-                    draft-key="forum-new-discussion"
-                    :upload-url="editor.uploadUrl"
-                    :max-images="editor.maxImages"
-                    :image-types="editor.imageTypes"
-                    :external-image-url="editor.externalImageUrl"
-                    :external-image-hosts="editor.externalImageHosts"
-                    :embed-url="editor.embedUrl"
-                    :embed-services="editor.embedServices"
-                    :submit-label="t('forum.create.submit')"
-                    :submitting="sending"
-                    :error="postError"
-                    @submit="submit"
-                />
+                <Link
+                    :href="cancelUrl"
+                    class="inline-flex min-h-[44px] items-center text-sm font-medium text-base-secondary hover:underline"
+                >
+                    {{ t('forum.create.cancel') }}
+                </Link>
             </div>
-
-            <Link
-                :href="cancelUrl"
-                class="inline-flex min-h-[44px] items-center text-sm font-medium text-base-secondary hover:underline"
-            >
-                {{ t('forum.create.cancel') }}
-            </Link>
-        </div>
+        </PublicNameGate>
     </div>
 </template>

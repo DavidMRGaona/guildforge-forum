@@ -119,6 +119,13 @@ export default {
             reveal: 'Revelar',
             revealFailed: 'No se ha podido revelar la tirada. Inténtalo de nuevo.',
         },
+        publicName: {
+            prompt: 'Para escribir en el foro necesitas un nombre público: es el que verán los demás, en lugar de tu nombre de cuenta.',
+            label: 'Nombre público',
+            save: 'Guardar nombre público',
+            required: 'Escribe el nombre público que quieras usar.',
+            saveError: 'No se ha podido guardar el nombre público. Inténtalo de nuevo.',
+        },
         posts: {
             writePrivatelyTo: 'Escribir un mensaje privado a {name}',
             moved: {

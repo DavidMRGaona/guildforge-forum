@@ -7,6 +7,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useRoutes } from '@/composables/useRoutes';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import PostEditor from '../editor/PostEditor.vue';
+import PublicNameGate from './PublicNameGate.vue';
 import type { ForumReplySettings } from '../../types/forum';
 
 /**
@@ -79,33 +80,35 @@ defineExpose({
 
 <template>
     <div v-if="reply.canPost" class="space-y-3">
-        <slot name="intro" />
-        <SpeakAsSelect
-            v-if="reply.characters"
-            v-model="speaker"
-            :picker="reply.characters"
-            :disabled="sending"
-        />
-        <!-- Only what the reader types counts: a draft restored or a quotation inserted is no input -->
-        <div @input="emit('typing')">
-            <PostEditor
-                ref="editor"
-                :label="label"
-                :draft-key="draftKey"
-                :mentions-url="reply.mentionsUrl"
-                :upload-url="reply.uploadUrl"
-                :max-images="reply.maxImages"
-                :image-types="reply.imageTypes"
-                :external-image-url="reply.externalImageUrl"
-                :external-image-hosts="reply.externalImageHosts"
-                :embed-url="reply.embedUrl"
-                :embed-services="reply.embedServices"
-                :submit-label="submitLabel"
-                :submitting="sending"
-                :error="error"
-                @submit="(document: JSONContent) => emit('submit', document, speaker)"
+        <PublicNameGate>
+            <slot name="intro" />
+            <SpeakAsSelect
+                v-if="reply.characters"
+                v-model="speaker"
+                :picker="reply.characters"
+                :disabled="sending"
             />
-        </div>
+            <!-- Only what the reader types counts: a draft restored or a quotation inserted is no input -->
+            <div @input="emit('typing')">
+                <PostEditor
+                    ref="editor"
+                    :label="label"
+                    :draft-key="draftKey"
+                    :mentions-url="reply.mentionsUrl"
+                    :upload-url="reply.uploadUrl"
+                    :max-images="reply.maxImages"
+                    :image-types="reply.imageTypes"
+                    :external-image-url="reply.externalImageUrl"
+                    :external-image-hosts="reply.externalImageHosts"
+                    :embed-url="reply.embedUrl"
+                    :embed-services="reply.embedServices"
+                    :submit-label="submitLabel"
+                    :submitting="sending"
+                    :error="error"
+                    @submit="(document: JSONContent) => emit('submit', document, speaker)"
+                />
+            </div>
+        </PublicNameGate>
     </div>
 
     <p v-else class="rounded-lg border border-default bg-surface p-4 text-sm text-base-secondary">

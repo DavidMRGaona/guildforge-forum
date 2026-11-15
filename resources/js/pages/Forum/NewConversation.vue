@@ -6,6 +6,7 @@ import type { JSONContent } from '@tiptap/core';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import PeoplePicker from '../../components/conversations/PeoplePicker.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
+import PublicNameGate from '../../components/forum/PublicNameGate.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import { sendJson } from '../../forum/api';
 import type { ForumPerson } from '../../types/forum';
@@ -116,79 +117,81 @@ async function submit(document: JSONContent): Promise<void> {
         />
 
         <!-- Not a <form>: the editor holds a form of its own (its link field) -->
-        <div v-else class="space-y-6">
-            <div>
-                <p id="conversation-people" class="text-sm font-medium text-base-primary">
-                    {{ t('forum.conversations.create.peopleLabel') }}
-                </p>
-                <p class="mb-2 text-sm text-base-muted">
-                    {{ t('forum.conversations.create.peopleHelp', { max: maxPeople }) }}
-                </p>
-                <PeoplePicker
-                    v-model="people"
-                    :label="t('forum.conversations.create.peopleLabel')"
-                    :people-url="peopleUrl"
-                    :max="maxPeople"
-                    :disabled="sending"
-                    :error="errors.recipients ?? null"
-                />
-            </div>
+        <PublicNameGate v-else>
+            <div class="space-y-6">
+                <div>
+                    <p id="conversation-people" class="text-sm font-medium text-base-primary">
+                        {{ t('forum.conversations.create.peopleLabel') }}
+                    </p>
+                    <p class="mb-2 text-sm text-base-muted">
+                        {{ t('forum.conversations.create.peopleHelp', { max: maxPeople }) }}
+                    </p>
+                    <PeoplePicker
+                        v-model="people"
+                        :label="t('forum.conversations.create.peopleLabel')"
+                        :people-url="peopleUrl"
+                        :max="maxPeople"
+                        :disabled="sending"
+                        :error="errors.recipients ?? null"
+                    />
+                </div>
 
-            <div>
-                <label
-                    for="conversation-title"
-                    class="block text-sm font-medium text-base-primary"
-                    >{{ t('forum.conversations.create.titleLabel') }}</label
+                <div>
+                    <label
+                        for="conversation-title"
+                        class="block text-sm font-medium text-base-primary"
+                        >{{ t('forum.conversations.create.titleLabel') }}</label
+                    >
+                    <input
+                        id="conversation-title"
+                        v-model="title"
+                        type="text"
+                        required
+                        :maxlength="titleMaxLength"
+                        autocomplete="off"
+                        class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        :aria-invalid="errors.title ? 'true' : 'false'"
+                        :aria-describedby="errors.title ? 'conversation-title-error' : undefined"
+                        data-testid="conversation-title"
+                        @keydown.enter.prevent="editor?.focus()"
+                    />
+                    <p
+                        v-if="errors.title"
+                        id="conversation-title-error"
+                        role="alert"
+                        class="mt-1 text-sm text-red-600"
+                    >
+                        {{ errors.title }}
+                    </p>
+                </div>
+
+                <div>
+                    <p class="mb-1 text-sm font-medium text-base-primary">
+                        {{ t('forum.conversations.create.messageLabel') }}
+                    </p>
+                    <PostEditor
+                        ref="editor"
+                        :label="t('forum.conversations.create.messageLabel')"
+                        draft-key="forum-new-conversation"
+                        text-only
+                        help-guide="forum.site.private-messages"
+                        :submit-label="t('forum.conversations.create.submit')"
+                        :submitting="sending"
+                        :error="messageError"
+                        @submit="submit"
+                    />
+                    <p class="mt-2 text-xs text-base-muted">
+                        {{ t('forum.conversations.startsLeft', { count: startsLeft }, startsLeft) }}
+                    </p>
+                </div>
+
+                <Link
+                    :href="indexUrl"
+                    class="inline-flex min-h-[44px] items-center text-sm font-medium text-base-secondary hover:underline"
                 >
-                <input
-                    id="conversation-title"
-                    v-model="title"
-                    type="text"
-                    required
-                    :maxlength="titleMaxLength"
-                    autocomplete="off"
-                    class="mt-1 block min-h-[44px] w-full rounded-md border border-default bg-surface px-3 text-base-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    :aria-invalid="errors.title ? 'true' : 'false'"
-                    :aria-describedby="errors.title ? 'conversation-title-error' : undefined"
-                    data-testid="conversation-title"
-                    @keydown.enter.prevent="editor?.focus()"
-                />
-                <p
-                    v-if="errors.title"
-                    id="conversation-title-error"
-                    role="alert"
-                    class="mt-1 text-sm text-red-600"
-                >
-                    {{ errors.title }}
-                </p>
+                    {{ t('forum.conversations.create.cancel') }}
+                </Link>
             </div>
-
-            <div>
-                <p class="mb-1 text-sm font-medium text-base-primary">
-                    {{ t('forum.conversations.create.messageLabel') }}
-                </p>
-                <PostEditor
-                    ref="editor"
-                    :label="t('forum.conversations.create.messageLabel')"
-                    draft-key="forum-new-conversation"
-                    text-only
-                    help-guide="forum.site.private-messages"
-                    :submit-label="t('forum.conversations.create.submit')"
-                    :submitting="sending"
-                    :error="messageError"
-                    @submit="submit"
-                />
-                <p class="mt-2 text-xs text-base-muted">
-                    {{ t('forum.conversations.startsLeft', { count: startsLeft }, startsLeft) }}
-                </p>
-            </div>
-
-            <Link
-                :href="indexUrl"
-                class="inline-flex min-h-[44px] items-center text-sm font-medium text-base-secondary hover:underline"
-            >
-                {{ t('forum.conversations.create.cancel') }}
-            </Link>
-        </div>
+        </PublicNameGate>
     </div>
 </template>

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Content\Rendering\RollView;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
+use Modules\Forum\Application\DTOs\PostWriterDTO;
 use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\DiceRoll;
@@ -51,6 +52,7 @@ final class HiddenRolls
         private readonly ForumSuspensions $suspensions,
         private readonly AccountDirectoryInterface $accounts,
         private readonly TimezoneServiceInterface $timezone,
+        private readonly CharacterWriterNames $writerNames,
     ) {}
 
     /**
@@ -75,7 +77,7 @@ final class HiddenRolls
                 : RollView::of($roll);
         }
 
-        return $this->withRevealers($views, $rolls);
+        return $this->withRevealers($views, $rolls, $reader);
     }
 
     /**
@@ -150,13 +152,15 @@ final class HiddenRolls
 
     /**
      * Who revealed each revealed roll, by the name their account has now (an anonymized one
-     * shows the site's anonymous name), and when, in the display zone.
+     * shows the site's anonymous name), and when, in the display zone. The writer who revealed
+     * a roll of their own post as a personal character (or one deleted since) is named as the
+     * post names them (forum#139), except to themselves and to moderation.
      *
      * @param  array<string, RollView>  $views
      * @param  list<DiceRoll>  $rolls
      * @return array<string, RollView>
      */
-    private function withRevealers(array $views, array $rolls): array
+    private function withRevealers(array $views, array $rolls, ?Authenticatable $reader): array
     {
         $revealed = array_values(array_filter($rolls, static fn (DiceRoll $roll): bool => $roll->hidden && $roll->revealedAt instanceof DateTimeImmutable));
         if ($revealed === []) {
@@ -164,14 +168,42 @@ final class HiddenRolls
         }
 
         $names = $this->accounts->namesOf(array_values(array_unique(array_filter(array_map(static fn (DiceRoll $roll): ?string => $roll->revealedBy, $revealed)))));
+        $inCharacter = $this->writerNames->namesFor($this->revealingWriters($revealed, $reader), $reader);
         foreach ($revealed as $roll) {
             $views[$roll->id] = $views[$roll->id]->withRevealer(
-                $roll->revealedBy === null ? null : ($names[$roll->revealedBy] ?? null),
+                $roll->revealedBy === null ? null : ($inCharacter[$roll->id]->name ?? $names[$roll->revealedBy] ?? null),
                 $roll->revealedAt instanceof DateTimeImmutable ? $this->timezone->format($roll->revealedAt) : null,
             );
         }
 
         return $views;
+    }
+
+    /**
+     * The revealed rolls whose revealer wrote their post, by roll id, with who that post speaks
+     * as; none for the reader's own posts or a discussion the reader moderates.
+     *
+     * @param  list<DiceRoll>  $revealed
+     * @return array<string, PostWriterDTO>
+     */
+    private function revealingWriters(array $revealed, ?Authenticatable $reader): array
+    {
+        $readerId = ForumBrowser::accountId($reader);
+        $writers = [];
+        foreach ($revealed as $roll) {
+            $revealer = $roll->revealedBy === null ? null : strtolower($roll->revealedBy);
+            $place = $revealer === null || $revealer === $readerId ? null : $this->place($roll->postId);
+            if ($place === null) {
+                continue;
+            }
+
+            [$post, $discussion] = $place;
+            if ($post->authorId() === $revealer && ! $this->access->canModerate($reader, $discussion)) {
+                $writers[$roll->id] = new PostWriterDTO($post->authorId(), $post->characterId()?->value, $post->spokeAsRemovedCharacter());
+            }
+        }
+
+        return $writers;
     }
 
     /**

@@ -10,16 +10,20 @@ use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumWriter;
+use Modules\Forum\Domain\Dice\NumberGenerator;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiceRollModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Unit\Domain\Dice\FixedNumbers;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
@@ -150,6 +154,24 @@ final class CharacterWriterNamesTest extends ModuleTestCase
         }
     }
 
+    public function test_a_character_the_reader_may_not_see_is_not_named_and_neither_is_the_account(): void
+    {
+        // Tied to a category the reader cannot view: the post moved here keeps speaking as it
+        $hidden = $this->aCategoryFor(CategoryAudience::associationMembers(), 'oculta');
+        $tied = $this->aCharacterOf($this->player->id, 'Elrond', boundTo: $hidden);
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->player->id), self::aBody('Desde Rivendel'), new DateTimeImmutable('2026-11-12 13:00:00'), false, $tied->id());
+
+        $response = $this->actingAs($this->reader)->get($this->discussionUrl())->assertOk();
+
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('posts.2.character', null)
+            ->where('posts.2.authorName', 'Personaje no disponible')
+            ->where('posts.2.authorId', null)
+            ->etc());
+        $this->assertNameNowhere($response);
+        $this->assertStringNotContainsString('Elrond', (string) json_encode($response->viewData('page'), JSON_UNESCAPED_UNICODE));
+    }
+
     public function test_a_post_out_of_character_shows_the_account_as_it_always_did(): void
     {
         app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->player->id), self::aBody('Fuera de personaje'), new DateTimeImmutable('2026-11-12 13:00:00'), false);
@@ -230,6 +252,32 @@ final class CharacterWriterNamesTest extends ModuleTestCase
         $response = $this->actingAs($this->reader)->get($this->discussionUrl());
         $response->assertInertia(fn (AssertableInertia $page) => $page->where('posts.2.html', fn (string $html): bool => str_contains($html, 'Personaje eliminado escribió:'))->etc());
         $this->assertNameNowhere($response);
+    }
+
+    public function test_a_hidden_roll_its_writer_revealed_in_character_never_names_the_account(): void
+    {
+        $this->app->instance(NumberGenerator::class, new FixedNumbers([4, 2]));
+        // Written and revealed while they had a public name, which they took away later
+        $this->player->forceFill(['display_name' => 'Lau'])->save();
+        $roll = ['type' => 'roll', 'attrs' => ['expression' => '2d6', 'reason' => 'Sigilo', 'rollId' => null, 'hidden' => true]];
+        $this->actingAs($this->player)
+            ->postJson("/foro/temas/{$this->discussion->id()->value}/mensajes", ['document' => ['type' => 'doc', 'content' => [$roll]], 'character' => $this->arwen->id()->value])
+            ->assertCreated();
+        $this->actingAs($this->player)->postJson('/foro/tiradas/'.DiceRollModel::query()->sole()->id.'/revelar')->assertOk();
+        $this->player->forceFill(['display_name' => null])->save();
+
+        $response = $this->actingAs($this->reader)->get($this->discussionUrl());
+        $response->assertInertia(fn (AssertableInertia $page) => $page->where('posts.2.html', fn (string $html): bool => str_contains($html, 'revelada por Arwen el'))->etc());
+        $this->assertNameNowhere($response);
+
+        $this->deleteArwen();
+
+        $response = $this->actingAs($this->reader)->get($this->discussionUrl());
+        $response->assertInertia(fn (AssertableInertia $page) => $page->where('posts.2.html', fn (string $html): bool => str_contains($html, 'revelada por Personaje eliminado el'))->etc());
+        $this->assertNameNowhere($response);
+        // Moderation still reads who did it
+        $this->actingAs($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM))->get($this->discussionUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.2.html', fn (string $html): bool => str_contains($html, 'revelada por '.self::ACCOUNT_NAME))->etc());
     }
 
     private function deleteArwen(): void

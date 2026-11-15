@@ -124,6 +124,7 @@ export default {
             save: 'Save public name',
             required: 'Enter the public name you want to use.',
             tooMany: 'Too many attempts. Wait a moment and try again.',
+            emailProblem: 'It could not be saved: check the email address of your account in your profile.',
             saveError: 'The public name could not be saved. Try again.',
         },
         posts: {

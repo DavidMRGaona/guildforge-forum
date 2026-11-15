@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
+import { router } from '@inertiajs/vue3';
 import { describe, expect, it, vi } from 'vitest';
 import ReplyBox from '../../../resources/js/components/forum/ReplyBox.vue';
 import type { ForumReplySettings } from '../../../resources/js/types/forum';
@@ -53,15 +54,24 @@ describe('ReplyBox without a public name', () => {
         });
         expect(quote).not.toHaveBeenCalled();
 
-        // The prompt saves the name: it is the real flow (the gate tells the box it is named)
+        // The prompt saves the name, in Inertia's order: the page with the name, then onSuccess
+        vi.mocked(router.post).mockImplementation(((
+            _url: string,
+            _data: unknown,
+            options?: { onStart?: () => void; onSuccess?: () => void }
+        ) => {
+            options?.onStart?.();
+            const auth = page.props.auth as { user: Record<string, unknown> };
+            page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
+            options?.onSuccess?.();
+        }) as never);
         await wrapper.get('input').setValue('Ana');
-        const auth = page.props.auth as { user: Record<string, unknown> };
-        const form = wrapper.get('form');
-        await form.trigger('submit');
-        page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
+        await wrapper.get('form').trigger('submit');
+        await wrapper.vm.$nextTick();
         await wrapper.vm.$nextTick();
         await wrapper.vm.$nextTick();
 
         expect(quote).toHaveBeenCalledWith({ postId: 'post-1', text: 'Hola' });
+        expect(focus).toHaveBeenCalled();
     });
 });

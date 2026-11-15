@@ -65,36 +65,68 @@ describe('PublicNameGate', () => {
         expect(data).toMatchObject({ email: 'nuevo@example.com' });
     });
 
-    it('says it is named once the saved name reaches the page', async () => {
+    it('says it is named, in the order Inertia works: the page first, then onSuccess', async () => {
         signIn({ displayName: null });
         vi.mocked(router.post).mockImplementation(((
             _url: string,
             _data: unknown,
-            options?: { onSuccess?: () => void }
+            options?: { onStart?: () => void; onSuccess?: () => void; onFinish?: () => void }
         ) => {
+            options?.onStart?.();
+            // The new page (with the saved name) is set before the callbacks run
+            const auth = page.props.auth as { user: Record<string, unknown> };
+            page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
             options?.onSuccess?.();
+            options?.onFinish?.();
         }) as never);
         const wrapper = mounted();
 
         await wrapper.get('input').setValue('Ana');
         await wrapper.get('form').trigger('submit');
-        expect(wrapper.emitted('named')).toBeUndefined();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.emitted('named')).toHaveLength(1);
+        expect(wrapper.find('[data-testid="editor"]').exists()).toBe(true);
+    });
+
+    it('does not say it is named for a name that was already there', async () => {
+        signIn({ displayName: null });
+        const wrapper = mounted();
 
         const auth = page.props.auth as { user: Record<string, unknown> };
         page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
         await wrapper.vm.$nextTick();
 
-        expect(wrapper.emitted('named')).toHaveLength(1);
+        expect(wrapper.emitted('named')).toBeUndefined();
     });
 
-    it('answers too many attempts in plain words', async () => {
+    it('shows the core email error as a pointer to the profile, never under the name', async () => {
         signIn({ displayName: null });
         vi.mocked(router.post).mockImplementation(((
             _url: string,
             _data: unknown,
-            options?: { onHttpException?: (r: { status: number }) => void }
+            options?: { onError?: (e: Record<string, string>) => void }
         ) => {
-            options?.onHttpException?.({ status: 429 });
+            options?.onError?.({ email: 'Ya está en uso', name: 'Otro' });
+        }) as never);
+        const wrapper = mounted();
+
+        await wrapper.get('input').setValue('Ana');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.get('[role="alert"]').text()).toContain('en tu perfil');
+        expect(wrapper.text()).not.toContain('Ya está en uso');
+    });
+
+    it('answers too many attempts in plain words, without Inertia’s dialog', async () => {
+        let handled: boolean | void = undefined;
+        signIn({ displayName: null });
+        vi.mocked(router.post).mockImplementation(((
+            _url: string,
+            _data: unknown,
+            options?: { onHttpException?: (r: { status: number }) => boolean | void }
+        ) => {
+            handled = options?.onHttpException?.({ status: 429 });
         }) as never);
         const wrapper = mounted();
 
@@ -102,6 +134,8 @@ describe('PublicNameGate', () => {
         await wrapper.get('form').trigger('submit');
 
         expect(wrapper.get('[role="alert"]').text()).toContain('demasiadas veces');
+        // false keeps Inertia from opening its own error dialog
+        expect(handled).toBe(false);
     });
 
     it('does not send an empty name', async () => {

@@ -125,6 +125,8 @@ export default {
             save: 'Guardar nombre público',
             required: 'Escribe el nombre público que quieras usar.',
             tooMany: 'Has probado demasiadas veces. Espera un momento y vuelve a intentarlo.',
+            emailProblem:
+                'No se ha podido guardar: revisa en tu perfil la dirección de email de tu cuenta.',
             saveError: 'No se ha podido guardar el nombre público. Inténtalo de nuevo.',
         },
         posts: {

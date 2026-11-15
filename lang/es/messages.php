@@ -687,7 +687,8 @@ return [
             'daily_limit' => 'Ya has empezado 5 conversaciones en las últimas 24 horas. Puedes seguir respondiendo en las que tienes.',
             'already_in' => 'Esa persona ya está en la conversación.',
             'not_allowed' => 'No puedes hacer eso con este mensaje.',
-            'people_without_public_name' => 'Alguna de las personas elegidas aún no ha elegido un nombre público.',
+            'people_without_public_name' => 'Alguna de esas personas aún no tiene nombre público.',
+            'person_without_public_name' => 'Esa persona aún no tiene nombre público.',
         ],
         'errors' => [
             'title' => 'Escribe un título de 120 caracteres como máximo.',

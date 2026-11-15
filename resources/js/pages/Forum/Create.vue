@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -45,6 +45,11 @@ const closed = ref(false);
 const sending = ref(false);
 const errors = ref<Record<string, string>>({});
 const postError = ref<string | null>(null);
+/** The name was just saved and the form took the prompt's place: the reader starts at the title */
+function focusTitle(): void {
+    void nextTick(() => document.getElementById('forum-title')?.focus());
+}
+
 const postEditor = ref<InstanceType<typeof PostEditor> | null>(null);
 
 const breadcrumbs = computed(() => [{ name: t('forum.title'), url: props.cancelUrl }]);
@@ -161,7 +166,7 @@ async function submit(document: JSONContent): Promise<void> {
         />
 
         <!-- Not a <form>: the editor holds a form of its own (its link field) -->
-        <PublicNameGate v-else>
+        <PublicNameGate v-else @named="focusTitle">
             <div class="space-y-6">
                 <div>
                     <label for="forum-title" class="block text-sm font-medium text-base-primary">{{

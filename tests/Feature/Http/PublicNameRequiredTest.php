@@ -162,13 +162,23 @@ final class PublicNameRequiredTest extends ModuleTestCase
         $this->actingAs($this->named)->postJson('/foro/conversaciones', ['title' => 'Hola', 'recipients' => [$this->nameless->id], 'document' => $this->messageDocument()])
             ->assertUnprocessable()
             ->assertJsonPath('reason', 'people_without_public_name')
-            ->assertJsonPath('message', 'Alguna de las personas elegidas aún no ha elegido un nombre público.');
+            ->assertJsonPath('message', 'Alguna de esas personas aún no tiene nombre público.');
 
         $third = UserModel::factory()->create(['name' => 'Eva', 'display_name' => 'Eva']);
         $id = $this->aConversation($this->named, $third)->id()->value;
         $this->actingAs($this->named)->postJson("/foro/conversaciones/{$id}/personas", ['account' => $this->nameless->id])
             ->assertUnprocessable()
-            ->assertJsonPath('reason', 'people_without_public_name');
+            ->assertJsonPath('reason', 'person_without_public_name')
+            ->assertJsonPath('message', 'Esa persona aún no tiene nombre público.');
+    }
+
+    public function test_adding_someone_already_in_keeps_its_reason_even_without_a_public_name(): void
+    {
+        $id = $this->conversationWithNameless();
+
+        $this->actingAs($this->named)->postJson("/foro/conversaciones/{$id}/personas", ['account' => $this->nameless->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'already_in');
     }
 
     public function test_adding_people_needs_a_public_name_of_the_one_who_adds(): void

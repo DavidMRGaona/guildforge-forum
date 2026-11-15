@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -35,6 +35,13 @@ const title = ref('');
 const sending = ref(false);
 const errors = ref<Record<string, string>>({});
 const messageError = ref<string | null>(null);
+/** The name was just saved and the form took the prompt's place: the reader starts choosing people */
+function focusPeople(): void {
+    void nextTick(() =>
+        document.querySelector<HTMLInputElement>('input[id^="people-search-"]')?.focus()
+    );
+}
+
 const editor = ref<InstanceType<typeof PostEditor> | null>(null);
 
 const breadcrumbs = computed(() => [{ name: t('forum.conversations.title'), url: props.indexUrl }]);
@@ -117,7 +124,7 @@ async function submit(document: JSONContent): Promise<void> {
         />
 
         <!-- Not a <form>: the editor holds a form of its own (its link field) -->
-        <PublicNameGate v-else>
+        <PublicNameGate v-else @named="focusPeople">
             <div class="space-y-6">
                 <div>
                     <p id="conversation-people" class="text-sm font-medium text-base-primary">

@@ -23,15 +23,19 @@ const hasName = computed(() => (user.value?.displayName ?? '').trim() !== '');
 const name = ref('');
 const saving = ref(false);
 const error = ref<string | null>(null);
-const saved = ref(false);
+// Set when saving starts, so the name is told as «named» whichever comes first: Inertia sets the
+// page (and with it the name) before `onSuccess`, and the watcher below runs a tick later
+const awaitingName = ref(false);
 
-// The shared props bring the saved name: only then does the slot show, and only then is it «named»
-watch(hasName, (now) => {
-    if (now && saved.value) {
-        saved.value = false;
+function announceNamed(): void {
+    if (awaitingName.value && hasName.value) {
+        awaitingName.value = false;
         emit('named');
     }
-});
+}
+
+// The shared props bring the saved name: only then does the slot show
+watch(hasName, announceNamed);
 
 function save(): void {
     const account = user.value;
@@ -59,19 +63,38 @@ function save(): void {
         {
             preserveScroll: true,
             preserveState: true,
-            onStart: () => (saving.value = true),
-            onFinish: () => (saving.value = false),
-            onSuccess: () => (saved.value = true),
-            // The core's validation of the field, shown at the field
-            onError: (errors) => {
-                error.value = errors.display_name ?? errors.name ?? t('forum.publicName.saveError');
+            onStart: () => {
+                saving.value = true;
+                awaitingName.value = true;
             },
-            // Too many attempts, or any other answer that is not a validation error
+            onFinish: () => (saving.value = false),
+            onSuccess: announceNamed,
+            // The core's validation: the field's own error at the field; an address the account
+            // can no longer use (taken by another account meanwhile) sends to the profile
+            onError: (errors) => {
+                awaitingName.value = false;
+                error.value = errors.display_name
+                    ? errors.display_name
+                    : errors.email
+                      ? t('forum.publicName.emailProblem')
+                      : t('forum.publicName.saveError');
+            },
+            // Too many attempts, or any other answer that is not a validation error: told here,
+            // instead of Inertia's error dialog
             onHttpException: (response) => {
+                awaitingName.value = false;
                 error.value =
                     response.status === 429
                         ? t('forum.publicName.tooMany')
                         : t('forum.publicName.saveError');
+
+                return false;
+            },
+            onNetworkError: () => {
+                awaitingName.value = false;
+                error.value = t('forum.publicName.saveError');
+
+                return false;
             },
         }
     );

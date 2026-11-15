@@ -212,9 +212,6 @@ final readonly class ConversationService
         if ($added === null || $added === $adderId || ! $this->access->mayTakePart($added) || $this->access->isBlockedBy($adderId, $added)) {
             throw ConversationRefusedException::because(ConversationRefusedException::UNAVAILABLE_PEOPLE);
         }
-        if ($this->accounts->withPublicName([$added]) === []) {
-            throw ConversationRefusedException::because(ConversationRefusedException::PEOPLE_WITHOUT_PUBLIC_NAME);
-        }
 
         $noteNumber = 0;
         DB::transaction(function () use ($adder, $adderId, $id, $added, &$noteNumber): void {
@@ -231,6 +228,10 @@ final readonly class ConversationService
             }
             if (count($people) >= ConversationRules::MAX_PARTICIPANTS) {
                 throw ConversationRefusedException::because(ConversationRefusedException::FULL);
+            }
+            // Their name goes in the note everyone reads (after the refusals that were always there)
+            if ($this->accounts->withPublicName([$added]) === []) {
+                throw ConversationRefusedException::because(ConversationRefusedException::PERSON_WITHOUT_PUBLIC_NAME);
             }
 
             $now = CarbonImmutable::now()->toDateTimeImmutable();

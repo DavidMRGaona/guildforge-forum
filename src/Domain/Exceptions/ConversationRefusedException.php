@@ -43,6 +43,9 @@ final class ConversationRefusedException extends RuntimeException
     /** Someone chosen has no public name: their account name would show to the others */
     public const string PEOPLE_WITHOUT_PUBLIC_NAME = 'people_without_public_name';
 
+    /** The person being added has no public name */
+    public const string PERSON_WITHOUT_PUBLIC_NAME = 'person_without_public_name';
+
     private function __construct(
         public readonly string $reason,
         string $message,

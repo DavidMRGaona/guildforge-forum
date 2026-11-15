@@ -6,6 +6,7 @@ namespace Modules\Forum\Http\Presenters;
 
 use App\Application\Services\TimezoneServiceInterface;
 use DateTimeImmutable;
+use Illuminate\Http\Request;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
@@ -37,6 +38,12 @@ final readonly class ForumPresenter
 {
     /** The query that asks a discussion's page by its place, for a page whose numbers all moved away */
     public const string PAGE_QUERY = 'pagina';
+
+    /** What a page asked for by its place looks like: a whole number from 1, nothing around it */
+    private const string PAGE_PATTERN = '/\A[1-9][0-9]{0,5}\z/';
+
+    /** The query that shows one person's messages of a discussion */
+    public const string AUTHOR_QUERY = 'autor';
 
     public function __construct(
         private ForumUrlsInterface $urls,
@@ -209,6 +216,7 @@ final readonly class ForumPresenter
         }
 
         $pageUrl = fn (int $start): string => $this->pageUrl($page, $start);
+        $firstUrl = $page->filtered ? $pageUrl(1) : $this->urls->discussion($discussion);
         $lastStart = ($page->pageCount() - 1) * $page->perPage + 1;
 
         return [
@@ -232,7 +240,7 @@ final readonly class ForumPresenter
                 'pageCount' => $page->pageCount(),
                 'perPage' => $page->perPage,
                 'highestNumber' => $page->highestNumber,
-                'firstUrl' => $page->hasPrevious() ? $this->urls->discussion($discussion) : null,
+                'firstUrl' => $page->hasPrevious() ? $firstUrl : null,
                 'previousUrl' => $page->hasPrevious() ? $pageUrl(max(1, $page->pageStart - $page->perPage)) : null,
                 'nextUrl' => $page->hasNext() ? $pageUrl($page->pageStart + $page->perPage) : null,
                 'lastUrl' => $page->hasNext() ? $pageUrl($lastStart) : null,
@@ -245,10 +253,46 @@ final readonly class ForumPresenter
                 'title' => $moved->target?->title()->value,
                 'url' => $moved->target instanceof Discussion ? $this->urls->discussion($moved->target, $moved->targetNumber) : null,
             ], $page->moved),
+            // One person's messages only (?autor=): who, how many and the way back to the whole discussion
+            'filter' => $page->filtered ? [
+                'authorName' => $this->filteredAuthorName($page, $posts),
+                'count' => $page->highestNumber,
+                // Posts awaiting approval on the page (only their author and moderation get them): not in the count
+                'pending' => count(array_filter($posts, static fn (array $post): bool => $post['status'] === PostStatus::Pending->value)),
+                'clearUrl' => $this->urls->discussion($discussion),
+            ] : null,
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
             'mentionNames' => $mentionNames,
         ];
+    }
+
+    /**
+     * Who the filtered messages are by, as the page shows them: only when it shows any (every
+     * one of them already names its writer), so nothing is said about a person without messages.
+     *
+     * @param  list<array<string, mixed>>  $posts  as `posts()` built them
+     */
+    private function filteredAuthorName(ConversationPageDTO $page, array $posts): ?string
+    {
+        foreach ($posts as $post) {
+            if ($post['authorId'] === $page->filterAuthorId && is_string($post['authorName'])) {
+                return $post['authorName'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The page a request asks for by its place (?pagina=), or null when it asks for none or for
+     * something that is not a page number.
+     */
+    public static function askedPage(Request $request): ?int
+    {
+        $page = $request->query(self::PAGE_QUERY);
+
+        return is_string($page) && preg_match(self::PAGE_PATTERN, $page) === 1 ? (int) $page : null;
     }
 
     /**
@@ -258,6 +302,13 @@ final readonly class ForumPresenter
      */
     public function pageUrl(ConversationPageDTO $page, int $start, bool $absolute = false): string
     {
+        // One person's messages: the page is its place among them, never a post's number
+        if ($page->filtered) {
+            $query = [self::AUTHOR_QUERY => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
+
+            return $this->urls->discussion($page->discussion, absolute: $absolute).'?'.http_build_query($query);
+        }
+
         $anchor = $page->anchorOf($start);
         if ($anchor !== null) {
             return $this->urls->discussion($page->discussion, $anchor, $absolute);

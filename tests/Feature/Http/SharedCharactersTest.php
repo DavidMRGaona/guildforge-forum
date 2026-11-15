@@ -340,6 +340,20 @@ final class SharedCharactersTest extends ModuleTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('posts.0.isStarter', true)->where('posts.1.isStarter', false)->etc());
     }
 
+    public function test_the_author_filter_counts_a_shared_characters_messages_for_the_directors_only(): void
+    {
+        $this->reply($this->director, $this->aSharedCharacterIn($this->space))->assertCreated();
+        $url = $this->discussionUrl().'?autor='.$this->director->id;
+
+        // The other director leads the campaign: they moderate its shared characters, not the discussion
+        $this->actingAs($this->coDirector)->get($url)
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('filter.count', 1)->etc());
+        $this->actingAs($this->director)->get($url)
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('filter.count', 1)->etc());
+        $this->actingAs($this->player)->get($url)
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('filter.count', 0)->where('posts', [])->etc());
+    }
+
     public function test_a_shared_character_does_not_give_its_writer_away_by_their_title(): void
     {
         app(MemberTitleService::class)->change($this->moderator, $this->director->id, 'Narradora');

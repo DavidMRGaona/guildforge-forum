@@ -21,6 +21,7 @@ use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\AccountId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostNumber;
 
@@ -110,6 +111,72 @@ final readonly class ConversationReader
             guestsRead: $this->access->canRead(null, $discussion),
             moved: $this->movedRuns($reader, $this->moved->inRange($id, $pageStart, $isLastPage ? null : $pageEnd)),
             pageAnchors: $highest === 0 ? [] : $this->pageAnchors($id, $pageStart, $perPage, $highest),
+        );
+    }
+
+    /**
+     * One person's messages of the discussion, paged like the discussion: the page (from 1) of
+     * the messages the reader may see, counted among themselves. What was asked for may be
+     * anything: an id that is not an account's, or one without messages, gives the same empty
+     * page, so nothing tells who exists. A message that speaks as a shared character hides its
+     * writer, so it does not count either, except for its writer and for moderation, as in the
+     * discussion itself.
+     *
+     * @throws DiscussionNotFoundException when the reader may not read it
+     */
+    public function openByAuthor(?Authenticatable $reader, DiscussionId $id, string $author, int $page = 1): ConversationPageDTO
+    {
+        $discussion = $this->readable($reader, $id);
+        $category = $this->categories->find($discussion->categoryId());
+        if (! $category instanceof Category) {
+            throw DiscussionNotFoundException::withId($id->value);
+        }
+
+        $authorId = AccountId::normalize($author);
+        $moderates = $this->access->canModerate($reader, $discussion);
+        $readerId = ForumBrowser::accountId($reader);
+        $numbers = [];
+        if ($authorId !== null) {
+            $characters = $this->posts->charactersByNumberOf($id, $authorId);
+            $hiding = array_flip($this->presenter->charactersHidingTheirWriter($reader, $readerId === $authorId, $moderates, array_values(array_filter($characters))));
+            foreach ($characters as $number => $character) {
+                if ($character === null || ! isset($hiding[$character])) {
+                    $numbers[] = $number;
+                }
+            }
+        }
+
+        $perPage = $this->settings->postsPerPage();
+        $count = count($numbers);
+        $pageStart = (min(max(1, $page), intdiv(max(0, $count - 1), $perPage) + 1) - 1) * $perPage + 1;
+        $posts = $this->posts->withNumbers($id, array_slice($numbers, $pageStart - 1, $perPage));
+
+        // As in the discussion, the posts awaiting approval of that person come last: only for
+        // them and for moderation, and they are not counted, for they have no place yet
+        if ($authorId !== null && $pageStart + $perPage > $count && $readerId !== null && ($moderates || $readerId === $authorId)) {
+            foreach ($this->posts->pendingIn($id) as $pending) {
+                if ($pending->authorId() === $authorId) {
+                    $posts[] = $pending;
+                }
+            }
+        }
+
+        return new ConversationPageDTO(
+            discussion: $discussion,
+            category: $category,
+            topics: $this->discussions->topicsOf($id),
+            posts: $posts,
+            contents: $this->presenter->present($posts, $discussion, $reader),
+            pageStart: $pageStart,
+            perPage: $perPage,
+            highestNumber: $count,
+            focusNumber: null,
+            lastReadNumber: null,
+            canPost: $this->posting->canPost($reader, $discussion),
+            canModerate: $moderates,
+            guestsRead: $this->access->canRead(null, $discussion),
+            filtered: true,
+            filterAuthorId: $authorId,
         );
     }
 

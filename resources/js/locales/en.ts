@@ -157,6 +157,13 @@ export default {
             next: 'Next',
             last: 'Last',
             pageOf: 'Page {page} of {count}',
+            authorFilter: {
+                showing: 'Showing one message by {name} | Showing {count} messages by {name}',
+                pendingOnly:
+                    'There is only one message by {name} awaiting approval. | There are only {count} messages by {name} awaiting approval.',
+                none: 'This discussion has no visible messages by that person.',
+                clear: 'View the whole discussion',
+            },
             errors: {
                 save: 'The post could not be saved. Please try again.',
                 delete: 'The post could not be deleted. Please try again.',

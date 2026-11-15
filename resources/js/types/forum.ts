@@ -296,6 +296,18 @@ export interface ForumPagination {
     lastUrl: string | null;
 }
 
+/** A discussion shown as one person's messages only (`?autor=`) */
+export interface ForumAuthorFilter {
+    /** Null when there are no messages to show: nothing is said about who it is */
+    authorName: string | null;
+    /** How many messages of that person the reader may see */
+    count: number;
+    /** Posts awaiting approval on the page (only for their author and moderation), not in the count */
+    pending: number;
+    /** The whole discussion */
+    clearUrl: string;
+}
+
 export interface ForumEditorSettings {
     uploadUrl: string | null;
     maxImages: number;

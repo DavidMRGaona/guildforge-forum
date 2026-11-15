@@ -295,3 +295,47 @@ describe('Discussion page, while it stays open', () => {
         );
     });
 });
+
+describe("Discussion page, showing one person's messages only", () => {
+    function mountFiltered(): VueWrapper {
+        const wrapper = mount(Discussion, {
+            props: {
+                ...props(null),
+                filter: {
+                    authorName: 'Jane Doe',
+                    count: 3,
+                    pending: 0,
+                    clearUrl: '/foro/t/7-partida',
+                },
+            } as never,
+            attachTo: document.body,
+        });
+        mounted.push(wrapper);
+
+        return wrapper;
+    }
+
+    it('says whose messages these are and links back to the whole discussion', () => {
+        const wrapper = mountFiltered();
+
+        const notice = wrapper.get('[data-testid="author-filter"]');
+        expect(notice.text()).toContain('Mostrando 3 mensajes de Jane Doe');
+        expect(notice.get('a').attributes('href')).toBe('/foro/t/7-partida');
+    });
+
+    it('does not follow the end of the discussion, so it never asks for new posts', async () => {
+        const fetchMock = serve({});
+        mountFiltered();
+
+        await vi.advanceTimersByTimeAsync(600_000);
+        await flushPromises();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('shows no notice on the whole discussion', () => {
+        const wrapper = mountPage(null);
+
+        expect(wrapper.find('[data-testid="author-filter"]').exists()).toBe(false);
+    });
+});

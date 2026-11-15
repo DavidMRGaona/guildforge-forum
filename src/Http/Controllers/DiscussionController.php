@@ -85,7 +85,7 @@ final class DiscussionController extends Controller
             $moved = $this->redirects->resolve($user, $number, $post === null ? null : (int) $post);
             if ($moved instanceof RedirectTargetDTO) {
                 // A merged discussion's filter goes with it (the person's messages went there too)
-                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber).($post === null ? self::filterQuery($request, withPage: false) : ''), 301);
+                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber).($post === null ? $this->filterQuery($request, withPage: false) : ''), 301);
             }
         }
         abort_unless($found instanceof Discussion, 404);
@@ -111,7 +111,7 @@ final class DiscussionController extends Controller
         $asked = $post === null ? null : (int) $post;
         $landed = $asked === null ? null : $page->focusNumber;
         if ($discussion !== DiscussionSlug::segment((int) $found->number(), $found->title()->value) || ($asked !== null && ($landed !== $asked || $asked === 1))) {
-            return redirect()->to($this->urls->discussion($found, $landed).($filtered ? self::filterQuery($request, withPage: true) : ''), 301);
+            return redirect()->to($this->urls->discussion($found, $landed).($filtered ? $this->filterQuery($request, withPage: true) : ''), 301);
         }
         // A page asked for by its place that has posts after all goes by its usual address
         if (! $filtered && $place !== null && $page->anchorOf($page->pageStart) !== null) {
@@ -157,7 +157,7 @@ final class DiscussionController extends Controller
      * account id normalized and the page validated; anything else is dropped. Empty when there
      * is no valid author (the redirect then leads to the whole discussion).
      */
-    private static function filterQuery(Request $request, bool $withPage): string
+    private function filterQuery(Request $request, bool $withPage): string
     {
         $author = $request->query(ForumPresenter::AUTHOR_QUERY);
         $author = is_string($author) ? AccountId::normalize($author) : null;

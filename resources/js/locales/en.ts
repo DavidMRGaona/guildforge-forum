@@ -136,7 +136,7 @@ export default {
             closedNotice: 'This discussion is closed: it takes no more replies.',
             cannotReply: 'You cannot reply in this category.',
             deletedAccount: 'Deleted account',
-            starter: 'Started the discussion',
+            starter: '(topic starter)',
             edited: 'edited on {at}',
             pendingBadge: 'awaiting approval',
             permalink: 'Link to post {number}',

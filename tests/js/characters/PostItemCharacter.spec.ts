@@ -82,7 +82,7 @@ describe('a post written as a character', () => {
 
         const starter = mounted({ ...aPost(null), isStarter: true });
         expect(starter.find('#post-2-author .truncate').text()).toBe('Jane Doe');
-        expect(starter.find('#post-2-author').text()).toContain('Autor del tema');
+        expect(starter.find('#post-2-author').text()).toContain('(autor del tema)');
     });
 
     it('shows the account out of character', () => {

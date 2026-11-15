@@ -43,7 +43,7 @@ watch(
 <template>
     <div
         ref="list"
-        class="divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
+        class="forum-post-list divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
     >
         <PostItem
             v-for="post in posts"

@@ -339,7 +339,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
             <!-- One block of posts divided by lines (no menu may be clipped: no overflow-hidden) -->
             <div
                 v-if="entries.length > 0"
-                class="divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
+                class="forum-post-list divide-y divide-[var(--color-border)] rounded-lg border border-default bg-surface"
             >
                 <template v-for="entry in entries" :key="entry.key">
                     <MovedPostsNotice v-if="entry.moved" :moved="entry.moved" />

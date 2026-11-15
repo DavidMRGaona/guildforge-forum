@@ -175,8 +175,46 @@ describe('a compact post', () => {
         const group = wrapper.get('[data-testid="post-author"]');
         expect(group.find('[data-testid="post-avatar"]').exists()).toBe(true);
         expect(group.find('p').text()).toContain('Un nombre bastante largo');
-        expect(group.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'flex-1']));
+        expect(group.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0']));
         expect(group.classes()).not.toContain('flex-wrap');
+    });
+
+    it('sends the date below a name that does not fit beside it, instead of cutting the name', () => {
+        // flex-1 starts from no width at all, so the line never wraps and the name shrinks to a letter
+        const group = mounted(aPost({ isStarter: true })).get('[data-testid="post-author"]');
+
+        expect(group.classes()).toContain('flex-auto');
+        expect(group.classes()).not.toContain('flex-1');
+    });
+
+    it('cuts the title before the name, and never the name below a few letters', () => {
+        const wrapper = mounted(
+            aPost({ isStarter: true, authorTitle: 'Lanzador de dados oficial' })
+        );
+
+        expect(wrapper.get('[data-testid="post-author-name"]').classes()).toContain('min-w-[6ch]');
+        expect(wrapper.get('[data-testid="post-author-title"]').classes()).toContain('shrink-[4]');
+    });
+
+    it('keeps a few letters of a character name next to «Retirado»', () => {
+        const wrapper = mounted(
+            aPost({
+                character: {
+                    id: 'character-1',
+                    name: 'Arwen Undómiel de Rivendel',
+                    initials: 'AR',
+                    portraitUrl: null,
+                    description: null,
+                    isRetired: true,
+                    isShared: false,
+                    actions: null,
+                },
+            })
+        );
+
+        expect(wrapper.get('[data-testid="post-character-name"]').classes()).toContain(
+            'min-w-[6ch]'
+        );
     });
 
     it('leaves room under a post that has no actions', () => {

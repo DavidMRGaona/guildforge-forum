@@ -497,8 +497,10 @@ async function remove(): Promise<void> {
 
         <div class="min-w-0">
             <header class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                <!-- Avatar and name always share a line: a long name is cut, never pushed below -->
-                <div class="flex min-w-0 flex-1 items-center gap-2" data-testid="post-author">
+                <!-- Avatar and name always share a line: a long name is cut, never pushed below. It
+                     starts from its own width (flex-auto), so when it does not fit beside the date
+                     the date goes to the next line instead of the name shrinking to a letter -->
+                <div class="flex min-w-0 flex-auto items-center gap-2" data-testid="post-author">
                     <!-- On phones the avatar moves to the author line, leaving the width to the text -->
                     <CharacterAvatar
                         v-if="post.character"
@@ -520,7 +522,9 @@ async function remove(): Promise<void> {
                         class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                         data-testid="post-character"
                     >
-                        <span class="min-w-0 truncate">{{ post.character.name }}</span>
+                        <span class="min-w-[6ch] truncate" data-testid="post-character-name">{{
+                            post.character.name
+                        }}</span>
                         <span
                             v-if="post.character.isRetired"
                             class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
@@ -533,13 +537,13 @@ async function remove(): Promise<void> {
                         :id="`${anchor}-author`"
                         class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                     >
-                        <span class="min-w-0 truncate">{{
+                        <span class="min-w-[6ch] truncate" data-testid="post-author-name">{{
                             post.authorName ?? t('forum.posts.deletedAccount')
                         }}</span>
-                        <!-- Given by moderation; escaped like any text -->
+                        <!-- Given by moderation; escaped like any text. Cut before the name -->
                         <span
                             v-if="post.authorTitle"
-                            class="min-w-0 truncate text-xs font-normal text-base-secondary"
+                            class="min-w-0 shrink-[4] truncate text-xs font-normal text-base-secondary"
                             :title="post.authorTitle"
                             data-testid="post-author-title"
                             >{{ post.authorTitle }}</span

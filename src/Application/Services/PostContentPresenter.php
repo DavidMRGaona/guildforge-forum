@@ -29,13 +29,15 @@ final readonly class PostContentPresenter
         private PostRenderer $renderer,
         private CharacterRepositoryInterface $characters,
         private CharacterRules $characterRules,
+        private ReplyCounts $replyCounts,
     ) {}
 
     /**
      * @param  list<Post>  $posts  of the discussion
+     * @param  bool  $withoutMedia  whether images and embeds are left out (a long post in a preview)
      * @return list<PostContentDTO> in the same order
      */
-    public function present(array $posts, Discussion $discussion, ?Authenticatable $reader): array
+    public function present(array $posts, Discussion $discussion, ?Authenticatable $reader, bool $withoutMedia = false): array
     {
         $readerId = $reader instanceof Authenticatable ? strtolower(is_scalar($reader->getAuthIdentifier()) ? (string) $reader->getAuthIdentifier() : '') : null;
         $moderates = $this->access->canModerate($reader, $discussion);
@@ -49,15 +51,17 @@ final readonly class PostContentPresenter
                 array_map(static fn (Post $post) => $post->body(), $shown),
                 $reader,
                 array_map(static fn (Post $post): ?string => ($characters[$post->characterId()->value ?? ''] ?? null)?->name(), $shown),
+                withoutMedia: $withoutMedia,
             ),
         );
+        $replies = $this->replyCounts->countsFor($posts, $reader);
         /** @var array<string, bool> $moderated */
         $moderated = [];
         foreach ($characters as $id => $character) {
             $moderated[$id] = $this->characterRules->moderates($reader, $character);
         }
 
-        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates, $characters, $moderated): PostContentDTO {
+        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates, $characters, $moderated, $replies): PostContentDTO {
             $own = $readerId !== null && $post->authorId() === $readerId;
             $ownEditable = $own && $canPost && $post->status() !== PostStatus::Deleted;
             // Moderators edit anyone's post; the version it replaces stays in its history
@@ -78,6 +82,7 @@ final readonly class PostContentPresenter
                 moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
                 authorHidden: ! $own && ! $moderates && (($characters[$post->characterId()->value ?? ''] ?? null)?->isNpc() ?? false)
                     && ! ($moderated[$post->characterId()->value ?? ''] ?? false),
+                replyCount: $replies[$post->id()->value] ?? 0,
             );
         }, $posts);
     }

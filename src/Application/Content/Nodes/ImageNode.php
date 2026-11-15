@@ -127,6 +127,11 @@ final class ImageNode extends AbstractNodeType
 
     public function toHtml(array $attributes, array $children, RenderContext $context): string
     {
+        // A long post in a preview says how many images it left out instead
+        if ($context->omitsMedia()) {
+            return '';
+        }
+
         $stored = self::storedPath($attributes);
         $url = $stored === null ? null : $context->imageUrl($stored);
         $alt = Attributes::string($attributes, 'alt') ?? '';

@@ -360,6 +360,9 @@ final readonly class ForumPresenter
                 'characterId' => $content->canEdit ? $post->characterId()?->value : null,
                 // Its moderation menu, for whoever moderates the discussion
                 'moderationUrl' => $moderates ? route('forum.moderation.posts', ['post' => $post->id()->value]) : null,
+                // The visible posts that reply to it (by «#N» or quoting it) the reader may read
+                'replyCount' => $content->replyCount,
+                'repliesUrl' => $content->replyCount > 0 ? route('forum.posts.replies', ['post' => $post->id()->value]) : null,
             ];
         }
 

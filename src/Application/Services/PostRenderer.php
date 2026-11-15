@@ -6,6 +6,7 @@ namespace Modules\Forum\Application\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Content\Nodes\EmbedNode;
+use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
 use Modules\Forum\Application\Content\Nodes\PostReferenceNode;
@@ -63,17 +64,32 @@ final readonly class PostRenderer
      * @param  list<PostBody>  $bodies
      * @param  array<int, string|null>  $speakers  by the index of each body: the name of the character it speaks as (rolls say who throws them); missing or null out of character
      * @param  bool  $offerReveal  whether the page lets the reader reveal hidden rolls (not in old versions)
+     * @param  bool  $withoutMedia  whether images and embeds are left out
      * @return list<string> the HTML of each, in the same order
      */
-    public function toHtml(array $bodies, ?Authenticatable $reader, array $speakers = [], bool $offerReveal = true): array
+    public function toHtml(array $bodies, ?Authenticatable $reader, array $speakers = [], bool $offerReveal = true, bool $withoutMedia = false): array
     {
-        $context = $this->contextFor($bodies, $reader, $offerReveal);
+        $context = $this->contextFor($bodies, $reader, $offerReveal, $withoutMedia);
 
         return array_map(
             fn (PostBody $body, int $index): string => $this->renderer->toHtml($body->document, $context->withSpeaker($speakers[$index] ?? null)),
             $bodies,
             array_keys($bodies),
         );
+    }
+
+    /**
+     * How many images and embeds a post holds (what a preview without media leaves out).
+     *
+     * @return array{images: int, embeds: int}
+     */
+    public function mediaCounts(PostBody $body): array
+    {
+        $image = (new ImageNode)->name();
+        $embed = (new EmbedNode)->name();
+        $found = $this->renderer->attributesOf($body->document, [$image, $embed]);
+
+        return ['images' => count($found[$image] ?? []), 'embeds' => count($found[$embed] ?? [])];
     }
 
     /**
@@ -136,7 +152,7 @@ final readonly class PostRenderer
     /**
      * @param  list<PostBody>  $bodies
      */
-    private function contextFor(array $bodies, ?Authenticatable $reader, bool $offerReveal): RenderContext
+    private function contextFor(array $bodies, ?Authenticatable $reader, bool $offerReveal, bool $withoutMedia = false): RenderContext
     {
         $mention = (new MentionNode)->name();
         $quote = (new PostQuoteNode)->name();
@@ -180,6 +196,7 @@ final readonly class PostRenderer
             rolls: $this->rollViews($this->distinct($rollIds), $reader, $offerReveal),
             embeds: $this->embedViews->for($embeds),
             references: $this->referenceViews($referenced, $found),
+            omitsMedia: $withoutMedia,
         );
     }
 

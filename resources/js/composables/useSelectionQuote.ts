@@ -1,3 +1,4 @@
+import { selectionText } from '../forum/selectionText';
 import { computePosition, flip, hide as hideMiddleware, offset, shift } from '@floating-ui/dom';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 
@@ -71,12 +72,9 @@ export function useSelectionQuote(
         if (!container.contains(whole.endContainer)) {
             range.setEnd(container, container.childNodes.length);
         }
-        const selected = range.toString().trim();
-        if (
-            selected === '' ||
-            selected !== selection.toString().trim() ||
-            !options.fits(selected)
-        ) {
+        // Without references and expanded posts: the stored text has neither
+        const selected = selectionText(range);
+        if (selected === '' || selected !== selectionText(whole) || !options.fits(selected)) {
             return null;
         }
 

@@ -196,6 +196,17 @@ final class HiddenRollsTest extends ModuleTestCase
         $this->assertStringNotContainsString('data-roll-reveal="', $this->postHtml($this->pageAs($this->moderator, $this->generalDiscussion)));
     }
 
+    public function test_a_preview_of_the_post_offers_no_reveal(): void
+    {
+        // Revealing reads the post again where it is shown, which a box opened by a reference is not
+        $this->hiddenReply($this->generalDiscussion)->assertCreated();
+
+        $html = (string) $this->actingAs($this->thrower)->getJson(route('forum.posts.preview', ['post' => $this->replyRow()->id]))->assertOk()->json('html');
+
+        $this->assertStringContainsString('forum-roll--secret', $html);
+        $this->assertStringNotContainsString('data-roll-reveal', $html);
+    }
+
     public function test_in_a_campaign_space_its_direction_sees_the_result_and_the_other_players_do_not(): void
     {
         $this->hiddenReply($this->spaceDiscussion)->assertCreated();

@@ -71,7 +71,9 @@ final class PostController extends Controller
             // Someone else's post is edited only by its moderators, and the edit is logged; it
             // keeps speaking as it did (nobody chooses someone else's character)
             // (images from other sites it already had are kept without the moderator's permission)
-            $edited = $this->moderation->editPost($user, $id, $this->bodies->fromInput($document, $user, $this->posts->find($id)?->body()));
+            $this->moderation->assertMayEdit($user, $id);
+            $existing = $this->posts->find($id);
+            $edited = $this->moderation->editPost($user, $id, $this->bodies->fromInput($document, $user, $existing?->body(), $existing?->discussionId()));
 
             return response()->json(['post' => $this->present($edited, $user)]);
         });

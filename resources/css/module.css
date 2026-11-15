@@ -118,6 +118,41 @@
     margin-top: 0 !important;
 }
 
+/*
+ * A reference to another post («#3»). The server draws it as a link only for readers who may
+ * read that post; for anyone else it is plain text in the same weight.
+ */
+.forum-ref {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+a.forum-ref {
+    color: var(--color-primary-700);
+    text-decoration: none;
+}
+
+a.forum-ref:hover,
+a.forum-ref[aria-expanded='true'] {
+    text-decoration: underline;
+}
+
+.dark a.forum-ref {
+    color: var(--color-primary-300);
+}
+
+/* The post a reference opens, under its paragraph */
+.forum-ref-preview {
+    margin-block: 0.5rem;
+}
+
+/* A long post in a preview: about twelve lines, fading out (its link reads it whole) */
+.forum-ref-preview__body--cut {
+    max-height: 18rem;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, black 75%, transparent);
+}
+
 .forum-image img {
     max-height: 32rem;
     border-radius: 0.5rem;

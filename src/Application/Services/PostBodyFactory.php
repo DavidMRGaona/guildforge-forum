@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Application\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Forum\Application\Content\DocumentReferences;
 use Modules\Forum\Application\Content\DocumentSchema;
 use Modules\Forum\Application\Content\PostDocument;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
@@ -14,6 +15,7 @@ use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 
@@ -33,16 +35,19 @@ final readonly class PostBodyFactory
         private ForumAccessInterface $access,
         private ExternalImageRules $externalImages,
         private EmbedRules $embeds,
+        private PostReferenceLinker $references,
     ) {}
 
     /**
-     * @param  PostBody|null  $previous  what the post said before, when it is an edit: images from other sites it already had are kept without checking them again
+     * @param  PostBody|null  $previous  what the post said before, when it is an edit: images from other sites and references it already had are kept without checking them again
+     * @param  DiscussionId|null  $discussionId  where the post is written, so «#N» there becomes a reference; null for a discussion's first post
      *
      * @throws InvalidDocumentException
      */
-    public function fromInput(mixed $raw, Authenticatable $author, ?PostBody $previous = null): PostBody
+    public function fromInput(mixed $raw, Authenticatable $author, ?PostBody $previous = null, ?DiscussionId $discussionId = null): PostBody
     {
-        $document = $this->schema->validate($raw);
+        // What is stored is the document with its numbers turned into references, checked again
+        $document = $this->schema->validate($this->references->link($this->schema->validate($raw)->toArray(), $discussionId, $author));
 
         $this->externalImages->assertAllowed($document, $author, $previous);
         $this->embeds->assertAllowed($document, $previous);
@@ -53,6 +58,7 @@ final readonly class PostBodyFactory
         }
 
         $this->assertQuotesHold($document, $author);
+        $this->assertReferencesHold($document, $author, $previous);
 
         $text = $this->renderer->toText($document);
         if (mb_strlen($text) > PostBody::MAX_PLAIN_TEXT_LENGTH) {
@@ -92,6 +98,35 @@ final readonly class PostBodyFactory
             if (! $original instanceof Post || ! str_contains($this->words($original->body()->plainText), $this->words($quotation['text']))) {
                 throw InvalidDocumentException::because(InvalidDocumentException::INVALID_QUOTE, '', 'A quotation does not match the quoted post');
             }
+        }
+    }
+
+    /**
+     * Every reference the post did not have before points at a visible post in a discussion the
+     * author may read (one sent by hand could name any id). The ones it had stay: a post hidden
+     * since must not stop its author from editing, and a reference shows nothing to a reader who
+     * may not read its post.
+     *
+     * @throws InvalidDocumentException
+     */
+    private function assertReferencesHold(PostDocument $document, Authenticatable $author, ?PostBody $previous): void
+    {
+        $kept = $previous instanceof PostBody ? DocumentReferences::of($previous)->referencedPostIds : [];
+        $postIds = array_values(array_diff($document->referencedPostIds(), $kept));
+        if ($postIds === []) {
+            return;
+        }
+
+        $readable = 0;
+        foreach ($this->posts->findMany(array_map(PostId::fromString(...), $postIds)) as $post) {
+            $discussion = $this->discussions->find($post->discussionId());
+            if ($post->isVisible() && $discussion instanceof Discussion && $this->access->canRead($author, $discussion)) {
+                $readable++;
+            }
+        }
+
+        if ($readable !== count($postIds)) {
+            throw InvalidDocumentException::because(InvalidDocumentException::UNKNOWN_POST, '', 'A referenced post cannot be read');
         }
     }
 

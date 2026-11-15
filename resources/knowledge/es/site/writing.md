@@ -1,11 +1,11 @@
 ---
 id: forum.site.writing
 title: Escribir un mensaje con el editor
-summary: Formato, citas, menciones, enlaces, borradores y cómo editar o borrar lo que has escrito.
+summary: Formato, citas, referencias a otros mensajes, menciones, enlaces, borradores y cómo editar o borrar lo que has escrito.
 category: community
 audience: site
 order: 20
-keywords: [editor, escribir, formato, negrita, cursiva, lista, cita, citar, mencionar, mención, arroba, enlace, código, borrador, editar mensaje, borrar mensaje, responder, encabezado, separador]
+keywords: [editor, escribir, formato, negrita, cursiva, lista, cita, citar, referencia, referencias, almohadilla, respuestas, mencionar, mención, arroba, enlace, código, borrador, editar mensaje, borrar mensaje, responder, encabezado, separador]
 related: [forum.site.images, forum.site.embeds, forum.site.notices, forum.site.overview]
 conditions:
   capabilities: [forum.visible]
@@ -23,6 +23,15 @@ Para enviar sin coger el ratón, pulsa Ctrl + Intro.
 ## Citar un mensaje
 
 Pulsa **Citar** debajo del mensaje al que respondes. Para citar solo una parte, selecciona ese trozo del mensaje y pulsa el botón **Citar** que aparece encima (en el móvil, debajo). La cita lleva el nombre de quien escribió y un enlace al mensaje, y a su autor le llega un aviso. El foro comprueba que lo citado es de verdad del mensaje original, y un mensaje puede llevar hasta 10 citas.
+
+## Referirse a otro mensaje
+
+Escribe **#** seguido del número de un mensaje del tema, como `#12`, para referirte a él. Al publicar, el número se convierte en un enlace. Quien lo pulse ve ese mensaje desplegado justo debajo, sin salir de la página, y con otra pulsación se pliega. Con Ctrl o Cmd se abre en su sitio, como cualquier enlace.
+
+- El número tiene que ir separado del resto del texto: `#12` o `(#12)` sí; `abc#12` o `#12a` no. Dentro de código, de enlaces y de citas se queda como lo escribiste.
+- Solo se convierten los mensajes que puedes leer. Quien no pueda leer el mensaje al que te refieres verá el número sin enlace.
+- La referencia sigue apuntando al mismo mensaje aunque el tema se separe o se una a otro y los mensajes cambien de número.
+- Bajo cada mensaje que ha recibido referencias o citas aparece **N respuestas**: púlsalo para ver esas respuestas desplegadas, de la más antigua a la más reciente.
 
 ## Mencionar a alguien
 

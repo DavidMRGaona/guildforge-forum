@@ -8,6 +8,7 @@ use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Content\DocumentReferences;
 use Modules\Forum\Application\Contracts\DiscussionCarryOverInterface;
 use Modules\Forum\Application\Contracts\ForumCountersInterface;
 use Modules\Forum\Application\Contracts\ForumLiveSignalsInterface;
@@ -25,6 +26,7 @@ use Modules\Forum\Domain\Exceptions\PostNotFoundException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostReferenceRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\RedirectRepositoryInterface;
@@ -68,6 +70,7 @@ final readonly class ForumWriter
         private DiscussionCarryOverInterface $carryOver,
         private CharacterRepositoryInterface $characters,
         private ForumLiveSignalsInterface $live,
+        private PostReferenceRepositoryInterface $references,
     ) {}
 
     /**
@@ -103,6 +106,7 @@ final readonly class ForumWriter
                         ? Post::submitForApproval($firstPostId, $discussion->id(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId)
                         : Post::publish($firstPostId, $discussion->id(), PostNumber::first(), $discussion->authorId(), $rolled->body, $discussion->createdAt(), $characterId);
                     $this->posts->save($post);
+                    $this->indexReferences($post);
                     $this->rolls->store($rolled);
 
                     $this->refresh($discussion->id(), [$discussion->categoryId()]);
@@ -127,7 +131,7 @@ final readonly class ForumWriter
      */
     public function reply(DiscussionId $discussionId, PostId $postId, ?string $authorId, PostBody $body, DateTimeImmutable $at, bool $needsApproval, ?CharacterId $characterId = null): Post
     {
-        return $this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval, $characterId): Post {
+        return $this->withTargetsTold($this->announced(DB::transaction(function () use ($discussionId, $postId, $authorId, $body, $at, $needsApproval, $characterId): Post {
             $discussion = $this->lockDiscussion($discussionId);
 
             $rolled = $this->rolls->settle($postId, $body, editing: false, at: $at, rolledBy: $authorId);
@@ -135,12 +139,13 @@ final readonly class ForumWriter
                 ? Post::submitForApproval($postId, $discussionId, $authorId, $rolled->body, $at, $characterId)
                 : Post::publish($postId, $discussionId, $this->nextNumber($discussionId), $authorId, $rolled->body, $at, $characterId);
             $this->posts->save($post);
+            $this->indexReferences($post);
             $this->rolls->store($rolled);
 
             $this->refresh($discussionId, [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS));
+        }, self::ATTEMPTS)));
     }
 
     /**
@@ -153,7 +158,7 @@ final readonly class ForumWriter
      */
     public function approvePost(PostId $postId, DateTimeImmutable $at): Post
     {
-        return $this->announced(DB::transaction(function () use ($postId, $at): Post {
+        return $this->withTargetsTold($this->announced(DB::transaction(function () use ($postId, $at): Post {
             $discussion = $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
@@ -168,7 +173,7 @@ final readonly class ForumWriter
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
 
             return $post;
-        }, self::ATTEMPTS));
+        }, self::ATTEMPTS)));
     }
 
     /**
@@ -190,6 +195,7 @@ final readonly class ForumWriter
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
             $this->live->postChanged($post);
+            $this->tellTargets($post);
 
             return $post;
         }, self::ATTEMPTS);
@@ -210,6 +216,7 @@ final readonly class ForumWriter
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
             $this->live->postChanged($post);
+            $this->tellTargets($post);
         }, self::ATTEMPTS);
     }
 
@@ -227,7 +234,8 @@ final readonly class ForumWriter
     public function editPost(PostId $postId, PostBody $body, ?string $editorId, DateTimeImmutable $at, ?SpeakerChoice $speaker = null): Post
     {
         $replaced = null;
-        $post = DB::transaction(function () use ($postId, $body, $editorId, $at, $speaker, &$replaced): Post {
+        $pointedAt = [];
+        $post = DB::transaction(function () use ($postId, $body, $editorId, $at, $speaker, &$replaced, &$pointedAt): Post {
             $this->lockDiscussion($this->posts->findOrFail($postId)->discussionId());
 
             $post = $this->posts->findOrFail($postId);
@@ -244,6 +252,7 @@ final readonly class ForumWriter
 
             $this->revisions->save(new PostRevision($postId, $this->revisions->nextNumber($postId), $replaced, $editorId, $at, $replacedCharacter));
             $this->posts->save($post);
+            $pointedAt = $this->indexReferences($post);
             $this->rolls->store($rolled);
 
             return $post;
@@ -251,6 +260,8 @@ final readonly class ForumWriter
 
         if ($replaced instanceof PostBody) {
             $this->live->postChanged($post);
+            // What it no longer points at loses a reply too
+            $this->tellTargets($post, $pointedAt);
         }
 
         // Only who the edit newly mentions or quotes hears about it
@@ -279,6 +290,7 @@ final readonly class ForumWriter
 
             $this->refresh($discussion->id(), [$discussion->categoryId()]);
             $this->live->postChanged($post);
+            $this->tellTargets($post);
 
             return $post;
         }, self::ATTEMPTS);
@@ -301,6 +313,7 @@ final readonly class ForumWriter
             $this->revisions->deleteOfPost($postId);
             $this->rolls->forget($postId);
             $this->posts->save($post);
+            $this->indexReferences($post);
             $this->live->postChanged($post);
 
             return $post;
@@ -547,6 +560,49 @@ final readonly class ForumWriter
 
             return new PostsMovedDTO($into, $map, count($pending));
         }, self::ATTEMPTS);
+    }
+
+    /**
+     * Writes what the post's body points at (by «#N» and by quoting), replacing what it pointed
+     * at before.
+     *
+     * @return list<string> the posts it pointed at before
+     */
+    private function indexReferences(Post $post): array
+    {
+        $before = $this->references->targetsOf($post->id());
+        $found = DocumentReferences::of($post->body());
+        $this->references->replaceFor($post->id(), $found->referencedPostIds, $found->quotedPostIds);
+
+        return $before;
+    }
+
+    /**
+     * Tells the open pages of the posts this one points at in its discussion that their reply
+     * count may have changed (also those it pointed at until now). Pages of other discussions
+     * are not told: they learn it when they are read again.
+     *
+     * @param  list<string>  $alsoPointedAt
+     */
+    private function tellTargets(Post $post, array $alsoPointedAt = []): void
+    {
+        $ids = array_values(array_unique([...$this->references->targetsOf($post->id()), ...$alsoPointedAt]));
+        if ($ids === []) {
+            return;
+        }
+
+        foreach ($this->posts->findMany(array_map(PostId::fromString(...), $ids)) as $target) {
+            if ($target->discussionId()->value === $post->discussionId()->value && $target->number() instanceof PostNumber && $target->id()->value !== $post->id()->value) {
+                $this->live->postChanged($target);
+            }
+        }
+    }
+
+    private function withTargetsTold(Post $post): Post
+    {
+        $this->tellTargets($post);
+
+        return $post;
     }
 
     /**

@@ -33,5 +33,6 @@ final readonly class PostContentDTO
         public ?Character $character = null,
         public bool $moderatesCharacter = false,
         public bool $authorHidden = false,
+        public int $replyCount = 0,
     ) {}
 }

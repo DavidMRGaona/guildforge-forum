@@ -61,6 +61,11 @@ final class EmbedNode extends AbstractNodeType
 
     public function toHtml(array $attributes, array $children, RenderContext $context): string
     {
+        // A long post in a preview says how many embeds it left out instead
+        if ($context->omitsMedia()) {
+            return '';
+        }
+
         // Checked again: a stored document is never trusted to have been validated
         $provider = $this->providerOf($attributes);
         $id = Attributes::string($attributes, 'id');

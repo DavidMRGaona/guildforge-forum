@@ -38,7 +38,8 @@ describe('the editor document', () => {
             '<h2>Crónica</h2>' +
                 '<p><strong>Negrita</strong> <em>cursiva</em> <s>tachado</s> <code>código</code> ' +
                 '<a href="https://example.com/a">enlace</a><br>' +
-                `<span data-account-id="${ACCOUNT}">@Ana</span></p>` +
+                `<span data-account-id="${ACCOUNT}">@Ana</span> ` +
+                `<span class="forum-ref" data-post-id="${POST}">#3</span></p>` +
                 '<blockquote><p>Cita libre</p></blockquote>' +
                 `<blockquote data-post-id="${POST}"><p>Cita de un mensaje</p></blockquote>` +
                 '<ul><li><p>Uno</p></li></ul>' +

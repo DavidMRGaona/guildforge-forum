@@ -23,6 +23,7 @@ use Modules\Forum\Application\Content\Nodes\OocNode;
 use Modules\Forum\Application\Content\Nodes\OrderedListNode;
 use Modules\Forum\Application\Content\Nodes\ParagraphNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
+use Modules\Forum\Application\Content\Nodes\PostReferenceNode;
 use Modules\Forum\Application\Content\Nodes\RollNode;
 use Modules\Forum\Domain\Exceptions\InvalidDocumentException;
 
@@ -114,6 +115,7 @@ final class DocumentSchema
             new ImageNode($maxImages),
             new HardBreakNode,
             new MentionNode,
+            new PostReferenceNode,
             new RollNode,
             new OocNode,
             EmbedNode::builtIn(),

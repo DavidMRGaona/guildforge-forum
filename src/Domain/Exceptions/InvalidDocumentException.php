@@ -51,6 +51,8 @@ final class InvalidDocumentException extends DomainException
 
     public const string TOO_MANY_QUOTES = 'too_many_quotes';
 
+    public const string TOO_MANY_REFERENCES = 'too_many_references';
+
     public const string UNKNOWN_ACCOUNT = 'unknown_account';
 
     public const string UNKNOWN_POST = 'unknown_post';

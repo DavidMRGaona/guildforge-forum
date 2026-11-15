@@ -22,6 +22,8 @@ final readonly class RenderContext
      * @param  array<string, RollView>  $rolls  by roll id
      * @param  string|null  $speaker  the name of the character the post speaks as; null out of character
      * @param  array<string, EmbedView>  $embeds  by EmbedView::key()
+     * @param  array<string, ReferenceView>  $references  by post id: the referenced posts that still exist
+     * @param  bool  $omitsMedia  whether images and embeds are left out (a long post shown in a preview)
      */
     public function __construct(
         private array $accountNames = [],
@@ -30,6 +32,8 @@ final readonly class RenderContext
         private array $rolls = [],
         private ?string $speaker = null,
         private array $embeds = [],
+        private array $references = [],
+        private bool $omitsMedia = false,
     ) {}
 
     /**
@@ -37,7 +41,7 @@ final readonly class RenderContext
      */
     public function withSpeaker(?string $speaker): self
     {
-        return new self($this->accountNames, $this->quotes, $this->imageUrl, $this->rolls, $speaker, $this->embeds);
+        return new self($this->accountNames, $this->quotes, $this->imageUrl, $this->rolls, $speaker, $this->embeds, $this->references, $this->omitsMedia);
     }
 
     /** Who the text being rendered is said by: a character's name, or null out of character */
@@ -54,6 +58,18 @@ final readonly class RenderContext
     public function quote(string $postId): ?QuoteSource
     {
         return $this->quotes[$postId] ?? null;
+    }
+
+    /** What the reader is shown of a referenced post; null once it is gone */
+    public function reference(string $postId): ?ReferenceView
+    {
+        return $this->references[$postId] ?? null;
+    }
+
+    /** Whether images and embeds are left out */
+    public function omitsMedia(): bool
+    {
+        return $this->omitsMedia;
     }
 
     public function roll(string $rollId): ?RollView

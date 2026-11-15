@@ -25,6 +25,7 @@ use Modules\Forum\Http\Controllers\ModerationQueueController;
 use Modules\Forum\Http\Controllers\PostController;
 use Modules\Forum\Http\Controllers\PostImageController;
 use Modules\Forum\Http\Controllers\PostLikesController;
+use Modules\Forum\Http\Controllers\PostReferencesController;
 use Modules\Forum\Http\Controllers\PostVersionsController;
 use Modules\Forum\Http\Controllers\ReadMarksController;
 use Modules\Forum\Http\Controllers\ReportController;
@@ -61,6 +62,17 @@ Route::prefix('foro')
         Route::get('t/{discussion}/{post?}', [DiscussionController::class, 'show'])
             ->where(['discussion' => '[1-9][0-9]{0,9}(?:-[a-z0-9-]*)?', 'post' => '[1-9][0-9]{0,9}'])
             ->name('discussions.show');
+
+        // A post as a reference to it opens it, and the posts that reply to it (JSON). Whoever
+        // may not read a post gets what a missing one gets
+        Route::middleware('throttle:120,1,forum-references')->group(function (): void {
+            Route::get('mensajes/{post}/vista', [PostReferencesController::class, 'preview'])
+                ->whereUuid('post')
+                ->name('posts.preview');
+            Route::get('mensajes/{post}/respuestas', [PostReferencesController::class, 'replies'])
+                ->whereUuid('post')
+                ->name('posts.replies');
+        });
 
         // The conversation a record's page shows (JSON). Any type and id reach the controller,
         // which answers an empty conversation for what it cannot show, never an error

@@ -23,5 +23,6 @@ final class EditorFixtureTest extends TestCase
         $this->assertSame($raw, $document->toArray());
         $this->assertSame(['9d4f6a2e-1b3c-4d5e-8f70-a1b2c3d4e5f6'], $document->mentionedAccountIds());
         $this->assertSame(['1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f'], $document->quotedPostIds());
+        $this->assertSame(['1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f'], $document->referencedPostIds());
     }
 }

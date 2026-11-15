@@ -532,6 +532,7 @@ return [
             'too_many_images' => 'El mensaje lleva más imágenes de las que permite el foro.',
             'too_many_mentions' => 'Un mensaje puede mencionar a 20 personas como mucho.',
             'too_many_quotes' => 'Un mensaje puede citar 10 mensajes como mucho.',
+            'too_many_references' => 'Un mensaje puede referirse a 30 mensajes como mucho.',
             'unknown_account' => 'Mencionas a una cuenta que ya no existe.',
             'unknown_post' => 'Citas un mensaje que no existe o que no puedes ver.',
             'invalid_quote' => 'La cita no coincide con el mensaje citado.',

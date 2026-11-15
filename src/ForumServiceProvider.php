@@ -77,6 +77,7 @@ use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Application\Services\HiddenRolls;
+use Modules\Forum\Console\Commands\IndexPostReferencesCommand;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
 use Modules\Forum\Domain\Dice\NumberGenerator;
@@ -94,6 +95,7 @@ use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ExternalImageCopyRepositoryInterface;
 use Modules\Forum\Domain\Repositories\MemberTitleRepositoryInterface;
 use Modules\Forum\Domain\Repositories\ModerationLogRepositoryInterface;
+use Modules\Forum\Domain\Repositories\PostReferenceRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRevisionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\RedirectRepositoryInterface;
@@ -137,6 +139,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentEmbed
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentExternalImageCopyRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentMemberTitleRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentModerationLogRepository;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostReferenceRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentPostRevisionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentRedirectRepository;
@@ -260,6 +263,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(UserBlocksInterface::class, EloquentUserBlocks::class);
         $this->app->singleton(ConversationDocuments::class);
         $this->app->bind(PostLinksInterface::class, DiscussionPostLinks::class);
+        $this->app->bind(PostReferenceRepositoryInterface::class, EloquentPostReferenceRepository::class);
         $this->app->bind(ForumUrlsInterface::class, RouteForumUrls::class);
         $this->app->bind(DiscussionReadsInterface::class, EloquentDiscussionReads::class);
         $this->app->bind(PostLikesInterface::class, EloquentPostLikes::class);
@@ -297,7 +301,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
             ->by('forum-images:'.self::requesterKey($request)));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PurgeDeletedPostsCommand::class, SyncPublicationDiscussionsCommand::class]);
+            $this->commands([PurgeDeletedPostsCommand::class, SyncPublicationDiscussionsCommand::class, IndexPostReferencesCommand::class]);
         }
 
         // Game tables, campaigns and events get their discussion; each change is checked in the queue

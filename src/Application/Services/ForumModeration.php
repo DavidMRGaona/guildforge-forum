@@ -414,6 +414,18 @@ final readonly class ForumModeration
      * @throws ForumActionDeniedException
      * @throws InvalidPostException once its author deleted it
      */
+    /**
+     * Checks the person may edit the post as its moderator, before anything is built from what
+     * they sent: an answer about the body must never tell them about a post they may not edit.
+     *
+     * @throws PostNotFoundException when they may not read its discussion
+     * @throws ForumActionDeniedException when they read it but do not moderate it
+     */
+    public function assertMayEdit(Authenticatable $moderator, PostId $id): void
+    {
+        $this->moderatedPost($moderator, $id);
+    }
+
     public function editPost(Authenticatable $moderator, PostId $id, PostBody $body): Post
     {
         [$post, $discussion] = $this->moderatedPost($moderator, $id);

@@ -3,11 +3,13 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
 import { Link } from '@inertiajs/vue3';
-import { Flag, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
+import { ChevronDown, Flag, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import LikeButton from './LikeButton.vue';
 import PostAvatar from './PostAvatar.vue';
+import PostPreview from './PostPreview.vue';
+import PostReplies from './PostReplies.vue';
 import ModerationDialog, { type ModerationDialogFields } from '../moderation/ModerationDialog.vue';
 import ModerationMenu, { type ModerationMenuItem } from '../moderation/ModerationMenu.vue';
 import ReportDialog from '../moderation/ReportDialog.vue';
@@ -17,11 +19,18 @@ import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import { quoteFits } from '../../editor/extensions/PostQuote';
+import { selectionText } from '../../forum/selectionText';
 import { revealRollUrl, sendJson } from '../../forum/api';
 import { useEmbeds } from '../../composables/useEmbeds';
+import { usePostReferences } from '../../composables/usePostReferences';
 import { useRollReveals } from '../../composables/useRollReveals';
 import { useSelectionQuote } from '../../composables/useSelectionQuote';
-import type { ForumCharacterPicker, ForumEditorSettings, ForumPost } from '../../types/forum';
+import type {
+    ForumCharacterPicker,
+    ForumEditorSettings,
+    ForumPost,
+    ForumPostPreview,
+} from '../../types/forum';
 
 type PostAction = 'hide' | 'show' | 'approve' | 'reject';
 type CharacterAction = 'retire' | 'delete';
@@ -100,6 +109,33 @@ watch(
     () => props.post.html,
     () => selection.hide()
 );
+
+/** A post as a reference opens it; null when it may not be read (or the request failed) */
+async function loadPreview(url: string): Promise<ForumPostPreview | null> {
+    const answer = await sendJson<ForumPostPreview>(url, 'GET');
+
+    return answer.ok ? answer.data : null;
+}
+
+// «#3» opens post 3 under its paragraph; the boxes go when the post is drawn again
+const references = usePostReferences(body, {
+    depth: 0,
+    load: loadPreview,
+    html: () => props.post.html,
+});
+watch(
+    () => props.post.html,
+    () => references.closeAll(),
+    { flush: 'pre' }
+);
+
+// «N respuestas»: the posts that point at this one or quote it
+const replyCount = computed(() =>
+    props.post.status === 'visible' ? (props.post.replyCount ?? 0) : 0
+);
+const showsReplies = computed(() => replyCount.value > 0 && Boolean(props.post.repliesUrl));
+const repliesOpen = ref(false);
+const repliesId = computed(() => `post-replies-${props.post.id}`);
 
 /**
  * Hands the teleported button to the composable. A function ref: the string form was never set
@@ -395,7 +431,11 @@ const showsLikes = computed(
 const hasFooter = computed(
     () =>
         !editing.value &&
-        (((props.canQuote || props.post.canEdit || props.post.canDelete || showsLikes.value) &&
+        (((props.canQuote ||
+            props.post.canEdit ||
+            props.post.canDelete ||
+            showsLikes.value ||
+            showsReplies.value) &&
             props.post.html !== null) ||
             moderationItems.value.length > 0 ||
             (props.post.reportUrl !== null && !reported.value) ||
@@ -417,8 +457,11 @@ function quote(): void {
     const whole = (props.post.quoteText ?? '').trim();
     const selection = window.getSelection();
     const selected =
-        selection && !selection.isCollapsed && body.value?.contains(selection.anchorNode)
-            ? selection.toString().trim()
+        selection &&
+        !selection.isCollapsed &&
+        selection.rangeCount > 0 &&
+        body.value?.contains(selection.anchorNode)
+            ? selectionText(selection.getRangeAt(0))
             : '';
     // A selection that takes in any of those labels would be refused: the whole post instead
     const text = selected !== '' && quoteFits(whole, selected) ? selected : whole;
@@ -683,6 +726,18 @@ async function remove(): Promise<void> {
                         v-html="post.html"
                     />
                     <!-- eslint-enable vue/no-v-html -->
+                    <Teleport
+                        v-for="item in references.open.value"
+                        :key="item.key"
+                        :to="item.anchor"
+                    >
+                        <PostPreview
+                            :preview="item.preview"
+                            :failed="item.failed"
+                            :depth="1"
+                            :load="loadPreview"
+                        />
+                    </Teleport>
                     <p v-if="error" role="alert" class="mt-2 text-sm text-red-600">{{ error }}</p>
                 </template>
             </div>
@@ -690,15 +745,33 @@ async function remove(): Promise<void> {
             <footer v-if="hasFooter" class="-ml-2 mt-1 flex flex-wrap items-center gap-0.5">
                 <LikeButton
                     v-if="showsLikes"
-                    class="mr-auto"
+                    :class="{ 'mr-auto': !showsReplies }"
                     :likes="post.likes"
                     :post-id="post.id"
                     :post-number="post.number"
                 />
                 <button
+                    v-if="showsReplies && post.repliesUrl"
+                    type="button"
+                    :class="[actionClass, 'mr-auto px-3']"
+                    :aria-expanded="repliesOpen ? 'true' : 'false'"
+                    :aria-controls="repliesId"
+                    data-testid="post-replies"
+                    @click="repliesOpen = !repliesOpen"
+                >
+                    {{ t('forum.references.replies', replyCount) }}
+                    <ChevronDown
+                        :class="[
+                            'h-4 w-4 transition-transform motion-reduce:transition-none',
+                            { 'rotate-180': repliesOpen },
+                        ]"
+                        aria-hidden="true"
+                    />
+                </button>
+                <button
                     v-if="canQuote && post.status === 'visible'"
                     type="button"
-                    :class="[actionClass, 'px-3', { 'ml-auto': !showsLikes }]"
+                    :class="[actionClass, 'px-3', { 'ml-auto': !showsLikes && !showsReplies }]"
                     :aria-label="t('forum.posts.quote')"
                     @click="quote"
                 >
@@ -767,6 +840,13 @@ async function remove(): Promise<void> {
                     @select="selectModeration"
                 />
             </footer>
+            <PostReplies
+                v-if="repliesOpen && post.repliesUrl"
+                :id="repliesId"
+                :url="post.repliesUrl"
+                :label="t('forum.references.region', { number: post.number ?? '' })"
+                :load="loadPreview"
+            />
 
             <ModerationDialog
                 v-model="moderationOpen"

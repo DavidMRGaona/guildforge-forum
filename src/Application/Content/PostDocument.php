@@ -7,6 +7,7 @@ namespace Modules\Forum\Application\Content;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
 use Modules\Forum\Application\Content\Nodes\MentionNode;
 use Modules\Forum\Application\Content\Nodes\PostQuoteNode;
+use Modules\Forum\Application\Content\Nodes\PostReferenceNode;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
 
 /**
@@ -95,6 +96,14 @@ final readonly class PostDocument
     public function quotedPostIds(): array
     {
         return $this->distinct((new PostQuoteNode)->name(), 'postId');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function referencedPostIds(): array
+    {
+        return $this->distinct((new PostReferenceNode)->name(), 'postId');
     }
 
     /**

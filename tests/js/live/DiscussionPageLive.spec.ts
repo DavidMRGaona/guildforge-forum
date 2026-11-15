@@ -301,7 +301,12 @@ describe("Discussion page, showing one person's messages only", () => {
         const wrapper = mount(Discussion, {
             props: {
                 ...props(null),
-                filter: { authorName: 'Jane Doe', count: 3, clearUrl: '/foro/t/7-partida' },
+                filter: {
+                    authorName: 'Jane Doe',
+                    count: 3,
+                    pending: 0,
+                    clearUrl: '/foro/t/7-partida',
+                },
             } as never,
             attachTo: document.body,
         });

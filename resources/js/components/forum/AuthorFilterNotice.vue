@@ -29,6 +29,9 @@ const { t } = useI18n();
                 filter.count
             )
         }}</span>
+        <span v-else-if="filter.pending > 0 && filter.authorName !== null">{{
+            t('forum.posts.authorFilter.pendingOnly', { name: filter.authorName })
+        }}</span>
         <span v-else>{{ t('forum.posts.authorFilter.none') }}</span>
         <span aria-hidden="true">·</span>
         <Link

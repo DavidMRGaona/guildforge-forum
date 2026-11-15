@@ -82,38 +82,36 @@ final readonly class PostContentPresenter
                 hiddenReason: $own || $moderates ? $post->hiddenReason() : null,
                 character: $characters[$post->characterId()->value ?? ''] ?? null,
                 moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
-                authorHidden: ! $own && ! $moderates && ($character = $characters[$post->characterId()->value ?? ''] ?? null) instanceof Character
-                    && $this->hidesWriter($character, $moderated[$post->characterId()->value ?? ''] ?? false),
+                authorHidden: $this->hidesWriter($own, $moderates, $characters[$post->characterId()->value ?? ''] ?? null, $moderated[$post->characterId()->value ?? ''] ?? false),
                 replyCount: $replies[$post->id()->value] ?? 0,
             );
         }, $posts);
     }
 
     /**
-     * The one rule that says a character hides the account behind its posts: a shared one, for
-     * a reader who does not moderate it. (Whoever wrote the post, or moderates the discussion,
-     * knows the writer either way: that is decided where the post is read.)
+     * The one rule that says a post's writer is not shown: the post speaks as a shared character
+     * the reader sees, and the reader neither wrote it, nor moderates the discussion, nor
+     * moderates that character. `present()` and the filter by author both ask it.
      */
-    private function hidesWriter(Character $character, bool $readerModeratesIt): bool
+    private function hidesWriter(bool $own, bool $moderatesDiscussion, ?Character $seen, bool $moderatesCharacter): bool
     {
-        return $character->isNpc() && ! $readerModeratesIt;
+        return ! $own && ! $moderatesDiscussion && $seen instanceof Character && $seen->isNpc() && ! $moderatesCharacter;
     }
 
     /**
-     * Which of these characters hide the account that wrote a post from this reader: a shared
-     * one the reader does not moderate, seen as the post shows it. The one rule that says a
-     * post's writer is not shown, for whoever is neither its author nor a moderator of the
-     * discussion (they know the writer either way).
+     * Which of these characters hide the writer of a post from this reader (see `hidesWriter()`).
      *
+     * @param  bool  $own  whether the reader wrote the posts asked about
+     * @param  bool  $moderatesDiscussion  whether the reader moderates the discussion
      * @param  list<string>  $ids  character ids
      * @return list<string> of those ids
      */
-    public function hidingTheirWriter(?Authenticatable $reader, array $ids): array
+    public function charactersHidingTheirWriter(?Authenticatable $reader, bool $own, bool $moderatesDiscussion, array $ids): array
     {
         $hiding = [];
-        $found = $this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids))));
-        foreach ($found as $id => $character) {
-            if ($this->characterRules->maySee($reader, $character) && $this->hidesWriter($character, $this->characterRules->moderates($reader, $character))) {
+        foreach ($this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids)))) as $id => $character) {
+            $seen = $this->characterRules->maySee($reader, $character) ? $character : null;
+            if ($this->hidesWriter($own, $moderatesDiscussion, $seen, $this->characterRules->moderates($reader, $character))) {
                 $hiding[] = (string) $id;
             }
         }

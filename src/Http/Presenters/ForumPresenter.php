@@ -28,7 +28,6 @@ use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Repositories\MemberTitleRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
-use Modules\Forum\Http\Controllers\DiscussionController;
 
 /**
  * The forum's page props: plain arrays with display times (in the display zone) and the
@@ -38,6 +37,9 @@ final readonly class ForumPresenter
 {
     /** The query that asks a discussion's page by its place, for a page whose numbers all moved away */
     public const string PAGE_QUERY = 'pagina';
+
+    /** The query that shows one person's messages of a discussion */
+    public const string AUTHOR_QUERY = 'autor';
 
     public function __construct(
         private ForumUrlsInterface $urls,
@@ -251,6 +253,8 @@ final readonly class ForumPresenter
             'filter' => $page->filtered ? [
                 'authorName' => $this->filteredAuthorName($page, $posts),
                 'count' => $page->highestNumber,
+                // Posts awaiting approval on the page (only their author and moderation get them): not in the count
+                'pending' => count(array_filter($posts, static fn (array $post): bool => $post['status'] === PostStatus::Pending->value)),
                 'clearUrl' => $this->urls->discussion($discussion),
             ] : null,
             'focusNumber' => $page->focusNumber,
@@ -285,7 +289,7 @@ final readonly class ForumPresenter
     {
         // One person's messages: the page is its place among them, never a post's number
         if ($page->filtered) {
-            $query = [DiscussionController::AUTHOR_QUERY => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
+            $query = [self::AUTHOR_QUERY => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
 
             return $this->urls->discussion($page->discussion, absolute: $absolute).'?'.http_build_query($query);
         }

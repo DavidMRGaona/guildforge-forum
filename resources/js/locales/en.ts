@@ -159,6 +159,7 @@ export default {
             pageOf: 'Page {page} of {count}',
             authorFilter: {
                 showing: 'Showing one message by {name} | Showing {count} messages by {name}',
+                pendingOnly: 'There are only messages by {name} awaiting approval.',
                 none: 'This discussion has no visible messages by that person.',
                 clear: 'View the whole discussion',
             },

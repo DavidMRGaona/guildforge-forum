@@ -34,6 +34,7 @@ use Modules\Forum\Domain\Exceptions\DiscussionNotStartedException;
 use Modules\Forum\Domain\Exceptions\InvalidDiscussionException;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
+use Modules\Forum\Domain\ValueObjects\AccountId;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
 use Modules\Forum\Http\Presenters\CharacterPresenter;
@@ -52,9 +53,6 @@ use Modules\Forum\Http\Requests\StoreDiscussionRequest;
 final class DiscussionController extends Controller
 {
     use RespondsWithForumErrors;
-
-    /** The query that shows one person's messages of a discussion */
-    public const string AUTHOR_QUERY = 'autor';
 
     public function __construct(
         private readonly DiscussionRepositoryInterface $discussions,
@@ -87,9 +85,7 @@ final class DiscussionController extends Controller
             $moved = $this->redirects->resolve($user, $number, $post === null ? null : (int) $post);
             if ($moved instanceof RedirectTargetDTO) {
                 // A merged discussion's filter goes with it (the person's messages went there too)
-                $author = $post === null ? $request->query(self::AUTHOR_QUERY) : null;
-
-                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber).(is_string($author) ? '?'.http_build_query([self::AUTHOR_QUERY => $author]) : ''), 301);
+                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber).($post === null ? self::filterQuery($request, withPage: false) : ''), 301);
             }
         }
         abort_unless($found instanceof Discussion, 404);
@@ -100,8 +96,8 @@ final class DiscussionController extends Controller
 
         // One person's messages (?autor=): only for the discussion's own address, never for a post's.
         // Whatever it holds is asked as it is: what is not an account's id is just a person without messages
-        $filtered = $post === null && $request->query->has(self::AUTHOR_QUERY);
-        $author = $request->query(self::AUTHOR_QUERY);
+        $filtered = $post === null && $request->query->has(ForumPresenter::AUTHOR_QUERY);
+        $author = $request->query(ForumPresenter::AUTHOR_QUERY);
 
         try {
             $page = $filtered
@@ -115,7 +111,7 @@ final class DiscussionController extends Controller
         $asked = $post === null ? null : (int) $post;
         $landed = $asked === null ? null : $page->focusNumber;
         if ($discussion !== DiscussionSlug::segment((int) $found->number(), $found->title()->value) || ($asked !== null && ($landed !== $asked || $asked === 1))) {
-            return redirect()->to($this->urls->discussion($found, $landed).($filtered ? '?'.http_build_query($request->query()) : ''), 301);
+            return redirect()->to($this->urls->discussion($found, $landed).($filtered ? self::filterQuery($request, withPage: true) : ''), 301);
         }
         // A page asked for by its place that has posts after all goes by its usual address
         if (! $filtered && $place !== null && $page->anchorOf($page->pageStart) !== null) {
@@ -154,6 +150,28 @@ final class DiscussionController extends Controller
             'moderation' => $page->canModerate && $user !== null ? $this->moderationMenu($user, $page->discussion) : null,
             'seo' => $seo,
         ]);
+    }
+
+    /**
+     * The query a redirect keeps from a filtered address: only what the page understands, the
+     * account id normalized and the page validated; anything else is dropped. Empty when there
+     * is no valid author (the redirect then leads to the whole discussion).
+     */
+    private static function filterQuery(Request $request, bool $withPage): string
+    {
+        $author = $request->query(ForumPresenter::AUTHOR_QUERY);
+        $author = is_string($author) ? AccountId::normalize($author) : null;
+        if ($author === null) {
+            return '';
+        }
+
+        $page = $request->query(ForumPresenter::PAGE_QUERY);
+        $query = [ForumPresenter::AUTHOR_QUERY => $author];
+        if ($withPage && is_string($page) && preg_match('/^[1-9][0-9]{0,5}$/', $page) === 1) {
+            $query[ForumPresenter::PAGE_QUERY] = $page;
+        }
+
+        return '?'.http_build_query($query);
     }
 
     /**

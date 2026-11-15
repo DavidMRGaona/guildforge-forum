@@ -128,11 +128,18 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
         }
     }
 
-    public function test_a_repeated_or_array_filter_is_not_a_filter(): void
+    public function test_an_array_author_is_a_person_without_messages(): void
     {
         $this->get($this->discussionUrl().'?autor[]='.$this->ana->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('filter.count', 0)->where('posts', [])->etc());
+    }
+
+    public function test_a_repeated_author_asks_for_the_last_one(): void
+    {
+        $this->get($this->discussionUrl().'?autor='.$this->ana->id.'&autor='.$this->luis->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filter.authorName', 'Luis')->where('filter.count', 12)->etc());
     }
 
     public function test_a_page_past_the_end_shows_the_last_one(): void
@@ -277,24 +284,55 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
             ->assertInertia(fn (Assert $page) => $page->where('posts', fn ($posts): bool => $posts->pluck('number')->all() === [21, 23, 25])->etc());
     }
 
-    public function test_the_address_of_a_merged_discussion_keeps_the_filter(): void
+    public function test_the_address_of_a_merged_discussion_keeps_the_author_normalized_and_nothing_else(): void
     {
         $moderator = $this->anAccount('forum:forum.moderate');
         [$into] = $this->aDiscussion($this->category, '2026-11-12 10:00:00', title: 'Destino');
         app(ForumModeration::class)->merge($moderator, $this->discussion->id(), $into->id());
+        $to = $this->discussionUrl($into);
 
-        $this->get($this->url($this->ana->id))
-            ->assertRedirect($this->discussionUrl($into).'?autor='.$this->ana->id)
-            ->assertStatus(301);
+        $this->get($this->url($this->ana->id).'&pagina=3&x=1')->assertStatus(301)->assertRedirect($to.'?autor='.$this->ana->id);
+        $this->get($this->url(strtoupper($this->ana->id)))->assertStatus(301)->assertRedirect($to.'?autor='.strtolower($this->ana->id));
+        $this->get($this->url('basura'))->assertStatus(301)->assertRedirect($to);
+        $this->get($this->discussionUrl().'?autor[]='.$this->ana->id)->assertStatus(301)->assertRedirect($to);
     }
 
-    public function test_a_wrong_slug_redirects_to_the_right_one_keeping_the_filter_and_the_page(): void
+    public function test_a_wrong_slug_redirects_keeping_only_the_author_normalized_and_the_valid_page(): void
     {
         $number = (int) $this->discussion->number();
+        $wrong = "/foro/t/{$number}-otro-titulo";
+        $right = $this->discussionUrl();
+        $ana = strtolower($this->ana->id);
 
-        $this->get("/foro/t/{$number}-otro-titulo?autor={$this->ana->id}&pagina=2")
-            ->assertStatus(301)
-            ->assertRedirect($this->discussionUrl().'?autor='.$this->ana->id.'&pagina=2');
+        $this->get("{$wrong}?autor={$ana}&pagina=2&x=1")->assertStatus(301)->assertRedirect("{$right}?autor={$ana}&pagina=2");
+        $this->get("{$wrong}?autor=".strtoupper($ana).'&pagina=2')->assertStatus(301)->assertRedirect("{$right}?autor={$ana}&pagina=2");
+        $this->get("{$wrong}?autor={$ana}&pagina=basura")->assertStatus(301)->assertRedirect("{$right}?autor={$ana}");
+        $this->get("{$wrong}?autor=basura&pagina=2")->assertStatus(301)->assertRedirect($right);
+        $this->get("{$wrong}?autor[]={$ana}")->assertStatus(301)->assertRedirect($right);
+    }
+
+    public function test_a_pending_message_of_somebody_else_is_not_shown_when_filtering_by_a_person(): void
+    {
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->luis->id), self::aBody('Pendiente de Luis'), new DateTimeImmutable('2026-11-11 09:00:00'), true);
+        $moderator = $this->anAccount(CategoryAccessPolicy::MODERATE_FORUM);
+
+        $this->actingAs($moderator)->get($this->url($this->ana->id).'&pagina=2')
+            ->assertInertia(fn (Assert $page) => $page->where('posts', fn ($posts): bool => $posts->pluck('number')->all() === [21, 23, 25])->where('filter.pending', 0)->etc());
+    }
+
+    public function test_when_the_only_message_is_pending_the_filter_says_so(): void
+    {
+        $newcomer = UserModel::factory()->create(['name' => 'nueva.login', 'display_name' => 'Nueva']);
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($newcomer->id), self::aBody('Pendiente'), new DateTimeImmutable('2026-11-11 09:00:00'), true);
+
+        $this->actingAs($newcomer)->get($this->url($newcomer->id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filter.count', 0)->where('filter.pending', 1)->where('filter.authorName', 'Nueva')
+                ->where('posts.0.status', 'pending')
+                ->etc());
+        // Somebody else sees nothing of it, nor its author's name
+        $this->actingAs($this->luis)->get($this->url($newcomer->id))
+            ->assertInertia(fn (Assert $page) => $page->where('posts', [])->where('filter.pending', 0)->where('filter.authorName', null)->etc());
     }
 
     private function postAs(UserModel $author, string $text, ?Character $as = null): Post

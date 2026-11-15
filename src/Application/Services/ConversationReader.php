@@ -133,11 +133,12 @@ final readonly class ConversationReader
         }
 
         $authorId = AccountId::normalize($author);
+        $moderates = $this->access->canModerate($reader, $discussion);
+        $readerId = ForumBrowser::accountId($reader);
         $numbers = [];
         if ($authorId !== null) {
             $characters = $this->posts->charactersByNumberOf($id, $authorId);
-            $knows = $this->access->canModerate($reader, $discussion) || ForumBrowser::accountId($reader) === $authorId;
-            $hiding = $knows ? [] : array_flip($this->presenter->hidingTheirWriter($reader, array_values(array_filter($characters))));
+            $hiding = array_flip($this->presenter->charactersHidingTheirWriter($reader, $readerId === $authorId, $moderates, array_values(array_filter($characters))));
             foreach ($characters as $number => $character) {
                 if ($character === null || ! isset($hiding[$character])) {
                     $numbers[] = $number;
@@ -149,11 +150,9 @@ final readonly class ConversationReader
         $count = count($numbers);
         $pageStart = (min(max(1, $page), intdiv(max(0, $count - 1), $perPage) + 1) - 1) * $perPage + 1;
         $posts = $this->posts->withNumbers($id, array_slice($numbers, $pageStart - 1, $perPage));
-        $moderates = $this->access->canModerate($reader, $discussion);
 
         // As in the discussion, the posts awaiting approval of that person come last: only for
         // them and for moderation, and they are not counted, for they have no place yet
-        $readerId = ForumBrowser::accountId($reader);
         if ($authorId !== null && $pageStart + $perPage > $count && $readerId !== null && ($moderates || $readerId === $authorId)) {
             foreach ($this->posts->pendingIn($id) as $pending) {
                 if ($pending->authorId() === $authorId) {

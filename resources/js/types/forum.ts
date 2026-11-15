@@ -302,6 +302,8 @@ export interface ForumAuthorFilter {
     authorName: string | null;
     /** How many messages of that person the reader may see */
     count: number;
+    /** Posts awaiting approval on the page (only for their author and moderation), not in the count */
+    pending: number;
     /** The whole discussion */
     clearUrl: string;
 }

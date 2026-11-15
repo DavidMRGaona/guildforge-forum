@@ -18,6 +18,7 @@ use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
+use Modules\Forum\Application\Services\PostReferenceLabels;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -45,6 +46,7 @@ final readonly class ForumPresenter
         private CharacterPresenter $characters,
         private MovedPostsQueryInterface $moved,
         private MemberTitleRepositoryInterface $titles,
+        private PostReferenceLabels $referenceLabels,
     ) {}
 
     /**
@@ -300,6 +302,8 @@ final readonly class ForumPresenter
                 $editable[$post->id()->value] = $post->body()->document;
             }
         }
+        // Its references show the number each post has now
+        $editable = $this->referenceLabels->fillMany($editable);
         $mentioned = [];
         foreach ($editable as $document) {
             self::collectMentions($document, $mentioned);

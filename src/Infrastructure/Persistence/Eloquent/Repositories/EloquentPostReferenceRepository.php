@@ -27,6 +27,14 @@ final class EloquentPostReferenceRepository implements PostReferenceRepositoryIn
             }
         }
 
+        // A post that is gone (its discussion deleted) is not pointed at any more
+        $existing = $rows === [] ? [] : array_flip(DB::table('forum_posts')
+            ->whereIn('id', array_values(array_unique(array_column($rows, 'target_post_id'))))
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => strtolower((string) $id))
+            ->all());
+        $rows = array_filter($rows, static fn (array $row): bool => isset($existing[$row['target_post_id']]));
+
         DB::table(self::TABLE)->where('source_post_id', $source->value)->delete();
         if ($rows !== []) {
             DB::table(self::TABLE)->insert(array_values($rows));

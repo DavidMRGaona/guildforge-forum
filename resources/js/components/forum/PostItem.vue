@@ -17,6 +17,7 @@ import CharacterAvatar from '../characters/CharacterAvatar.vue';
 import CharacterDialog from '../characters/CharacterDialog.vue';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import { quoteFits } from '../../editor/extensions/PostQuote';
+import { selectionText } from '../../forum/selectionText';
 import { revealRollUrl, sendJson } from '../../forum/api';
 import { useEmbeds } from '../../composables/useEmbeds';
 import { useRollReveals } from '../../composables/useRollReveals';
@@ -417,8 +418,11 @@ function quote(): void {
     const whole = (props.post.quoteText ?? '').trim();
     const selection = window.getSelection();
     const selected =
-        selection && !selection.isCollapsed && body.value?.contains(selection.anchorNode)
-            ? selection.toString().trim()
+        selection &&
+        !selection.isCollapsed &&
+        selection.rangeCount > 0 &&
+        body.value?.contains(selection.anchorNode)
+            ? selectionText(selection.getRangeAt(0))
             : '';
     // A selection that takes in any of those labels would be refused: the whole post instead
     const text = selected !== '' && quoteFits(whole, selected) ? selected : whole;

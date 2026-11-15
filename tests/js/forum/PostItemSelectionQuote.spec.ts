@@ -115,6 +115,29 @@ describe('quoting a selection with the floating button', () => {
         expect(floatingButton()).toBeNull();
     });
 
+    it('quotes a selection without the references it holds', async () => {
+        const wrapper = mounted(
+            aPost({
+                html: '<p>Como dice <a class="forum-ref" href="/foro/t/7-partida/3" data-post-id="post-3">#3</a>, sí</p>',
+                quoteText: 'Como dice , sí',
+            })
+        );
+        const paragraph = wrapper.element.querySelector('.forum-post p')!;
+        const selection = window.getSelection()!;
+        selection.removeAllRanges();
+        selection.setBaseAndExtent(paragraph, 0, paragraph, paragraph.childNodes.length);
+        document.dispatchEvent(new Event('selectionchange'));
+        vi.advanceTimersByTime(150);
+        await wrapper.vm.$nextTick();
+
+        floatingButton()!.click();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.emitted('quote')?.at(-1)).toEqual([
+            { postId: 'post-1', text: 'Como dice , sí' },
+        ]);
+    });
+
     it('places the button next to the selection', async () => {
         const wrapper = mounted(aPost());
         select(wrapper, 'abordaje');

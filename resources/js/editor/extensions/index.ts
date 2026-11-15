@@ -14,6 +14,7 @@ import { HeadingShortcut } from './HeadingShortcut';
 import { ForumRoll } from './ForumRoll';
 import { MarkdownPaste } from './MarkdownPaste';
 import { PostQuote } from './PostQuote';
+import { PostReference } from './PostReference';
 
 export interface ForumExtensionOptions {
     placeholder?: string;
@@ -55,6 +56,7 @@ export function createForumExtensions(options: ForumExtensionOptions): AnyExtens
         ForumLink,
         ForumImage.configure({ urlFor: options.imageUrl }),
         PostQuote,
+        PostReference,
         ForumRoll,
         ForumOoc.configure({ label: options.oocLabel ?? '' }),
         ForumEmbed.configure({

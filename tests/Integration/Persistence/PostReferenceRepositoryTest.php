@@ -61,6 +61,16 @@ final class PostReferenceRepositoryTest extends ModuleTestCase
         $this->assertSame([$this->target->id()->value], $this->references()->targetsOf($source->id()));
     }
 
+    public function test_a_post_that_is_gone_is_left_out(): void
+    {
+        // A post its author kept pointing at after its discussion was deleted
+        $source = $this->aReply($this->discussion, '2026-11-10 19:00:00');
+
+        $this->references()->replaceFor($source->id(), ['0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a', $this->target->id()->value], ['0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a']);
+
+        $this->assertSame([$this->target->id()->value], $this->references()->targetsOf($source->id()));
+    }
+
     public function test_counts_group_by_the_discussion_of_each_visible_reply(): void
     {
         $reference = $this->aReply($this->discussion, '2026-11-10 19:00:00');

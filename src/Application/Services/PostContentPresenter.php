@@ -152,9 +152,12 @@ final readonly class PostContentPresenter
     public function charactersHidingTheirWriter(?Authenticatable $reader, bool $own, bool $moderatesDiscussion, array $ids): array
     {
         $hiding = [];
-        foreach ($this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids)))) as $id => $character) {
-            $seen = $this->characterRules->maySee($reader, $character) ? $character : null;
-            if ($this->hidesWriter($own, $moderatesDiscussion, $seen, $this->characterRules->moderates($reader, $character))) {
+        $characters = $this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids))));
+        // Their categories in one read, not one per character
+        $bound = $this->characterRules->boundCategoriesOf($characters);
+        foreach ($characters as $id => $character) {
+            $seen = $this->characterRules->maySee($reader, $character, $bound) ? $character : null;
+            if ($this->hidesWriter($own, $moderatesDiscussion, $seen, $this->characterRules->moderates($reader, $character, $bound))) {
                 $hiding[] = (string) $id;
             }
         }

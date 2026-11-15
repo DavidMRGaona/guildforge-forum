@@ -62,6 +62,24 @@ final class ForumRepositoriesTest extends ModuleTestCase
         $this->assertNull($repository->findBySlug(new CategorySlug('otra')));
     }
 
+    public function test_many_categories_come_back_in_one_read_by_id_leaving_out_those_that_do_not_exist(): void
+    {
+        $repository = app(CategoryRepositoryInterface::class);
+        $first = $this->aCategory('primera');
+        $second = $this->aCategory('segunda', 1);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $found = $repository->findMany([$first->id(), $second->id(), $first->id(), CategoryId::generate()]);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame(1, $queries);
+        $this->assertEqualsCanonicalizing([$first->id()->value, $second->id()->value], array_keys($found));
+        $this->assertSame('segunda', $found[$second->id()->value]->slug()->value);
+        $this->assertSame([], $repository->findMany([]));
+    }
+
     public function test_saving_a_category_again_updates_it(): void
     {
         $repository = app(CategoryRepositoryInterface::class);

@@ -11,7 +11,9 @@ namespace Modules\Forum\Application\Queries;
 interface ProfileActivityQueryInterface
 {
     /**
-     * The characters the person's visible messages speak as, in the categories given.
+     * The characters the person's visible messages speak as, in the categories given, and those
+     * of the first message of each visible topic they opened there, whatever its state (the
+     * topics are counted by it).
      *
      * @param  list<string>  $categoryIds
      */

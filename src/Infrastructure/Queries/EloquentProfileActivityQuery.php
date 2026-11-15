@@ -31,7 +31,21 @@ final readonly class EloquentProfileActivityQuery implements ProfileActivityQuer
             return new ProfileCharacterUseDTO([], false);
         }
 
-        $rows = $this->visiblePosts($authorId, $categoryIds)
+        // The messages counted and listed, and the first message of each topic the person opened, whatever
+        // its state: the topics count by it, so its character is decided with the same rules
+        $query = DB::table('forum_posts as p')
+            ->join('forum_discussions as d', 'd.id', '=', 'p.discussion_id')
+            ->where('p.author_id', $authorId)
+            ->whereNotNull('p.number')
+            ->where(static function (Builder $counted) use ($authorId): void {
+                $counted->where(static function (Builder $visible): void {
+                    $visible->where('p.status', PostStatus::Visible->value)->whereNotNull('p.published_at');
+                })->orWhere(static function (Builder $opening) use ($authorId): void {
+                    $opening->where('p.number', 1)->where('d.author_id', $authorId);
+                });
+            });
+
+        $rows = $this->visibleTopics($query, $categoryIds)
             ->where(static function (Builder $where): void {
                 $where->whereNotNull('p.character_id')->orWhere('p.character_removed', true);
             })

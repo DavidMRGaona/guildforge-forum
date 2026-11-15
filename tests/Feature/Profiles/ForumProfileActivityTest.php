@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Application\Services\ProfileActivity;
@@ -26,9 +27,13 @@ use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
+use Modules\Forum\Domain\ValueObjects\CategoryModerators;
+use Modules\Forum\Domain\ValueObjects\CategorySlug;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
@@ -315,6 +320,8 @@ final class ForumProfileActivityTest extends ModuleTestCase
                 ['type' => 'mention', 'attrs' => ['id' => strtolower((string) $this->luis->id)]],
                 ['type' => 'text', 'text' => ' y '],
                 ['type' => 'mention', 'attrs' => ['id' => strtolower((string) $nameless->id)]],
+                ['type' => 'text', 'text' => ' y '],
+                ['type' => 'mention', 'attrs' => ['id' => '3f1c5a0e-1d2b-4c3d-8e9f-a0b1c2d3e4f5']],
                 ['type' => 'text', 'text' => ', <b>mirad</b>', 'marks' => [['type' => 'bold']]],
             ]],
             ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => str_repeat('largo ', 80)]]],
@@ -324,7 +331,8 @@ final class ForumProfileActivityTest extends ModuleTestCase
         $excerpt = $this->posts($this->render(null))[0]['excerpt'];
 
         $this->assertIsString($excerpt);
-        $this->assertStringStartsWith('Hola @Luis y @', $excerpt);
+        // Without a public name the account is «alguien»; one that no longer exists, as the forum says it
+        $this->assertStringStartsWith('Hola @Luis y @alguien y @cuenta eliminada, ', $excerpt);
         $this->assertStringContainsString('<b>mirad</b>', $excerpt);
         $this->assertStringNotContainsString('cuenta.secreta', $excerpt);
         $this->assertStringNotContainsString('citado', $excerpt);
@@ -346,20 +354,126 @@ final class ForumProfileActivityTest extends ModuleTestCase
         $this->assertStringNotContainsString($discussion->id()->value, $json);
     }
 
-    public function test_the_queries_do_not_grow_with_the_messages(): void
+    public function test_the_queries_do_not_grow_with_the_messages_nor_the_characters(): void
     {
-        $this->aDiscussion($this->general, '2026-11-10 10:00:00', $this->anaId(), title: 'Uno');
+        // Every category exists from the start: only messages and characters are added
+        $categories = [$this->general];
+        for ($i = 1; $i <= 8; $i++) {
+            $categories[] = $this->aCategoryFor($i % 2 === 0 ? CategoryAudience::signedIn() : CategoryAudience::everyone(), "mesa-{$i}", position: $i);
+        }
+        [$first] = $this->aDiscussion($this->general, '2026-11-10 10:00:00', $this->anaId(), title: 'Uno');
+        $this->postAs($this->ana, $first, 'Como mercader', '2026-11-10 11:00:00', $this->aSharedCharacterIn($this->general));
+        $this->postAs($this->ana, $first, 'Como Arwen', '2026-11-10 12:00:00', $this->aCharacterOf($this->anaId(), boundTo: $this->general));
+        // The first render also warms what any request reads once (roles, settings)
+        $this->render($this->luis);
         $few = $this->countQueries(fn () => $this->render($this->luis));
 
-        $members = $this->aCategoryFor(CategoryAudience::signedIn(), 'socios', position: 1);
-        $arwen = $this->aCharacterOf($this->anaId());
-        for ($i = 0; $i < 8; $i++) {
-            [$discussion] = $this->aDiscussion($i % 2 === 0 ? $this->general : $members, sprintf('2026-11-11 1%d:00:00', $i), $this->anaId(), title: "Tema {$i}");
-            $this->postAs($this->ana, $discussion, 'Como Arwen', sprintf('2026-11-11 1%d:30:00', $i), $arwen);
+        // Each category gets a shared character and a personal one tied to it, both written with
+        foreach (array_slice($categories, 1) as $i => $category) {
+            [$discussion] = $this->aDiscussion($category, sprintf('2026-11-11 1%d:00:00', $i), $this->anaId(), title: "Tema {$i}");
+            $this->postAs($this->ana, $discussion, 'Como otro mercader', sprintf('2026-11-11 1%d:10:00', $i), $this->aSharedCharacterIn($category, "Mercader {$i}"));
+            $this->postAs($this->ana, $discussion, 'Como otra elfa', sprintf('2026-11-11 1%d:20:00', $i), $this->aCharacterOf($this->anaId(), "Elfa {$i}", boundTo: $category));
         }
         $many = $this->countQueries(fn () => $this->render($this->luis));
 
-        $this->assertLessThanOrEqual($few + 2, $many);
+        $this->assertSame($few, $many);
+    }
+
+    public function test_a_hidden_first_message_as_a_shared_character_still_hides_the_topic(): void
+    {
+        $shared = $this->aSharedCharacterIn($this->general);
+        $discussion = Discussion::start(DiscussionId::generate(), $this->general->id(), $this->anaId(), new DiscussionTitle('El mercader llega'), new DateTimeImmutable('2026-11-10 10:00:00'));
+        $opening = app(ForumWriter::class)->startDiscussion($discussion, PostId::generate(), self::aBody('Buenas tardes, viajeros'), false, $shared->id());
+        $opening->hide('Fuera de tono');
+        app(PostRepositoryInterface::class)->save($opening);
+        $this->postAs($this->ana, $discussion, 'Fuera de personaje', '2026-11-10 11:00:00');
+
+        // The topic still lists, with its first message hidden: who opened it as the character stays unknown
+        foreach ([null, $this->luis] as $viewer) {
+            $profile = $this->render($viewer);
+            $this->assertNull($this->stat($profile, self::TOPICS));
+            $this->assertSame(1, $this->stat($profile, self::POSTS)?->value);
+        }
+
+        $moderation = $this->render($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM));
+        $this->assertSame(1, $this->stat($moderation, self::TOPICS)?->value);
+        $this->assertSame(['Fuera de personaje'], array_column($this->posts($moderation), 'excerpt'));
+    }
+
+    public function test_moderating_one_category_shows_the_shared_character_there_and_not_elsewhere(): void
+    {
+        $tavern = $this->aCategoryFor(CategoryAudience::everyone(), 'taberna', position: 1);
+        [$moderator, $court] = $this->aCategoryModeratedByANewAccount('corte', 2);
+        $merchant = $this->aSharedCharacterIn($tavern);
+        [$discussion] = $this->aDiscussion($tavern, '2026-11-10 10:00:00', $this->anaId(), title: 'En la taberna');
+        $this->postAs($this->ana, $discussion, 'Antes', '2026-11-10 11:00:00');
+        $this->postAs($this->ana, $discussion, 'Habla en la taberna', '2026-11-10 12:00:00', $merchant);
+        $this->postAs($this->ana, $discussion, 'Puente', '2026-11-10 13:00:00');
+        $this->postAs($this->ana, $discussion, 'Habla en la corte', '2026-11-10 14:00:00', $merchant);
+        // Moderation moves the last two to the court: the character stays tied to the tavern
+        app(ForumModeration::class)->split($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM), $discussion->id(), [4, 5], 'En la corte', $court->id());
+
+        // Nobody else knows who speaks as the merchant
+        $guest = $this->render(null);
+        $this->assertSame(['Puente', 'Antes', 'Primer mensaje'], array_column($this->posts($guest), 'excerpt'));
+        $this->assertSame(3, $this->stat($guest, self::POSTS)?->value);
+
+        // Whoever moderates the court reads its writer there, never in the tavern
+        $courtModeration = $this->render($moderator);
+        $this->assertSame(['Habla en la corte', 'Puente', 'Antes', 'Primer mensaje'], array_column($this->posts($courtModeration), 'excerpt'));
+        $this->assertSame(4, $this->stat($courtModeration, self::POSTS)?->value);
+    }
+
+    public function test_moderating_the_character_shows_it_where_its_category_is_not_moderated(): void
+    {
+        [$moderator, $tavern] = $this->aCategoryModeratedByANewAccount('taberna', 1);
+        $court = $this->aCategoryFor(CategoryAudience::everyone(), 'corte', position: 2);
+        $merchant = $this->aSharedCharacterIn($tavern);
+        [$discussion] = $this->aDiscussion($tavern, '2026-11-10 10:00:00', $this->anaId(), title: 'En la taberna');
+        $this->postAs($this->ana, $discussion, 'Puente', '2026-11-10 11:00:00');
+        $this->postAs($this->ana, $discussion, 'Habla en la corte', '2026-11-10 12:00:00', $merchant);
+        app(ForumModeration::class)->split($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM), $discussion->id(), [2, 3], 'En la corte', $court->id());
+
+        // The court is not theirs, but the merchant is: tied to the tavern they moderate
+        $profile = $this->render($moderator);
+        $this->assertSame(['Habla en la corte', 'Puente', 'Primer mensaje'], array_column($this->posts($profile), 'excerpt'));
+
+        $this->assertSame(['Puente', 'Primer mensaje'], array_column($this->posts($this->render($this->luis)), 'excerpt'));
+    }
+
+    public function test_a_message_moved_where_the_viewer_cannot_read_leaves_with_it(): void
+    {
+        $members = $this->aCategoryFor(CategoryAudience::signedIn(), 'socios', position: 1);
+        [$discussion] = $this->aDiscussion($this->general, '2026-11-10 10:00:00', $this->anaId(), title: 'Abierto');
+        $this->postAs($this->ana, $discussion, 'Se queda', '2026-11-10 11:00:00');
+        $this->postAs($this->ana, $discussion, 'Se va', '2026-11-10 12:00:00');
+        app(ForumModeration::class)->split($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM), $discussion->id(), [3], 'Solo socios', $members->id());
+
+        $guest = $this->render(null);
+        $this->assertSame(['Se queda', 'Primer mensaje'], array_column($this->posts($guest), 'excerpt'));
+        $this->assertSame(2, $this->stat($guest, self::POSTS)?->value);
+        $this->assertSame(1, $this->stat($guest, self::TOPICS)?->value);
+
+        $member = $this->render($this->luis);
+        $this->assertSame(['Se va', 'Se queda', 'Primer mensaje'], array_column($this->posts($member), 'excerpt'));
+        $this->assertSame(2, $this->stat($member, self::TOPICS)?->value);
+    }
+
+    public function test_a_first_message_by_someone_else_says_nothing_about_how_the_topic_counts(): void
+    {
+        $merchant = $this->aSharedCharacterIn($this->general);
+        [$discussion, $opening] = $this->aDiscussion($this->general, '2026-11-10 10:00:00', $this->anaId(), title: 'Tema');
+        $this->postAs($this->ana, $discussion, 'Respuesta', '2026-11-10 11:00:00');
+        // What a split or a merge may leave: the first message is someone else's, as a shared character
+        DB::table('forum_posts')->where('id', $opening->id()->value)->update([
+            'author_id' => strtolower((string) $this->luis->id),
+            'character_id' => $merchant->id()->value,
+        ]);
+
+        $profile = $this->render(null);
+
+        $this->assertSame(1, $this->stat($profile, self::TOPICS)?->value);
+        $this->assertSame(['Respuesta'], array_column($this->posts($profile), 'excerpt'));
     }
 
     public function test_the_profile_page_draws_the_section_and_the_counters_with_the_forum_component(): void
@@ -402,6 +516,31 @@ final class ForumProfileActivityTest extends ModuleTestCase
         }
 
         return $found;
+    }
+
+    /**
+     * A category everyone reads and a new account moderates (through a role of its own).
+     *
+     * @return array{UserModel, Category}
+     */
+    private function aCategoryModeratedByANewAccount(string $slug, int $position): array
+    {
+        $moderator = $this->anAccount('forum:test.placeholder');
+        $roleId = $moderator->roles()->value('roles.id');
+        $this->assertIsString($roleId);
+        $category = new Category(
+            CategoryId::generate(),
+            ucfirst($slug),
+            new CategorySlug($slug),
+            null,
+            $position,
+            viewAudience: CategoryAudience::everyone(),
+            writeAudience: CategoryAudience::signedIn(),
+            moderators: new CategoryModerators([$roleId]),
+        );
+        app(CategoryRepositoryInterface::class)->save($category);
+
+        return [$moderator, $category];
     }
 
     private function render(?Authenticatable $viewer, ?ProfileOwnerDTO $owner = null): ResolvedProfileDTO

@@ -680,7 +680,11 @@ export interface ForumProfilePost {
     url: string;
     category: string;
     categoryUrl: string;
-    /** Plain text, cut short; empty when the message is only quotes, images or embeds */
+    /**
+     * Plain text, cut short, without the messages it quotes: images by their description, embeds by
+     * their address, rolls by their expression and reason (never their result). Empty when nothing
+     * is left (only quotes, references or images without a description).
+     */
     excerpt: string;
     publishedAt: string;
     publishedLabel: string;

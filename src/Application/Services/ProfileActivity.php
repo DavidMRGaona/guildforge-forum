@@ -167,8 +167,9 @@ final class ProfileActivity
     }
 
     /**
-     * The names the mentions of the documents show: public names only, and a neutral word for
-     * an account without one, so an excerpt never names an account by its login.
+     * The names the mentions of the documents show: public names only, and a neutral word for an
+     * account without one, so an excerpt never names an account by its login. An account that no
+     * longer exists is left out, and the mention says so as in the forum («@cuenta eliminada»).
      *
      * @param  list<array<array-key, mixed>>  $documents
      * @return array<string, string>
@@ -185,14 +186,20 @@ final class ProfileActivity
                 }
             }
         }
-        if ($ids === []) {
+
+        $existing = $ids === [] ? [] : array_map(strval(...), array_keys($this->accounts->namesOf(array_values($ids))));
+        if ($existing === []) {
             return [];
         }
 
-        $public = $this->accounts->publicNamesOf(array_values($ids));
+        $public = $this->accounts->publicNamesOf($existing);
         $someone = __('forum::messages.profile.someone');
+        $names = [];
+        foreach ($existing as $id) {
+            $names[$id] = $public[$id] ?? (is_string($someone) ? $someone : '');
+        }
 
-        return array_map(static fn (string $id): string => $public[$id] ?? (is_string($someone) ? $someone : ''), $ids);
+        return $names;
     }
 
     /**

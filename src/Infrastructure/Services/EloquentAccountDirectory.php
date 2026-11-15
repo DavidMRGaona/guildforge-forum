@@ -43,6 +43,26 @@ final readonly class EloquentAccountDirectory implements AccountDirectoryInterfa
         return $names;
     }
 
+    public function publicNamesOf(array $accountIds): array
+    {
+        $ids = $this->valid($accountIds);
+        if ($ids === []) {
+            return [];
+        }
+
+        $names = [];
+        foreach (UserModel::query()->withTrashed()->whereKey($ids)->get(['id', 'name', 'display_name', 'anonymized_at']) as $user) {
+            $public = is_string($user->display_name) ? trim($user->display_name) : '';
+            if ($public !== '') {
+                $names[strtolower($user->id)] = $user->display_name;
+            } elseif ($user->anonymized_at !== null) {
+                $names[strtolower($user->id)] = $user->name;
+            }
+        }
+
+        return $names;
+    }
+
     public function avatarsOf(array $accountIds): array
     {
         $ids = $this->valid($accountIds);

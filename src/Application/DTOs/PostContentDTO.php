@@ -16,6 +16,10 @@ use Modules\Forum\Domain\Enums\PostStatus;
  * as, when the reader may see that character (`moderatesCharacter`: the reader may change,
  * retire or delete it). `authorHidden`: it speaks as a shared character and the reader is neither
  * its author nor a moderator of its space, so the account that wrote it is not shown.
+ * `unnamedWriter`: it speaks, or spoke, as a personal character and its writer has no public
+ * name, so it is named as the character or with a neutral label, never by the account
+ * (CharacterWriterNames); null when the post names its writer as always, and always null for
+ * its author and for moderation.
  */
 final readonly class PostContentDTO
 {
@@ -34,5 +38,6 @@ final readonly class PostContentDTO
         public bool $moderatesCharacter = false,
         public bool $authorHidden = false,
         public int $replyCount = 0,
+        public ?WriterNameDTO $unnamedWriter = null,
     ) {}
 }

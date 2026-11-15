@@ -10,7 +10,9 @@ use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
 
 /**
  * One discussion of a list, as stored. `lastReadNumber` is null without a reader and 0 when the
- * reader never opened it.
+ * reader never opened it. The characters its first and last posts speak as (or whether they spoke
+ * as one deleted since) decide how their writers are named (CharacterWriterNames); the first
+ * post's only while its writer is the discussion's author.
  */
 final readonly class DiscussionRowDTO
 {
@@ -34,6 +36,10 @@ final readonly class DiscussionRowDTO
         public array $topics,
         public ?int $lastReadNumber,
         public ?string $lastPostSharedName = null,
+        public ?string $lastPostCharacterId = null,
+        public bool $lastPostCharacterRemoved = false,
+        public ?string $starterCharacterId = null,
+        public bool $starterCharacterRemoved = false,
     ) {}
 
     /**

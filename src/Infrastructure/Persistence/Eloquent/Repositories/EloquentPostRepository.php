@@ -39,6 +39,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             'content_purged_at' => $post->contentPurgedAt(),
             'hidden_reason' => $post->hiddenReason(),
             'character_id' => $post->characterId()?->value,
+            'character_removed' => $post->spokeAsRemovedCharacter(),
             'created_at' => $post->createdAt(),
         ]);
     }
@@ -139,6 +140,21 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
         }
 
         return $found;
+    }
+
+    public function removedCharacterNumbersOf(DiscussionId $discussionId, string $authorId): array
+    {
+        return array_values(array_map(
+            intval(...),
+            PostModel::query()
+                ->where('discussion_id', $discussionId->value)
+                ->where('author_id', $authorId)
+                ->where('character_removed', true)
+                ->whereNotNull('number')
+                ->orderBy('number')
+                ->pluck('number')
+                ->all(),
+        ));
     }
 
     public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber
@@ -249,6 +265,7 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             contentPurgedAt: $model->content_purged_at?->toDateTimeImmutable(),
             hiddenReason: $model->status === PostStatus::Hidden->value ? $model->hidden_reason : null,
             characterId: $model->character_id === null ? null : CharacterId::fromString($model->character_id),
+            characterRemoved: $model->character_removed,
         );
     }
 }

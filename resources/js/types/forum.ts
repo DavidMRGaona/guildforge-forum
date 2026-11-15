@@ -127,6 +127,8 @@ export interface ForumPost {
     number: number | null;
     authorId: string | null;
     authorName: string | null;
+    /** The account exists but is not shown: it speaks, or spoke, as a personal character of someone without a public name */
+    writerUnnamed?: boolean;
     /** The author's profile avatar (Cloudinary public id); null in character, without one or for an account no longer active */
     authorAvatarPublicId?: string | null;
     /** The title moderation gave the author; null in character, without one or for an account no longer active */

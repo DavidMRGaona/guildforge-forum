@@ -7,6 +7,8 @@ namespace Modules\Forum\Application\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\DTOs\PostContentDTO;
+use Modules\Forum\Application\DTOs\PostWriterDTO;
+use Modules\Forum\Application\DTOs\WriterNameDTO;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
@@ -30,6 +32,7 @@ final readonly class PostContentPresenter
         private CharacterRepositoryInterface $characters,
         private CharacterRules $characterRules,
         private ReplyCounts $replyCounts,
+        private CharacterWriterNames $writerNames,
     ) {}
 
     /**
@@ -57,13 +60,14 @@ final readonly class PostContentPresenter
             ),
         );
         $replies = $this->replyCounts->countsFor($posts, $reader);
+        $unnamed = $this->unnamedWriters($posts, $reader, $readerId, $moderates);
         /** @var array<string, bool> $moderated */
         $moderated = [];
         foreach ($characters as $id => $character) {
             $moderated[$id] = $this->characterRules->moderates($reader, $character);
         }
 
-        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates, $characters, $moderated, $replies): PostContentDTO {
+        return array_map(function (Post $post) use ($html, $readerId, $canPost, $moderates, $characters, $moderated, $replies, $unnamed): PostContentDTO {
             $own = $readerId !== null && $post->authorId() === $readerId;
             $ownEditable = $own && $canPost && $post->status() !== PostStatus::Deleted;
             // Moderators edit anyone's post; the version it replaces stays in its history
@@ -84,8 +88,36 @@ final readonly class PostContentPresenter
                 moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
                 authorHidden: $this->hidesWriter($own, $moderates, $characters[$post->characterId()->value ?? ''] ?? null, $moderated[$post->characterId()->value ?? ''] ?? false),
                 replyCount: $replies[$post->id()->value] ?? 0,
+                unnamedWriter: $unnamed[$post->id()->value] ?? null,
             );
         }, $posts);
+    }
+
+    /**
+     * The posts that name their writer as a character or with a neutral label, by post id: those
+     * that speak, or spoke, as a personal character of someone without a public name. Never for
+     * their writer or whoever moderates the discussion, who see the account as always.
+     *
+     * @param  list<Post>  $posts
+     * @return array<string, WriterNameDTO>
+     */
+    private function unnamedWriters(array $posts, ?Authenticatable $reader, ?string $readerId, bool $moderates): array
+    {
+        if ($moderates) {
+            return [];
+        }
+
+        $writers = [];
+        foreach ($posts as $post) {
+            if ($readerId === null || $post->authorId() !== $readerId) {
+                $writers[$post->id()->value] = new PostWriterDTO($post->authorId(), $post->characterId()?->value, $post->spokeAsRemovedCharacter());
+            }
+        }
+
+        return array_filter(
+            $this->writerNames->namesFor($writers, $reader),
+            static fn (WriterNameDTO $name): bool => ! $name->isPublicName,
+        );
     }
 
     /**
@@ -96,6 +128,17 @@ final readonly class PostContentPresenter
     private function hidesWriter(bool $own, bool $moderatesDiscussion, ?Character $seen, bool $moderatesCharacter): bool
     {
         return ! $own && ! $moderatesDiscussion && $seen instanceof Character && $seen->isNpc() && ! $moderatesCharacter;
+    }
+
+    /**
+     * Whether one person's messages, filtered by their account (?autor=), leave out those they
+     * wrote as a personal character or as one deleted since: when they have no public name and
+     * the reader is neither them nor a moderator, for those posts never name the account
+     * (CharacterWriterNames), and listing them under it would.
+     */
+    public function hidesCharacterPostsOf(string $authorId, bool $own, bool $moderatesDiscussion): bool
+    {
+        return ! $own && ! $moderatesDiscussion && ! $this->writerNames->hasPublicName($authorId);
     }
 
     /**

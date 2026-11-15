@@ -20,7 +20,7 @@ use Modules\Forum\Http\Presenters\ForumPresenter;
 final class PostReferencesController extends Controller
 {
     /** What a preview carries of the post as the discussion page draws it */
-    private const array FIELDS = ['id', 'number', 'url', 'status', 'authorId', 'authorName', 'authorAvatarPublicId', 'authorTitle', 'character', 'publishedAt', 'publishedLabel', 'html', 'replyCount', 'repliesUrl'];
+    private const array FIELDS = ['id', 'number', 'url', 'status', 'authorId', 'authorName', 'writerUnnamed', 'authorAvatarPublicId', 'authorTitle', 'character', 'publishedAt', 'publishedLabel', 'html', 'replyCount', 'repliesUrl'];
 
     public function __construct(
         private readonly PostPreviews $previews,

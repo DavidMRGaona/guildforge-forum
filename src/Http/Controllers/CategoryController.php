@@ -46,7 +46,7 @@ final class CategoryController extends Controller
 
         return Inertia::render('Forum/Category', [
             'category' => [...$this->presenter->categoryHeader($access, $readable), 'follow' => $this->engagement->categoryFollow($reader, $access->category)],
-            'subcategories' => $this->presenter->categoryTree($readable, $access->category->id()),
+            'subcategories' => $this->presenter->categoryTree($readable, $access->category->id(), $reader),
             ...$this->listProps($request, $scope, pinnedFirst: true, baseUrl: $this->urls->category($access->category)),
             'search' => $this->presenter->searchBox($readable, $access->category),
             'canStart' => $canStart,

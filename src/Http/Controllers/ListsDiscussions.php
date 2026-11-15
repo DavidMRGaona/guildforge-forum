@@ -44,7 +44,7 @@ trait ListsDiscussions
 
         return [
             'discussions' => [
-                ...$this->presenter->discussionList($page, $scope),
+                ...$this->presenter->discussionList($page, $scope, $reader),
                 'nextUrl' => $page->next instanceof DiscussionCursor ? $query(['desde' => $page->next->encode()]) : null,
                 'firstUrl' => $cursor instanceof DiscussionCursor ? $query([]) : null,
             ],

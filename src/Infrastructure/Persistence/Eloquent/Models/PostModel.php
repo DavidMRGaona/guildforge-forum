@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $content_purged_at
  * @property string|null $hidden_reason
  * @property string|null $character_id
+ * @property bool $character_removed
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -42,7 +43,7 @@ final class PostModel extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'deleted_at', 'content_purged_at', 'hidden_reason', 'character_id', 'created_at'];
+    protected $fillable = ['id', 'discussion_id', 'number', 'author_id', 'status', 'body', 'plain_text', 'published_at', 'edited_at', 'deleted_at', 'content_purged_at', 'hidden_reason', 'character_id', 'character_removed', 'created_at'];
 
     /**
      * @return BelongsTo<DiscussionModel, $this>
@@ -68,6 +69,7 @@ final class PostModel extends Model
         return [
             'number' => 'integer',
             'body' => 'array',
+            'character_removed' => 'boolean',
             'published_at' => 'immutable_datetime',
             'edited_at' => 'immutable_datetime',
             'deleted_at' => 'immutable_datetime',

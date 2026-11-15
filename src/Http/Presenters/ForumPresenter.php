@@ -6,6 +6,7 @@ namespace Modules\Forum\Http\Presenters;
 
 use App\Application\Services\TimezoneServiceInterface;
 use DateTimeImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
@@ -14,11 +15,15 @@ use Modules\Forum\Application\DTOs\ConversationPageDTO;
 use Modules\Forum\Application\DTOs\MovedPostsDTO;
 use Modules\Forum\Application\DTOs\PostContentDTO;
 use Modules\Forum\Application\DTOs\PostLikesDTO;
+use Modules\Forum\Application\DTOs\PostWriterDTO;
+use Modules\Forum\Application\DTOs\WriterNameDTO;
 use Modules\Forum\Application\Queries\CategoryStatsDTO;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
+use Modules\Forum\Application\Services\CharacterWriterNames;
+use Modules\Forum\Application\Services\ForumBrowser;
 use Modules\Forum\Application\Services\PostReferenceLabels;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
@@ -54,6 +59,7 @@ final readonly class ForumPresenter
         private MovedPostsQueryInterface $moved,
         private MemberTitleRepositoryInterface $titles,
         private PostReferenceLabels $referenceLabels,
+        private CharacterWriterNames $writerNames,
     ) {}
 
     /**
@@ -81,10 +87,14 @@ final readonly class ForumPresenter
      * @param  list<CategoryAccessDTO>  $readable
      * @return list<array<string, mixed>>
      */
-    public function categoryTree(array $readable, ?CategoryId $under = null): array
+    public function categoryTree(array $readable, ?CategoryId $under = null, ?Authenticatable $reader = null): array
     {
         $stats = $this->stats->statsOf(array_map(static fn (CategoryAccessDTO $access): string => $access->category->id()->value, $readable));
         $names = $this->names(array_values(array_filter(array_map(static fn (CategoryStatsDTO $stat): ?string => $stat->lastPostAuthorId, $stats))));
+        $names = [...$names, ...$this->characterWriterNames(array_map(
+            static fn (CategoryStatsDTO $stat): PostWriterDTO => new PostWriterDTO($stat->lastPostAuthorId, $stat->lastPostCharacterId, $stat->lastPostCharacterRemoved),
+            $this->keyed($stats, 'last'),
+        ), $reader)];
 
         $cards = [];
         foreach ($readable as $access) {
@@ -150,7 +160,7 @@ final readonly class ForumPresenter
      * @param  list<CategoryAccessDTO>  $readable  to name each row's category
      * @return array{pinned: list<array<string, mixed>>, items: list<array<string, mixed>>}
      */
-    public function discussionList(DiscussionListPageDTO $page, array $readable): array
+    public function discussionList(DiscussionListPageDTO $page, array $readable, ?Authenticatable $reader = null): array
     {
         $categories = [];
         foreach ($readable as $access) {
@@ -162,6 +172,12 @@ final readonly class ForumPresenter
             ...array_map(static fn (DiscussionRowDTO $row): ?string => $row->authorId, $rows),
             ...array_map(static fn (DiscussionRowDTO $row): ?string => $row->lastPostAuthorId, $rows),
         ])));
+        $writers = [];
+        foreach ($rows as $row) {
+            $writers['starter:'.$row->id] = new PostWriterDTO($row->authorId, $row->starterCharacterId, $row->starterCharacterRemoved);
+            $writers['last:'.$row->id] = new PostWriterDTO($row->lastPostAuthorId, $row->lastPostCharacterId, $row->lastPostCharacterRemoved);
+        }
+        $names = [...$names, ...$this->characterWriterNames($writers, $reader)];
 
         // Where a row resumes when the first unread number moved away: the first post after it
         $resumeFrom = [];
@@ -360,10 +376,14 @@ final readonly class ForumPresenter
             self::collectMentions($document, $mentioned);
         }
 
-        // A post that speaks as a shared character shows no account to whoever may not know it
+        // A post that speaks as a shared character shows no account to whoever may not know it,
+        // nor one as a personal character (living or deleted) of someone without a public name
+        // (forum#139): not even its id, which their posts out of character carry with their name
         $shown = [];
         foreach ($posts as $index => $post) {
-            $shown[$index] = $post->authorId() !== null && ! $contents[$index]->authorHidden ? $post->authorId() : null;
+            $shown[$index] = $post->authorId() !== null && ! $contents[$index]->authorHidden && ! $contents[$index]->unnamedWriter instanceof WriterNameDTO
+                ? $post->authorId()
+                : null;
         }
 
         $names = $this->names(array_values(array_unique([
@@ -385,7 +405,9 @@ final readonly class ForumPresenter
                 'id' => $post->id()->value,
                 'number' => $number,
                 'authorId' => $shown[$index],
-                'authorName' => $shown[$index] === null ? null : ($names[$shown[$index]] ?? null),
+                'authorName' => $this->authorName($content, $shown[$index], $names),
+                // The account exists but is not shown (no public name): never «Cuenta eliminada»
+                'writerUnnamed' => $content->unnamedWriter instanceof WriterNameDTO,
                 // A post in character shows the character's portrait, never the account's avatar
                 'authorAvatarPublicId' => $shown[$index] === null || $content->character instanceof Character ? null : ($avatars[$shown[$index]] ?? null),
                 // In character the fiction rules: neither the account's avatar nor its title
@@ -457,7 +479,7 @@ final readonly class ForumPresenter
             $lastPost = [
                 'discussionTitle' => $stat->lastDiscussionTitle,
                 'url' => $this->urls->discussionFrom($stat->lastDiscussionNumber, $stat->lastDiscussionTitle, $stat->lastPostNumber),
-                'authorName' => $stat->lastPostSharedName ?? ($stat->lastPostAuthorId === null ? null : ($names[$stat->lastPostAuthorId] ?? null)),
+                'authorName' => $stat->lastPostSharedName ?? $names['last:'.$category->id()->value] ?? ($stat->lastPostAuthorId === null ? null : ($names[$stat->lastPostAuthorId] ?? null)),
                 'at' => $this->timezone->iso($stat->lastActivityAt),
                 'atLabel' => $this->timezone->format($stat->lastActivityAt),
             ];
@@ -511,11 +533,11 @@ final readonly class ForumPresenter
             'category' => $category instanceof Category
                 ? ['name' => $category->name(), 'url' => $this->urls->category($category), 'color' => $category->appearance()->color]
                 : null,
-            'authorName' => $row->authorId === null ? null : ($names[$row->authorId] ?? null),
+            'authorName' => $names['starter:'.$row->id] ?? ($row->authorId === null ? null : ($names[$row->authorId] ?? null)),
             'topics' => $this->topics($row->topics),
             'replyCount' => max(0, $row->postCount - 1),
             'lastPost' => [
-                'authorName' => $row->lastPostSharedName ?? ($row->lastPostAuthorId === null ? null : ($names[$row->lastPostAuthorId] ?? null)),
+                'authorName' => $row->lastPostSharedName ?? $names['last:'.$row->id] ?? ($row->lastPostAuthorId === null ? null : ($names[$row->lastPostAuthorId] ?? null)),
                 'at' => $this->timezone->iso($row->lastActivityAt),
                 'atLabel' => $this->timezone->format($row->lastActivityAt),
                 'url' => $row->lastPostNumber === null ? null : $this->urls->discussionFrom($row->number, $row->title, $row->lastPostNumber),
@@ -528,6 +550,51 @@ final readonly class ForumPresenter
             'isUnread' => $row->lastReadNumber === null ? null : $row->isUnread(),
             'unreadCount' => $unreadCount,
         ];
+    }
+
+    /**
+     * How the writers of these posts are named when they speak, or spoke, as a personal
+     * character (CharacterWriterNames), keyed like `$writers`; their own posts name the reader's
+     * account as always.
+     *
+     * @param  array<string, PostWriterDTO>  $writers
+     * @return array<string, string>
+     */
+    private function characterWriterNames(array $writers, ?Authenticatable $reader): array
+    {
+        $readerId = ForumBrowser::accountId($reader);
+        $others = array_filter($writers, static fn (PostWriterDTO $writer): bool => $readerId === null || $writer->authorId === null || strtolower($writer->authorId) !== $readerId);
+
+        return array_map(static fn (WriterNameDTO $name): string => $name->name, $this->writerNames->namesFor($others, $reader));
+    }
+
+    /**
+     * The items with each key prefixed, so names by post never meet names by account id.
+     *
+     * @template T
+     *
+     * @param  array<string, T>  $items
+     * @return array<string, T>
+     */
+    private function keyed(array $items, string $prefix): array
+    {
+        return array_combine(array_map(static fn (string $key): string => $prefix.':'.$key, array_keys($items)), array_values($items));
+    }
+
+    /**
+     * The name a post shows for its writer. In character, without a public name, the character
+     * speaks alone (no «por …» line); once that character is deleted, a neutral label.
+     *
+     * @param  array<string, string>  $names  by account id
+     */
+    private function authorName(PostContentDTO $content, ?string $shownId, array $names): ?string
+    {
+        $unnamed = $content->unnamedWriter;
+        if ($unnamed instanceof WriterNameDTO) {
+            return $unnamed->seenCharacter instanceof Character ? null : $unnamed->name;
+        }
+
+        return $shownId === null ? null : ($names[$shownId] ?? null);
     }
 
     /**

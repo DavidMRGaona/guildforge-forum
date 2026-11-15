@@ -31,6 +31,7 @@ final class Post
      * @param  DateTimeImmutable|null  $publishedAt  when it became readable: when it was written, or approved
      * @param  string|null  $hiddenReason  why moderation hid it, shown to its author and its moderators
      * @param  CharacterId|null  $characterId  the character it speaks as; null out of character
+     * @param  bool  $characterRemoved  whether it spoke as a character deleted since (forum#139)
      *
      * @throws InvalidPostException when the number or publication time does not match the status, for an author id that is not a UUID, or for a reason on a post that is not hidden
      */
@@ -48,6 +49,7 @@ final class Post
         private ?DateTimeImmutable $contentPurgedAt = null,
         private ?string $hiddenReason = null,
         private ?CharacterId $characterId = null,
+        private bool $characterRemoved = false,
     ) {
         if ($hiddenReason !== null && $status !== PostStatus::Hidden) {
             throw InvalidPostException::reasonWithoutHiding($status);
@@ -190,6 +192,10 @@ final class Post
 
         $this->body = $body;
         $this->characterId = $characterId;
+        // Speaking as another character from now on: it no longer speaks as the deleted one
+        if ($characterId instanceof CharacterId) {
+            $this->characterRemoved = false;
+        }
         $this->editedAt = $at;
     }
 
@@ -197,6 +203,15 @@ final class Post
     public function characterId(): ?CharacterId
     {
         return $this->characterId;
+    }
+
+    /**
+     * Whether it spoke as a character that was deleted since: its writer is then named only by
+     * their public name, never by the account (forum#139).
+     */
+    public function spokeAsRemovedCharacter(): bool
+    {
+        return $this->characterRemoved;
     }
 
     public function speaksAs(?CharacterId $characterId): bool

@@ -142,6 +142,27 @@ final class PostReferenceWritingTest extends ModuleTestCase
         }
     }
 
+    public function test_editing_someone_elses_post_tells_nothing_about_what_it_points_at(): void
+    {
+        // Two posts the stranger may not read; someone else's post points at one of them
+        $role = RoleModel::query()->create(['name' => 'keepers', 'display_name' => 'Keepers']);
+        [$private, $target] = $this->aDiscussion($this->aCategoryFor(CategoryAudience::roles([$role->id]), 'privada'));
+        $other = $this->aReply($private, '2026-11-10 19:30:00');
+        $theirs = $this->replyOfAuthor(self::doc([self::text('Ver '), self::reference($target->id()->value)]));
+        $stranger = $this->anAccount();
+
+        // Pointing at what the post already points at, and at something else: the same answer
+        $statuses = [];
+        foreach ([$target, $other] as $pointedAt) {
+            $statuses[] = $this->actingAs($stranger)
+                ->patchJson($this->updateUrl($theirs), ['document' => self::doc([self::reference($pointedAt->id()->value)])])
+                ->status();
+        }
+
+        $this->assertSame($statuses[0], $statuses[1]);
+        $this->assertNotSame(422, $statuses[0]);
+    }
+
     public function test_without_a_discussion_numbers_stay_text(): void
     {
         // A new discussion's first post has nothing to point at yet (DiscussionStarter gives no discussion)

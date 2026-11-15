@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PostAvatar from './PostAvatar.vue';
+import { useEmbeds } from '../../composables/useEmbeds';
 import { usePostReferences } from '../../composables/usePostReferences';
 import type { ForumPostPreview } from '../../types/forum';
 
@@ -23,7 +24,13 @@ const props = defineProps<{
 const { t } = useI18n();
 
 const body = ref<HTMLElement | null>(null);
-const references = usePostReferences(body, { depth: props.depth, load: props.load });
+const references = usePostReferences(body, {
+    depth: props.depth,
+    load: props.load,
+    html: () => props.preview?.html,
+});
+// Its embeds load on request (or with consent) like those of the post itself
+useEmbeds(body, () => props.preview?.html ?? null);
 // Its own boxes go when the post is drawn again
 watch(
     () => props.preview?.html,
@@ -79,7 +86,7 @@ const hidden = computed((): string | null => {
                 <a
                     v-if="preview.url"
                     :href="preview.url"
-                    class="text-xs text-base-secondary hover:underline"
+                    class="inline-flex min-h-[44px] items-center text-xs text-base-secondary hover:underline"
                     :title="preview.discussionTitle"
                     >#{{ preview.number }}</a
                 >

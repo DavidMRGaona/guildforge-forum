@@ -182,6 +182,35 @@ final class ReferenceLinkingTest extends TestCase
         $this->assertCount(DocumentLimits::MAX_REFERENCES * 2, $linked['content'][0]['content']);
     }
 
+    public function test_a_number_too_big_for_a_post_stays_text(): void
+    {
+        // Post numbers fit a 32-bit integer; asking for a bigger one would break the query on PostgreSQL
+        $document = self::doc([self::paragraph([self::text('Pedido #2147483648 y #9999999999')])]);
+
+        $this->assertSame($document, $this->link($document));
+        $this->assertSame([], $this->asked);
+    }
+
+    public function test_references_further_on_count_towards_the_limit(): void
+    {
+        $text = implode(' ', array_map(static fn (int $number): string => '#'.$number, range(1, DocumentLimits::MAX_REFERENCES)));
+        $existing = array_fill(0, 5, ['type' => 'postReference', 'attrs' => ['postId' => self::POST_3]]);
+        $ids = [];
+        foreach (range(1, DocumentLimits::MAX_REFERENCES) as $number) {
+            $ids[$number] = sprintf('00000000-0000-4000-8000-%012d', $number);
+        }
+
+        $linked = ReferenceLinking::link(self::doc([self::paragraph([self::text($text)]), self::paragraph($existing)]), static fn (array $numbers): array => $ids);
+
+        $references = 0;
+        array_walk_recursive($linked, static function (mixed $value, int|string $key) use (&$references): void {
+            if ($key === 'type' && $value === 'postReference') {
+                $references++;
+            }
+        });
+        $this->assertSame(DocumentLimits::MAX_REFERENCES, $references);
+    }
+
     public function test_only_up_to_the_limit_are_converted(): void
     {
         $text = implode(' ', array_map(static fn (int $number): string => '#'.$number, range(1, DocumentLimits::MAX_REFERENCES + 1)));

@@ -118,7 +118,11 @@ async function loadPreview(url: string): Promise<ForumPostPreview | null> {
 }
 
 // «#3» opens post 3 under its paragraph; the boxes go when the post is drawn again
-const references = usePostReferences(body, { depth: 0, load: loadPreview });
+const references = usePostReferences(body, {
+    depth: 0,
+    load: loadPreview,
+    html: () => props.post.html,
+});
 watch(
     () => props.post.html,
     () => references.closeAll(),

@@ -138,6 +138,38 @@ describe('the replies of a post', () => {
         expect(wrapper.find('[data-testid="post-replies-more"]').exists()).toBe(false);
     });
 
+    it('loads an embed of a reply when asked', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(
+                async () =>
+                    new Response(
+                        JSON.stringify({
+                            data: [
+                                {
+                                    ...aReply(2),
+                                    html:
+                                        '<figure class="forum-embed" data-forum-embed data-embed-service="youtube" data-embed-src="https://www.youtube-nocookie.com/embed/x" data-embed-aspect="video" data-embed-referrer="strict-origin" data-embed-sandbox="allow-scripts" data-embed-title="YouTube">' +
+                                        '<div class="forum-embed__consent"><button type="button" data-embed-load>Cargar contenido de YouTube</button></div></figure>',
+                                },
+                            ],
+                            next: null,
+                        }),
+                        { status: 200, headers: { 'Content-Type': 'application/json' } }
+                    )
+            )
+        );
+        const wrapper = mounted(1);
+        await wrapper.get('[data-testid="post-replies"]').trigger('click');
+        await flushPromises();
+
+        (wrapper.element as Element).querySelector<HTMLButtonElement>('[data-embed-load]')!.click();
+
+        expect(
+            (wrapper.element as Element).querySelector('[data-testid="post-replies-list"] iframe')
+        ).not.toBeNull();
+    });
+
     it('says one reply in the singular', () => {
         expect(mounted(1).get('[data-testid="post-replies"]').text()).toContain('1 respuesta');
     });

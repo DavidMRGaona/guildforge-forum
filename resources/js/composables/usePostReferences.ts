@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import type { ForumPostPreview } from '../types/forum';
 
 /** How many boxes open one inside another; a reference deeper than that goes to its post */
@@ -24,7 +24,12 @@ export interface OpenReference {
  */
 export function usePostReferences(
     body: Ref<HTMLElement | null>,
-    options: { depth: number; load: (url: string) => Promise<ForumPostPreview | null> }
+    options: {
+        depth: number;
+        load: (url: string) => Promise<ForumPostPreview | null>;
+        /** The body's HTML: when it is drawn again, its links are marked again */
+        html: () => string | null | undefined;
+    }
 ): { open: Ref<OpenReference[]>; closeAll: () => void } {
     const open = ref<OpenReference[]>([]) as Ref<OpenReference[]>;
     const loaded = new Map<string, Promise<ForumPostPreview | null>>();
@@ -118,16 +123,35 @@ export function usePostReferences(
         });
     }
 
+    /**
+     * Says on every reference of this body that it opens in place (closed for now), so a screen
+     * reader announces it before the first click. Links inside boxes are their own body's.
+     */
+    function mark(): void {
+        const container = body.value;
+        if (container === null || options.depth >= MAX_REFERENCE_DEPTH) {
+            return;
+        }
+        container.querySelectorAll<HTMLElement>('a.forum-ref[data-preview-url]').forEach((link) => {
+            const box = link.closest('.forum-ref-preview');
+            if ((box === null || !container.contains(box)) && !link.hasAttribute('aria-expanded')) {
+                link.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
     let attached: HTMLElement | null = null;
 
     function attach(element: HTMLElement | null): void {
         attached?.removeEventListener('click', onClick);
         attached = element;
         attached?.addEventListener('click', onClick);
+        mark();
     }
 
     onMounted(() => attach(body.value));
     watch(body, (element) => attach(element));
+    watch(options.html, () => void nextTick(mark));
     onBeforeUnmount(() => {
         closeAll();
         attach(null);

@@ -114,7 +114,8 @@ final readonly class PostPreviews
         return new PostPreviewDTO(
             post: $post,
             discussion: $discussion,
-            content: $this->contents->present([$post], $discussion, $reader, withoutMedia: $long)[0],
+            // A box is not read again after revealing a roll: it offers no «Revelar»
+            content: $this->contents->present([$post], $discussion, $reader, withoutMedia: $long, offerReveal: false)[0],
             truncated: $long,
             hiddenImages: $media['images'],
             hiddenEmbeds: $media['embeds'],

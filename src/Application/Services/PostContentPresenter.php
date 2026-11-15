@@ -35,9 +35,10 @@ final readonly class PostContentPresenter
     /**
      * @param  list<Post>  $posts  of the discussion
      * @param  bool  $withoutMedia  whether images and embeds are left out (a long post in a preview)
+     * @param  bool  $offerReveal  whether hidden rolls offer «Revelar» (not where the post is not read again after it)
      * @return list<PostContentDTO> in the same order
      */
-    public function present(array $posts, Discussion $discussion, ?Authenticatable $reader, bool $withoutMedia = false): array
+    public function present(array $posts, Discussion $discussion, ?Authenticatable $reader, bool $withoutMedia = false, bool $offerReveal = true): array
     {
         $readerId = $reader instanceof Authenticatable ? strtolower(is_scalar($reader->getAuthIdentifier()) ? (string) $reader->getAuthIdentifier() : '') : null;
         $moderates = $this->access->canModerate($reader, $discussion);
@@ -51,6 +52,7 @@ final readonly class PostContentPresenter
                 array_map(static fn (Post $post) => $post->body(), $shown),
                 $reader,
                 array_map(static fn (Post $post): ?string => ($characters[$post->characterId()->value ?? ''] ?? null)?->name(), $shown),
+                offerReveal: $offerReveal,
                 withoutMedia: $withoutMedia,
             ),
         );

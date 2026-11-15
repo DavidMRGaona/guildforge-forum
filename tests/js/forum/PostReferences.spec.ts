@@ -29,7 +29,7 @@ function aPreview(overrides: Partial<ForumPostPreview> = {}): ForumPostPreview {
     };
 }
 
-function aPost(html: string): ForumPost {
+function aPost(html: string, overrides: Partial<ForumPost> = {}): ForumPost {
     return {
         id: 'post-1',
         number: 5,
@@ -56,17 +56,18 @@ function aPost(html: string): ForumPost {
         likes: { count: 0, liked: false, names: [], others: 0, canLike: false, url: null },
         character: null,
         characterId: null,
+        ...overrides,
     };
 }
 
 const wrappers: VueWrapper[] = [];
 let answers: Record<string, ForumPostPreview | null> = {};
 
-function mounted(html: string): VueWrapper {
+function mounted(html: string, overrides: Partial<ForumPost> = {}): VueWrapper {
     const wrapper = mount(PostItem, {
         attachTo: document.body,
         props: {
-            post: aPost(html),
+            post: aPost(html, overrides),
             focused: false,
             canQuote: true,
             editor: {
@@ -141,6 +142,43 @@ describe('opening a reference in place', () => {
 
         expect(boxes(wrapper)).toHaveLength(0);
         expect(reference.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('tells from the start that a reference opens in place', () => {
+        const wrapper = mounted(`<p>${link('post-3', 3)}</p>`);
+
+        expect(wrapper.get('a.forum-ref').attributes('aria-expanded')).toBe('false');
+    });
+
+    it('opens with one click after editing was cancelled with a box open', async () => {
+        const wrapper = mounted(`<p>Mira ${link('post-3', 3)}</p>`, {
+            canEdit: true,
+            document: { type: 'doc', content: [{ type: 'paragraph' }] },
+            updateUrl: '/foro/mensajes/post-1',
+        });
+        click(wrapper.get('a.forum-ref').element);
+        await flushPromises();
+        expect(boxes(wrapper)).toHaveLength(1);
+
+        await wrapper.get('button[aria-label="Editar"]').trigger('click');
+        await flushPromises();
+        const cancel = wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Cancelar la edición');
+        await cancel!.trigger('click');
+        await flushPromises();
+
+        click(wrapper.get('a.forum-ref').element);
+        await flushPromises();
+        expect(boxes(wrapper)).toHaveLength(1);
+    });
+
+    it('gives the number in an opened post a touch target of 44 px', async () => {
+        const wrapper = mounted(`<p>${link('post-3', 3)}</p>`);
+        click(wrapper.get('a.forum-ref').element);
+        await flushPromises();
+
+        expect(boxes(wrapper)[0]!.querySelector('header a')?.className).toContain('min-h-[44px]');
     });
 
     it('lets a click with a modifier or another button go to the post', () => {

@@ -25,6 +25,9 @@ final class ReferenceLinking
     /** A «#N» that is a word of its own inside a run; its edges are checked against the runs next to it */
     private const string NUMBER = '/(?<![\p{L}\p{N}\/#])#([1-9]\d{0,9})(?![\p{L}\p{N}])/u';
 
+    /** The highest post number there can be (a 32-bit integer): a bigger «#N» is not a post */
+    private const int MAX_POST_NUMBER = 2_147_483_647;
+
     /** Text with these marks keeps its words */
     private const array LITERAL_MARKS = ['code', 'link'];
 
@@ -36,8 +39,8 @@ final class ReferenceLinking
     public static function link(array $document, Closure $resolve): array
     {
         $numbers = [];
-        $existing = 0;
-        self::collect($document, $numbers, $existing);
+        self::collect($document, $numbers);
+        $existing = self::countReferences($document);
 
         $ids = $numbers === [] ? [] : $resolve(array_map(intval(...), array_keys($numbers)));
         $room = max(0, DocumentLimits::MAX_REFERENCES - $existing);
@@ -46,20 +49,15 @@ final class ReferenceLinking
     }
 
     /**
-     * The numbers written as words of their own, and how many references there already are.
+     * The numbers written as words of their own, up to as many as may become references.
      *
      * @param  array<array-key, mixed>  $node
      * @param  array<int, true>  $numbers
      */
-    private static function collect(array $node, array &$numbers, int &$existing): void
+    private static function collect(array $node, array &$numbers): void
     {
         $type = $node['type'] ?? null;
-        if ($type === (new PostReferenceNode)->name()) {
-            $existing++;
-
-            return;
-        }
-        if (self::keepsItsText($type)) {
+        if ($type === (new PostReferenceNode)->name() || self::keepsItsText($type)) {
             return;
         }
 
@@ -77,9 +75,28 @@ final class ReferenceLinking
                     $numbers[$number] = true;
                 }
             } else {
-                self::collect($child, $numbers, $existing);
+                self::collect($child, $numbers);
             }
         }
+    }
+
+    /**
+     * How many references the document already holds, wherever they are.
+     *
+     * @param  array<array-key, mixed>  $node
+     */
+    private static function countReferences(array $node): int
+    {
+        if (($node['type'] ?? null) === (new PostReferenceNode)->name()) {
+            return 1;
+        }
+
+        $count = 0;
+        foreach (self::children($node) as $child) {
+            $count += self::countReferences($child);
+        }
+
+        return $count;
     }
 
     /**
@@ -151,7 +168,11 @@ final class ReferenceLinking
             if ($end === $length && preg_match('/[\p{L}\p{N}]/u', self::firstCharacterOf($siblings[$index + 1] ?? null)) === 1) {
                 continue;
             }
-            $matches[] = [$start, strlen($whole), (int) $found[1][$i][0]];
+            $number = (int) $found[1][$i][0];
+            if ($number > self::MAX_POST_NUMBER) {
+                continue;
+            }
+            $matches[] = [$start, strlen($whole), $number];
         }
 
         return $matches;

@@ -19,7 +19,6 @@ use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Application\Services\PostReferenceLabels;
-use Modules\Forum\Http\Controllers\DiscussionController;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -29,6 +28,7 @@ use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Repositories\MemberTitleRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
+use Modules\Forum\Http\Controllers\DiscussionController;
 
 /**
  * The forum's page props: plain arrays with display times (in the display zone) and the

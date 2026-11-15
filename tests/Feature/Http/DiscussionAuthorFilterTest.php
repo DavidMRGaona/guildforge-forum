@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Services\UserServiceInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
+use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
-use App\Application\Services\UserServiceInterface;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
-use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Tests\Support\BuildsCharacters;

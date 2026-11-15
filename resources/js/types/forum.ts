@@ -671,3 +671,17 @@ export interface ForumBlock {
     sinceLabel: string;
     unblockUrl: string;
 }
+
+/** One of a person's latest messages on their public profile (`forum.latest-posts`, forum#135) */
+export interface ForumProfilePost {
+    /** The topic's title */
+    title: string;
+    /** The message's own address */
+    url: string;
+    category: string;
+    categoryUrl: string;
+    /** Plain text, cut short; empty when the message is only quotes, images or embeds */
+    excerpt: string;
+    publishedAt: string;
+    publishedLabel: string;
+}

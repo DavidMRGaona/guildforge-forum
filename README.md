@@ -342,6 +342,20 @@ En `/buscar` salen como las pestañas «Temas del foro» y «Mensajes del foro»
 
 **Buscar dentro del foro.** `/foro/buscar?q=<texto>[&categoria=<slug>][&pagina=<n>]` usa el mismo motor (Meilisearch o la base de datos de reserva) limitado a los dos tipos y, además, comprueba cada resultado contra las tablas: un índice atrasado nunca enseña un mensaje que ya está oculto o borrado, ni una categoría que el lector ya no puede leer. Mira los 100 primeros resultados del motor (y avisa si hay más), en páginas de 10. Un fallo del motor da una página con el aviso, nunca un 500. Es una página con `noindex`, con un límite de 60 peticiones por minuto.
 
+## Perfil público
+
+El foro pone su actividad en el perfil público de cada persona, `/miembros/<dirección>` (core ≥ 3.79, #742; `registerProfileSections()` y `registerProfileStats()`):
+
+- **«Últimos mensajes en el foro»** (`forum.latest-posts`, región principal, encendida por defecto, `components/profile/LatestPostsSection.vue`): los 5 últimos mensajes, cada uno con el título del tema (que enlaza al propio mensaje), la categoría, la fecha y un extracto en texto plano de 200 caracteres. El extracto sale del documento sin las citas (son palabras de otra persona) y sus menciones solo nombran por el nombre público; una cuenta sin él sale como «@alguien». Sin nada que enseñar no se dibuja (`NothingToDrawException`).
+- **«Mensajes en el foro»** (`forum.posts`) y **«Temas abiertos»** (`forum.topics`): los contadores, sin enlace, porque el foro no tiene una lista de los mensajes o los temas de una persona (el filtro `?autor=` es de cada tema). Con 0 no se enseñan (`null`): un 0 diría que la persona no escribió nada cuando quizá escribió donde quien mira no puede leer.
+
+Todo se decide para quien mira con las reglas del propio foro (`Application\Services\ProfileActivity`, ligado por petición y compartido por la sección y los contadores):
+
+- Con el foro en vista previa, quien no lo puede ver (`ForumVisibility::isVisibleTo()`) no recibe nada.
+- Solo las categorías que puede leer (`ForumBrowser::readableCategories()`), y en ellas solo los mensajes visibles de temas visibles: nunca lo oculto, lo borrado, lo pendiente de aprobar ni los temas ocultos o en espera, tampoco para la moderación ni para la propia persona. El perfil no es sitio para moderar.
+- Lo escrito como un personaje compartido solo cuenta y sale para quien puede saber quién lo escribió: su autor, la moderación de la categoría y quien modera el personaje (`PostContentPresenter::charactersHidingTheirWriter()`, la misma regla que el tema y el filtro por autor). Lo escrito como personaje propio por alguien sin nombre público sigue `hidesCharacterPostsOf()`. Fuera de personaje y en personaje cuentan igual. Un tema abierto como personaje compartido tampoco cuenta para los demás.
+- Las consultas son pocas y acotadas (`EloquentProfileActivityQuery`, índice `forum_posts_author_activity_idx` sobre autor, estado y publicación): las categorías, los personajes usados (y, si los hay, sus fichas y el nombre público de la persona), la lista, los nombres de sus menciones y una por contador; ninguna crece con los mensajes.
+
 ## Personajes
 
 Cada cuenta escribe como sus personajes, para que las partidas se lean como una historia.
@@ -410,6 +424,7 @@ El ajuste *Acceso al foro* (`access`) decide quién ve el foro en el sitio: **So
 - Ningún aviso sale (`shouldSend()` de cada uno) y sus categorías de correo no aparecen en el perfil (audiencia).
 - La web recibe `forumVisible` (prop compartida): las pestañas «Foro» y «Personajes» del perfil la usan como `visibleKey`, y la conversación de las fichas y el aviso del menú no piden nada.
 - Las guías del sitio exigen la capacidad `forum.visible`.
+- La sección y los contadores del perfil público no se dibujan.
 - El enlace «Foro» del menú (`ForumMenuLink`) pasa a visibilidad por permiso con `forum:forum.preview` y, al abrir el foro, recupera la visibilidad que tenía (guardada en el ajuste `forum_menu_link_before_preview`). Se aplica al guardar los ajustes y al habilitar o actualizar el módulo, así que un sitio que ya tenía el foro lo deja en vista previa con esta versión. Un enlace nuevo nace con la visibilidad del acceso.
 
 El panel no cambia: categorías, moderación y ajustes siguen con sus permisos. Los temas automáticos de las publicaciones se siguen creando, ocultos hasta que se abra el foro. La suite del módulo arranca con el foro abierto (`FORUM_ACCESS_DEFAULT=open` en su `phpunit.xml`).

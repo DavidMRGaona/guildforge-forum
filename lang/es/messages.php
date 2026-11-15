@@ -709,6 +709,14 @@ return [
         ],
     ],
 
+    'profile' => [
+        'latest_posts' => 'Últimos mensajes en el foro',
+        'latest_posts_description' => 'Los últimos mensajes escritos en el foro, con su tema y su categoría.',
+        'posts' => 'Mensajes en el foro',
+        'topics' => 'Temas abiertos',
+        // How an excerpt names a mentioned account without a public name
+        'someone' => 'alguien',
+    ],
     'search' => [
         'discussions' => [
             'label' => 'Temas del foro',

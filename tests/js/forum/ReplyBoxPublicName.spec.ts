@@ -1,5 +1,5 @@
-import { mount } from '@vue/test-utils';
-import { defineComponent, h } from 'vue';
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { describe, expect, it, vi } from 'vitest';
 import ReplyBox from '../../../resources/js/components/forum/ReplyBox.vue';
@@ -63,13 +63,12 @@ describe('ReplyBox without a public name', () => {
             options?.onStart?.();
             const auth = page.props.auth as { user: Record<string, unknown> };
             page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
-            options?.onSuccess?.();
+            // The watcher runs a tick later, before Inertia gets to `onSuccess`
+            void nextTick().then(() => options?.onSuccess?.());
         }) as never);
         await wrapper.get('input').setValue('Ana');
         await wrapper.get('form').trigger('submit');
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick();
+        await flushPromises();
 
         expect(quote).toHaveBeenCalledWith({ postId: 'post-1', text: 'Hola' });
         expect(focus).toHaveBeenCalled();

@@ -119,14 +119,15 @@ final readonly class ConversationService
             }
         }
 
-        // Their names appear in the lists, the participants and the notes
+        if ($this->startsLeft($author) === 0) {
+            throw ConversationRefusedException::because(ConversationRefusedException::DAILY_LIMIT);
+        }
+        // Their names appear in the lists, the participants and the notes (after the limit, which
+        // was always the reason for whoever has used all their starts)
         if (array_diff($recipients, $this->accounts->withPublicName($recipients)) !== []) {
             throw ConversationRefusedException::because(ConversationRefusedException::PEOPLE_WITHOUT_PUBLIC_NAME);
         }
 
-        if ($this->startsLeft($author) === 0) {
-            throw ConversationRefusedException::because(ConversationRefusedException::DAILY_LIMIT);
-        }
         $this->countMessage($authorId);
 
         $now = CarbonImmutable::now()->toDateTimeImmutable();

@@ -68,6 +68,7 @@ function save(): void {
                 awaitingName.value = true;
             },
             onFinish: () => (saving.value = false),
+            onCancel: () => (awaitingName.value = false),
             onSuccess: announceNamed,
             // The core's validation: the field's own error at the field; an address the account
             // can no longer use (taken by another account meanwhile) sends to the profile

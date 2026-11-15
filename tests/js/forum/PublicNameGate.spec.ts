@@ -1,4 +1,5 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PublicNameGate from '../../../resources/js/components/forum/PublicNameGate.vue';
@@ -76,14 +77,17 @@ describe('PublicNameGate', () => {
             // The new page (with the saved name) is set before the callbacks run
             const auth = page.props.auth as { user: Record<string, unknown> };
             page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
-            options?.onSuccess?.();
-            options?.onFinish?.();
+            // The watcher runs a tick later, before Inertia gets to `onSuccess`
+            void nextTick().then(() => {
+                options?.onSuccess?.();
+                options?.onFinish?.();
+            });
         }) as never);
         const wrapper = mounted();
 
         await wrapper.get('input').setValue('Ana');
         await wrapper.get('form').trigger('submit');
-        await wrapper.vm.$nextTick();
+        await flushPromises();
 
         expect(wrapper.emitted('named')).toHaveLength(1);
         expect(wrapper.find('[data-testid="editor"]').exists()).toBe(true);
@@ -124,8 +128,12 @@ describe('PublicNameGate', () => {
         vi.mocked(router.post).mockImplementation(((
             _url: string,
             _data: unknown,
-            options?: { onHttpException?: (r: { status: number }) => boolean | void }
+            options?: {
+                onStart?: () => void;
+                onHttpException?: (r: { status: number }) => boolean | void;
+            }
         ) => {
+            options?.onStart?.();
             handled = options?.onHttpException?.({ status: 429 });
         }) as never);
         const wrapper = mounted();
@@ -179,4 +187,61 @@ describe('PublicNameGate', () => {
 
         expect(wrapper.get('[role="alert"]').text()).toBe('Demasiado largo');
     });
+
+    it('answers a 403 and a network failure with the generic text, without Inertia’s dialog', async () => {
+        signIn({ displayName: null });
+        const answers: Array<boolean | void> = [];
+        vi.mocked(router.post).mockImplementation(((
+            _url: string,
+            _data: unknown,
+            options?: {
+                onStart?: () => void;
+                onHttpException?: (r: { status: number }) => boolean | void;
+                onNetworkError?: () => boolean | void;
+            }
+        ) => {
+            options?.onStart?.();
+            answers.push(options?.onHttpException?.({ status: 403 }));
+            answers.push(options?.onNetworkError?.());
+        }) as never);
+        const wrapper = mounted();
+
+        await wrapper.get('input').setValue('Ana');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.get('[role="alert"]').text()).toBe(
+            'No se ha podido guardar el nombre público. Inténtalo de nuevo.'
+        );
+        expect(answers).toEqual([false, false]);
+    });
+
+    it.each([
+        ['a validation error', 'onError', [{ display_name: 'Demasiado largo' }]],
+        ['too many attempts', 'onHttpException', [{ status: 429 }]],
+        ['a network failure', 'onNetworkError', []],
+        ['a cancelled visit', 'onCancel', []],
+    ])(
+        'does not say it is named when %s ended the save and the name arrives later',
+        async (_label, callback, args) => {
+            signIn({ displayName: null });
+            vi.mocked(router.post).mockImplementation(((
+                _url: string,
+                _data: unknown,
+                options?: Record<string, ((...a: unknown[]) => unknown) | undefined>
+            ) => {
+                options?.onStart?.();
+                options?.[callback]?.(...args);
+            }) as never);
+            const wrapper = mounted();
+
+            await wrapper.get('input').setValue('Ana');
+            await wrapper.get('form').trigger('submit');
+            // The name reaches the page afterwards (another tab, a later load)
+            const auth = page.props.auth as { user: Record<string, unknown> };
+            page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
+            await flushPromises();
+
+            expect(wrapper.emitted('named')).toBeUndefined();
+        }
+    );
 });

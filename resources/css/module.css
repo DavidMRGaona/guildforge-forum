@@ -716,7 +716,7 @@ a.forum-ref[aria-expanded='true'] {
  * deep in the dark one, so the text keeps its contrast in both, and the focus ring
  * (a box-shadow) stays visible on top of a background. */
 article[data-starter='true'] {
-    background-color: color-mix(in srgb, var(--color-primary-light) 40%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary-light) 25%, transparent);
 }
 
 /* The list that holds the posts is rounded without overflow-hidden (no menu may be clipped), so

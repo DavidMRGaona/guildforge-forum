@@ -29,13 +29,15 @@ final readonly class EloquentConversationCandidates implements ConversationCandi
         }
 
         $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $needle);
-        $name = 'LOWER(COALESCE(NULLIF(display_name, \'\'), name))';
+        // Only by public name: an account without one would show up under its account name
+        $name = 'LOWER(display_name)';
         $skip = array_values(array_filter(array_map(AccountId::normalize(...), $excluded), is_string(...)));
 
         $found = [];
         foreach ([$escaped.'%', '%'.$escaped.'%'] as $pattern) {
             $users = UserModel::query()
                 ->whereNull('anonymized_at')
+                ->whereNotNull('display_name')
                 ->whereRaw("{$name} LIKE ? ESCAPE '\\'", [$pattern])
                 ->whereKeyNot([...$skip, ...array_keys($found)])
                 ->orderByRaw($name)

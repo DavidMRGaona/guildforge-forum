@@ -50,7 +50,7 @@ final class PostEndpointsTest extends ModuleTestCase
         $this->access = new FakeForumAccess;
         $this->app->instance(ForumAccessInterface::class, $this->access);
 
-        $this->author = UserModel::factory()->create(['name' => 'Ana Pérez', 'display_name' => null]);
+        $this->author = UserModel::factory()->create(['name' => 'Ana Pérez', 'display_name' => 'Ana Pérez']);
         $this->access->letWrite($this->author);
         [$this->discussion, $this->firstPost] = $this->aDiscussion($this->aCategory(), authorId: $this->author->id);
     }
@@ -230,7 +230,7 @@ final class PostEndpointsTest extends ModuleTestCase
 
     public function test_moderators_read_every_version_of_a_post_and_nobody_else_does(): void
     {
-        $moderator = UserModel::factory()->create(['name' => 'Moderación', 'display_name' => null]);
+        $moderator = UserModel::factory()->create(['name' => 'Moderación', 'display_name' => 'Moderación']);
         $this->access->letModerate($moderator);
         app(ForumWriter::class)->editPost($this->firstPost->id(), self::aBody('Segunda'), strtolower($this->author->id), new DateTimeImmutable('2026-11-10 19:00:00'));
         $url = "/foro/mensajes/{$this->firstPost->id()->value}/versiones";
@@ -250,9 +250,9 @@ final class PostEndpointsTest extends ModuleTestCase
 
     public function test_mention_candidates_are_only_people_who_may_read_the_discussion(): void
     {
-        $reader = UserModel::factory()->create(['name' => 'Anabel Ruiz', 'display_name' => null]);
+        $reader = UserModel::factory()->create(['name' => 'Anabel Ruiz', 'display_name' => 'Anabel Ruiz']);
         $alsoReader = UserModel::factory()->create(['name' => 'Juana', 'display_name' => 'Luciana']);
-        UserModel::factory()->create(['name' => 'Anacleto Sin Acceso', 'display_name' => null]);
+        UserModel::factory()->create(['name' => 'Anacleto Sin Acceso', 'display_name' => 'Anacleto Sin Acceso']);
         $gone = UserModel::factory()->create(['name' => 'Ana Anónima', 'display_name' => null, 'anonymized_at' => now()]);
         $this->access->letRead($reader, $alsoReader, $gone);
         $url = "/foro/temas/{$this->discussion->id()->value}/menciones";

@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ConversationNoticesInterface;
 use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\ConversationStartsInterface;
@@ -56,6 +57,7 @@ final readonly class ConversationService
         private PostRateLimiterInterface $rateLimiter,
         private ConversationNoticesInterface $notices,
         private ForumLiveSignalsInterface $live,
+        private AccountDirectoryInterface $accounts,
     ) {}
 
     /**
@@ -120,6 +122,12 @@ final readonly class ConversationService
         if ($this->startsLeft($author) === 0) {
             throw ConversationRefusedException::because(ConversationRefusedException::DAILY_LIMIT);
         }
+        // Their names appear in the lists, the participants and the notes (after the limit, which
+        // was always the reason for whoever has used all their starts)
+        if (array_diff($recipients, $this->accounts->withPublicName($recipients)) !== []) {
+            throw ConversationRefusedException::because(ConversationRefusedException::PEOPLE_WITHOUT_PUBLIC_NAME);
+        }
+
         $this->countMessage($authorId);
 
         $now = CarbonImmutable::now()->toDateTimeImmutable();
@@ -221,6 +229,10 @@ final readonly class ConversationService
             }
             if (count($people) >= ConversationRules::MAX_PARTICIPANTS) {
                 throw ConversationRefusedException::because(ConversationRefusedException::FULL);
+            }
+            // Their name goes in the note everyone reads (after the refusals that were always there)
+            if ($this->accounts->withPublicName([$added]) === []) {
+                throw ConversationRefusedException::because(ConversationRefusedException::PERSON_WITHOUT_PUBLIC_NAME);
             }
 
             $now = CarbonImmutable::now()->toDateTimeImmutable();

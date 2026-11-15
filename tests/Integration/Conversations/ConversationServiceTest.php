@@ -209,6 +209,17 @@ final class ConversationServiceTest extends ModuleTestCase
         $this->assertRefused(ConversationRefusedException::UNAVAILABLE_PEOPLE, fn () => $this->conversations()->add($this->ana, $other->id(), $this->luis->id));
     }
 
+    public function test_the_daily_limit_comes_before_the_public_name_of_the_recipients(): void
+    {
+        for ($i = 0; $i < ConversationRules::STARTS_PER_DAY; $i++) {
+            $this->aConversation($this->ana, $this->luis);
+            CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinutes(2));
+        }
+        $this->eva->forceFill(['display_name' => null])->save();
+
+        $this->assertRefused(ConversationRefusedException::DAILY_LIMIT, fn () => $this->aConversation($this->ana, $this->eva));
+    }
+
     public function test_five_new_conversations_a_day_and_replying_does_not_count(): void
     {
         for ($i = 0; $i < ConversationRules::STARTS_PER_DAY; $i++) {

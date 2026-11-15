@@ -118,6 +118,16 @@ export default {
             reveal: 'Reveal',
             revealFailed: 'The roll could not be revealed. Try again.',
         },
+        publicName: {
+            prompt: 'To write in the forum you need a public name: it is the one others will see, instead of your account name.',
+            label: 'Public name',
+            save: 'Save public name',
+            required: 'Enter the public name you want to use.',
+            tooMany: 'Too many attempts. Wait a moment and try again.',
+            emailProblem:
+                'It could not be saved: check the email address of your account in your profile.',
+            saveError: 'The public name could not be saved. Try again.',
+        },
         posts: {
             writePrivatelyTo: 'Write a private message to {name}',
             moved: {

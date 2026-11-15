@@ -95,7 +95,8 @@ final class ConversationController extends Controller
         $preselected = null;
         $to = AccountId::normalize((string) $request->query('para', ''));
         if ($to !== null && $to !== ForumBrowser::accountId($user) && $this->access->mayTakePart($to) && ! $this->access->isBlockedBy((string) ForumBrowser::accountId($user), $to)) {
-            $name = $this->accounts->namesOf([$to])[$to] ?? null;
+            // Without a public name their account name would show: treated as if they did not exist
+            $name = $this->accounts->withPublicName([$to]) === [] ? null : ($this->accounts->namesOf([$to])[$to] ?? null);
             $preselected = $name === null ? null : ['id' => $to, 'name' => $name];
         }
 

@@ -108,9 +108,9 @@ final class HiddenRollsTest extends ModuleTestCase
         app(PublicationSourceRegistryInterface::class)->register(FakeCampaignSource::class, 'example');
         app(PublicationSourceRegistryInterface::class)->register(FakeGameTableSource::class, 'example');
 
-        $this->thrower = UserModel::factory()->create(['name' => 'Ana', 'display_name' => null]);
-        $this->reader = UserModel::factory()->create(['name' => 'Luis', 'display_name' => null]);
-        $this->director = UserModel::factory()->create(['name' => 'Marta', 'display_name' => null]);
+        $this->thrower = UserModel::factory()->create(['name' => 'Ana', 'display_name' => 'Ana']);
+        $this->reader = UserModel::factory()->create(['name' => 'Luis', 'display_name' => 'Luis']);
+        $this->director = UserModel::factory()->create(['name' => 'Marta', 'display_name' => 'Marta']);
         $this->moderator = $this->anAccount(CategoryAccessPolicy::MODERATE_FORUM);
 
         FakePublicationSource::put(new PublicationDTO(
@@ -413,14 +413,14 @@ final class HiddenRollsTest extends ModuleTestCase
 
     public function test_writing_mention_names_again_keeps_the_result_out(): void
     {
-        $mentioned = UserModel::factory()->create(['name' => 'Pedro', 'display_name' => null]);
+        $mentioned = UserModel::factory()->create(['name' => 'Pedro', 'display_name' => 'Pedro']);
         $postId = $this->reply($this->generalDiscussion, [
             $this->roll('2d6+3', 'Ataque'),
             ['type' => 'paragraph', 'content' => [['type' => 'mention', 'attrs' => ['id' => strtolower($mentioned->id)]]]],
         ])->json('post.id');
 
         // An account renamed or anonymized has its mentions written again
-        $mentioned->forceFill(['name' => 'Pedro Gil'])->save();
+        $mentioned->forceFill(['name' => 'Pedro Gil', 'display_name' => 'Pedro Gil'])->save();
         app(MentionTextsInterface::class)->refreshFor((string) $mentioned->id);
 
         $text = (string) PostModel::query()->whereKey($postId)->value('plain_text');

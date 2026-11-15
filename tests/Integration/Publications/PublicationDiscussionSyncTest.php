@@ -414,7 +414,7 @@ final class PublicationDiscussionSyncTest extends ModuleTestCase
     {
         $system = app(SystemAccountInterface::class)->id();
         UserModel::query()->findOrFail($system)->forceFill(['name' => 'Asociación', 'display_name' => 'Asociación'])->saveQuietly();
-        $someone = UserModel::factory()->create(['name' => 'Asunción', 'display_name' => null]);
+        $someone = UserModel::factory()->create(['name' => 'Asunción', 'display_name' => 'Asunción']);
 
         $this->assertSame([strtolower($someone->id)], app(AccountDirectoryInterface::class)->mentionable([$system, $someone->id]));
 

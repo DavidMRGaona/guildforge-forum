@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -7,6 +7,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useRoutes } from '@/composables/useRoutes';
 import SpeakAsSelect from '../characters/SpeakAsSelect.vue';
 import PostEditor from '../editor/PostEditor.vue';
+import PublicNameGate from './PublicNameGate.vue';
 import type { ForumReplySettings } from '../../types/forum';
 
 /**
@@ -70,8 +71,37 @@ const notice = computed<
     return props.isClosed ? 'closed' : 'forbidden';
 });
 
+// A quotation asked for while the prompt for a public name stands in place of the editor waits
+// for the editor, which then takes it and the focus
+type Quotation = { postId: string; text: string };
+const pendingQuote = ref<Quotation | null>(null);
+const focusWhenShown = ref(false);
+
+function quote(source: Quotation): void {
+    if (editor.value) {
+        editor.value.quote(source);
+
+        return;
+    }
+    pendingQuote.value = source;
+}
+
+watch(editor, (shown) => {
+    if (!shown) {
+        return;
+    }
+    if (pendingQuote.value) {
+        shown.quote(pendingQuote.value);
+        pendingQuote.value = null;
+    }
+    if (focusWhenShown.value) {
+        focusWhenShown.value = false;
+        void nextTick(() => shown.focus());
+    }
+});
+
 defineExpose({
-    quote: (source: { postId: string; text: string }) => editor.value?.quote(source),
+    quote,
     focus: () => editor.value?.focus(),
     clear: () => editor.value?.clear(),
 });
@@ -79,33 +109,35 @@ defineExpose({
 
 <template>
     <div v-if="reply.canPost" class="space-y-3">
-        <slot name="intro" />
-        <SpeakAsSelect
-            v-if="reply.characters"
-            v-model="speaker"
-            :picker="reply.characters"
-            :disabled="sending"
-        />
-        <!-- Only what the reader types counts: a draft restored or a quotation inserted is no input -->
-        <div @input="emit('typing')">
-            <PostEditor
-                ref="editor"
-                :label="label"
-                :draft-key="draftKey"
-                :mentions-url="reply.mentionsUrl"
-                :upload-url="reply.uploadUrl"
-                :max-images="reply.maxImages"
-                :image-types="reply.imageTypes"
-                :external-image-url="reply.externalImageUrl"
-                :external-image-hosts="reply.externalImageHosts"
-                :embed-url="reply.embedUrl"
-                :embed-services="reply.embedServices"
-                :submit-label="submitLabel"
-                :submitting="sending"
-                :error="error"
-                @submit="(document: JSONContent) => emit('submit', document, speaker)"
+        <PublicNameGate @named="focusWhenShown = true">
+            <slot name="intro" />
+            <SpeakAsSelect
+                v-if="reply.characters"
+                v-model="speaker"
+                :picker="reply.characters"
+                :disabled="sending"
             />
-        </div>
+            <!-- Only what the reader types counts: a draft restored or a quotation inserted is no input -->
+            <div @input="emit('typing')">
+                <PostEditor
+                    ref="editor"
+                    :label="label"
+                    :draft-key="draftKey"
+                    :mentions-url="reply.mentionsUrl"
+                    :upload-url="reply.uploadUrl"
+                    :max-images="reply.maxImages"
+                    :image-types="reply.imageTypes"
+                    :external-image-url="reply.externalImageUrl"
+                    :external-image-hosts="reply.externalImageHosts"
+                    :embed-url="reply.embedUrl"
+                    :embed-services="reply.embedServices"
+                    :submit-label="submitLabel"
+                    :submitting="sending"
+                    :error="error"
+                    @submit="(document: JSONContent) => emit('submit', document, speaker)"
+                />
+            </div>
+        </PublicNameGate>
     </div>
 
     <p v-else class="rounded-lg border border-default bg-surface p-4 text-sm text-base-secondary">

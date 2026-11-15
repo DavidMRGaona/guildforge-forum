@@ -52,11 +52,11 @@ final class ConversationEndpointsTest extends ModuleTestCase
         config(['scout.driver' => 'null']);
         CarbonImmutable::setTestNow('2026-11-20 10:00:00');
         $this->ana = $this->anAccount();
-        $this->ana->update(['name' => 'Ana Pérez', 'display_name' => null]);
+        $this->ana->update(['name' => 'Ana Pérez', 'display_name' => 'Ana Pérez']);
         $this->luis = $this->anAccount();
-        $this->luis->update(['name' => 'Luis Gómez', 'display_name' => null]);
+        $this->luis->update(['name' => 'Luis Gómez', 'display_name' => 'Luis Gómez']);
         $this->eva = $this->anAccount();
-        $this->eva->update(['name' => 'Eva Ruiz', 'display_name' => null]);
+        $this->eva->update(['name' => 'Eva Ruiz', 'display_name' => 'Eva Ruiz']);
         $this->conversation = $this->aConversation($this->ana, $this->luis);
     }
 
@@ -177,11 +177,11 @@ final class ConversationEndpointsTest extends ModuleTestCase
     public function test_the_people_search_leaves_out_oneself_whoever_blocked_one_and_whoever_may_not_take_part(): void
     {
         $suspended = $this->anAccount();
-        $suspended->update(['name' => 'Eva Suspendida', 'display_name' => null]);
-        app(SuspensionService::class)->suspend(UserModel::factory()->admin()->create(['name' => 'Moderación Central', 'display_name' => null]), $suspended->id, 'Spam', null);
+        $suspended->update(['name' => 'Eva Suspendida', 'display_name' => 'Eva Suspendida']);
+        app(SuspensionService::class)->suspend(UserModel::factory()->admin()->create(['name' => 'Moderación Central', 'display_name' => 'Moderación Central']), $suspended->id, 'Spam', null);
         app(BlockService::class)->block($this->eva, $this->luis->id);
         $anonymized = $this->anAccount();
-        $anonymized->update(['name' => 'Eva Borrada', 'display_name' => null]);
+        $anonymized->update(['name' => 'Eva Borrada', 'display_name' => 'Eva Borrada']);
         app(UserServiceInterface::class)->anonymize($anonymized->id);
 
         $this->actingAs($this->luis)->getJson('/foro/conversaciones/personas?q=e')->assertOk()->assertJsonPath('people', []);

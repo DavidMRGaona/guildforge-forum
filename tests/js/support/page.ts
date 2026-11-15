@@ -10,13 +10,19 @@ export const page = reactive<{ props: Record<string, unknown>; url: string; comp
     component: 'Test',
 });
 
-/** Signs a user in on the page; `mustVerifyEmail` closes the actions behind the verification gate. */
-export function signIn(user: { mustVerifyEmail?: boolean } = {}): void {
+/**
+ * Signs a user in on the page; `mustVerifyEmail` closes the actions behind the verification gate
+ * and `displayName: null` leaves them without a public name (the forum asks for one to write).
+ */
+export function signIn(
+    user: { mustVerifyEmail?: boolean; displayName?: string | null } = {}
+): void {
     page.props = {
         auth: {
             user: {
                 id: 'user-1',
                 name: 'John Doe',
+                displayName: user.displayName === undefined ? 'John' : user.displayName,
                 email: 'john.doe@example.com',
                 emailVerified: user.mustVerifyEmail !== true,
                 mustVerifyEmail: user.mustVerifyEmail === true,

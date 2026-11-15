@@ -34,6 +34,7 @@ use Modules\Forum\Http\Controllers\SharedCharacterController;
 use Modules\Forum\Http\Controllers\SubjectConversationController;
 use Modules\Forum\Http\Controllers\SuspensionController;
 use Modules\Forum\Http\Middleware\EnsureForumIsVisible;
+use Modules\Forum\Http\Middleware\RequirePublicName;
 
 /*
 |--------------------------------------------------------------------------
@@ -97,7 +98,7 @@ Route::prefix('foro')
             Route::get('moderacion', ModerationQueueController::class)->name('moderation.index');
             // Starting a discussion counts against the posts-per-minute limit too
             Route::post('temas', [DiscussionController::class, 'store'])
-                ->middleware('throttle:20,1,forum-discussions')
+                ->middleware([RequirePublicName::class, 'throttle:20,1,forum-discussions'])
                 ->name('discussions.store');
             Route::post('temas/{discussion}/leido', [ReadMarksController::class, 'discussion'])
                 ->whereUuid('discussion')
@@ -117,11 +118,12 @@ Route::prefix('foro')
         Route::middleware('auth')->group(function (): void {
             Route::post('temas/{discussion}/mensajes', [PostController::class, 'store'])
                 ->whereUuid('discussion')
+                ->middleware(RequirePublicName::class)
                 ->name('posts.store');
             // Every edit keeps a version: edits and deletions have a limit of their own
             Route::patch('mensajes/{post}', [PostController::class, 'update'])
                 ->whereUuid('post')
-                ->middleware('throttle:30,1,forum-edits')
+                ->middleware([RequirePublicName::class, 'throttle:30,1,forum-edits'])
                 ->name('posts.update');
             Route::delete('mensajes/{post}', [PostController::class, 'destroy'])
                 ->whereUuid('post')
@@ -130,7 +132,7 @@ Route::prefix('foro')
             // Revealing a hidden roll, for good
             Route::post('tiradas/{roll}/revelar', [RollController::class, 'reveal'])
                 ->whereUuid('roll')
-                ->middleware('throttle:30,1,forum-edits')
+                ->middleware([RequirePublicName::class, 'throttle:30,1,forum-edits'])
                 ->name('rolls.reveal');
             Route::get('mensajes/{post}/versiones', [PostVersionsController::class, 'index'])
                 ->whereUuid('post')
@@ -194,13 +196,14 @@ Route::prefix('foro')
                 ->middleware('throttle:60,1,forum-conversation-people')
                 ->name('people');
             Route::post('/', [ConversationController::class, 'store'])
-                ->middleware('throttle:20,1,forum-conversation-starts')
+                ->middleware([RequirePublicName::class, 'throttle:20,1,forum-conversation-starts'])
                 ->name('store');
             Route::get('{conversation}', [ConversationController::class, 'show'])
                 ->whereUuid('conversation')
                 ->name('show');
             Route::post('{conversation}/mensajes', [ConversationMessageController::class, 'store'])
                 ->whereUuid('conversation')
+                ->middleware(RequirePublicName::class)
                 ->name('messages.store');
             // What an open conversation asks for while it is open (forum#89): after its last entry,
             // and the entries it was told changed; real time only says when
@@ -215,6 +218,7 @@ Route::prefix('foro')
             Route::middleware('throttle:30,1,forum-conversation-people-changes')->group(function (): void {
                 Route::post('{conversation}/personas', [ConversationController::class, 'add'])
                     ->whereUuid('conversation')
+                    ->middleware(RequirePublicName::class)
                     ->name('participants.store');
                 Route::post('{conversation}/salir', [ConversationController::class, 'leave'])
                     ->whereUuid('conversation')
@@ -252,7 +256,7 @@ Route::prefix('foro')
         Route::middleware('auth')->group(function (): void {
             Route::post('mensajes/{post}/me-gusta', [PostLikesController::class, 'store'])
                 ->whereUuid('post')
-                ->middleware('throttle:60,1,forum-likes')
+                ->middleware([RequirePublicName::class, 'throttle:60,1,forum-likes'])
                 ->name('posts.like');
             Route::delete('mensajes/{post}/me-gusta', [PostLikesController::class, 'destroy'])
                 ->whereUuid('post')

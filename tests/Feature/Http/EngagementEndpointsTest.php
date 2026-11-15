@@ -51,8 +51,8 @@ final class EngagementEndpointsTest extends ModuleTestCase
         $this->useUtcStorage();
         $this->category = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
         $this->members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios', position: 1);
-        $this->author = UserModel::factory()->create(['name' => 'Ana', 'display_name' => null]);
-        $this->reader = UserModel::factory()->create(['name' => 'Luis', 'display_name' => null]);
+        $this->author = UserModel::factory()->create(['name' => 'Ana', 'display_name' => 'Ana']);
+        $this->reader = UserModel::factory()->create(['name' => 'Luis', 'display_name' => 'Luis']);
         [$this->discussion, $this->post] = $this->aDiscussion($this->category, authorId: $this->author->id, title: 'La tumba');
     }
 

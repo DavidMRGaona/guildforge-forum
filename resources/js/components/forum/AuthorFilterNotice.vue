@@ -7,7 +7,8 @@ import type { ForumAuthorFilter } from '../../types/forum';
 /**
  * The notice of a discussion shown as one person's messages only: how many there are and the
  * way back to the whole discussion. Without messages (or for a person that does not exist) it
- * says the same thing for both.
+ * says the same thing for both. Messages awaiting approval, which only their author and
+ * moderation get on the page, are not in the count: when they are all there is, it says so.
  */
 defineProps<{
     filter: ForumAuthorFilter;
@@ -30,7 +31,11 @@ const { t } = useI18n();
             )
         }}</span>
         <span v-else-if="filter.pending > 0 && filter.authorName !== null">{{
-            t('forum.posts.authorFilter.pendingOnly', { name: filter.authorName })
+            t(
+                'forum.posts.authorFilter.pendingOnly',
+                { name: filter.authorName, count: filter.pending },
+                filter.pending
+            )
         }}</span>
         <span v-else>{{ t('forum.posts.authorFilter.none') }}</span>
         <span aria-hidden="true">·</span>

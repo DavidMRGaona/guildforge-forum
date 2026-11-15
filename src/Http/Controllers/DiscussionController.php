@@ -91,8 +91,7 @@ final class DiscussionController extends Controller
         abort_unless($found instanceof Discussion, 404);
 
         // A page whose numbers all moved away is asked for by its place
-        $place = $request->query(ForumPresenter::PAGE_QUERY);
-        $place = $post === null && is_string($place) && preg_match('/^[1-9][0-9]{0,5}$/', $place) === 1 ? (int) $place : null;
+        $place = $post === null ? ForumPresenter::askedPage($request) : null;
 
         // One person's messages (?autor=): only for the discussion's own address, never for a post's.
         // Whatever it holds is asked as it is: what is not an account's id is just a person without messages
@@ -165,9 +164,9 @@ final class DiscussionController extends Controller
             return '';
         }
 
-        $page = $request->query(ForumPresenter::PAGE_QUERY);
+        $page = ForumPresenter::askedPage($request);
         $query = [ForumPresenter::AUTHOR_QUERY => $author];
-        if ($withPage && is_string($page) && preg_match('/^[1-9][0-9]{0,5}$/', $page) === 1) {
+        if ($withPage && $page !== null) {
             $query[ForumPresenter::PAGE_QUERY] = $page;
         }
 

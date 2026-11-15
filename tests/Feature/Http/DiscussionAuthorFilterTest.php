@@ -123,7 +123,8 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
             ->where('pagination.pageCount', 1)
             ->etc();
 
-        foreach ([$nobody->id, '3f1c5a0e-1d2b-4c3d-8e9f-a0b1c2d3e4f5', 'no-es-un-id', str_repeat('a', 300)] as $author) {
+        $ana = $this->ana->id;
+        foreach ([$nobody->id, '3f1c5a0e-1d2b-4c3d-8e9f-a0b1c2d3e4f5', 'no-es-un-id', str_repeat('a', 300), "urn:uuid:{$ana}", "{{$ana}}", "{$ana}}}"] as $author) {
             $this->get($this->url($author))->assertOk()->assertInertia($expected);
         }
     }
@@ -294,6 +295,9 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
         $this->get($this->url($this->ana->id).'&pagina=3&x=1')->assertStatus(301)->assertRedirect($to.'?autor='.$this->ana->id);
         $this->get($this->url(strtoupper($this->ana->id)))->assertStatus(301)->assertRedirect($to.'?autor='.strtolower($this->ana->id));
         $this->get($this->url('basura'))->assertStatus(301)->assertRedirect($to);
+        foreach (['urn:uuid:'.$this->ana->id, '{'.$this->ana->id.'}', $this->ana->id.'}}'] as $wrapped) {
+            $this->get($this->url($wrapped))->assertStatus(301)->assertRedirect($to);
+        }
         $this->get($this->discussionUrl().'?autor[]='.$this->ana->id)->assertStatus(301)->assertRedirect($to);
     }
 
@@ -307,6 +311,9 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
         $this->get("{$wrong}?autor={$ana}&pagina=2&x=1")->assertStatus(301)->assertRedirect("{$right}?autor={$ana}&pagina=2");
         $this->get("{$wrong}?autor=".strtoupper($ana).'&pagina=2')->assertStatus(301)->assertRedirect("{$right}?autor={$ana}&pagina=2");
         $this->get("{$wrong}?autor={$ana}&pagina=basura")->assertStatus(301)->assertRedirect("{$right}?autor={$ana}");
+        foreach (["urn:uuid:{$ana}", '{'.$ana.'}', $ana.'}}'] as $wrapped) {
+            $this->get("{$wrong}?autor={$wrapped}&pagina=2")->assertStatus(301)->assertRedirect($right);
+        }
         $this->get("{$wrong}?autor=basura&pagina=2")->assertStatus(301)->assertRedirect($right);
         $this->get("{$wrong}?autor[]={$ana}")->assertStatus(301)->assertRedirect($right);
     }

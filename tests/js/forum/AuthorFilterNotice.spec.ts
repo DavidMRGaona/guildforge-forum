@@ -43,7 +43,17 @@ describe('AuthorFilterNotice', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Solo hay mensajes de Ana pendientes de aprobación.');
+        expect(wrapper.text()).toContain('Solo hay un mensaje de Ana pendiente de aprobación.');
         expect(wrapper.text()).not.toContain('no tiene mensajes visibles');
+    });
+
+    it('uses the plural for several messages awaiting approval', () => {
+        const wrapper = mount(AuthorFilterNotice, {
+            props: {
+                filter: { authorName: 'Ana', count: 0, pending: 2, clearUrl: '/foro/t/7-partida' },
+            },
+        });
+
+        expect(wrapper.text()).toContain('Solo hay 2 mensajes de Ana pendientes de aprobación.');
     });
 });

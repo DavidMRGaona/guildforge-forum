@@ -6,6 +6,7 @@ namespace Modules\Forum\Http\Presenters;
 
 use App\Application\Services\TimezoneServiceInterface;
 use DateTimeImmutable;
+use Illuminate\Http\Request;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
@@ -37,6 +38,9 @@ final readonly class ForumPresenter
 {
     /** The query that asks a discussion's page by its place, for a page whose numbers all moved away */
     public const string PAGE_QUERY = 'pagina';
+
+    /** What a page asked for by its place looks like: a whole number from 1, nothing around it */
+    private const string PAGE_PATTERN = '/\A[1-9][0-9]{0,5}\z/';
 
     /** The query that shows one person's messages of a discussion */
     public const string AUTHOR_QUERY = 'autor';
@@ -278,6 +282,17 @@ final readonly class ForumPresenter
         }
 
         return null;
+    }
+
+    /**
+     * The page a request asks for by its place (?pagina=), or null when it asks for none or for
+     * something that is not a page number.
+     */
+    public static function askedPage(Request $request): ?int
+    {
+        $page = $request->query(self::PAGE_QUERY);
+
+        return is_string($page) && preg_match(self::PAGE_PATTERN, $page) === 1 ? (int) $page : null;
     }
 
     /**

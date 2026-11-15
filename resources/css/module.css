@@ -718,3 +718,18 @@ a.forum-ref[aria-expanded='true'] {
 article[data-starter='true'] {
     background-color: color-mix(in srgb, var(--color-primary-light) 40%, transparent);
 }
+
+/* The list that holds the posts is rounded without overflow-hidden (no menu may be clipped), so
+ * the starter's border and tint would stick out of its corners: round the outer corners of the
+ * first and the last post, one pixel less than the list so they sit inside its own border.
+ * The post is the list's child, or the only post of a wrapper that is. */
+.forum-post-list > :first-child:is(article[data-starter='true']),
+.forum-post-list > :first-child > article[data-starter='true']:first-child {
+    border-top-left-radius: calc(var(--border-radius) - 1px);
+    border-top-right-radius: calc(var(--border-radius) - 1px);
+}
+.forum-post-list > :last-child:is(article[data-starter='true']),
+.forum-post-list > :last-child > article[data-starter='true']:last-child {
+    border-bottom-left-radius: calc(var(--border-radius) - 1px);
+    border-bottom-right-radius: calc(var(--border-radius) - 1px);
+}

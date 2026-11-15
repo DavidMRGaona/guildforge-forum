@@ -1,5 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import SubjectConversationThread from '../../../resources/js/components/subjects/SubjectConversationThread.vue';
 import PostItem from '../../../resources/js/components/forum/PostItem.vue';
 import type { ForumPost, ForumPostCharacter } from '../../../resources/js/types/forum';
 
@@ -128,5 +129,34 @@ describe('the topic starter mark', () => {
 
         expect(wrapper.find('article').attributes('data-starter')).toBe('true');
         expect(wrapper.find('[data-testid="post-starter-label"]').exists()).toBe(true);
+    });
+
+    it('lets a post list round the outer corners of its first and last starter posts', () => {
+        // module.css targets `.forum-post-list > …`: the list must carry the class, and the
+        // first and last posts must be its children (the page wraps each one in a div)
+        const wrapper = mount(SubjectConversationThread, {
+            props: {
+                posts: [aPost({ id: 'a', isStarter: true }), aPost({ id: 'b', number: 3 })],
+                readUrl: null,
+                lastReadNumber: null,
+                canQuote: false,
+                editor: {
+                    uploadUrl: null,
+                    maxImages: 10,
+                    imageTypes: ['image/png'],
+                    externalImageUrl: null,
+                    externalImageHosts: [],
+                    embedUrl: null,
+                    embedServices: [],
+                },
+                mentionsUrl: null,
+                mentionNames: {},
+            },
+        });
+
+        expect(wrapper.classes()).toContain('forum-post-list');
+        expect(wrapper.element.firstElementChild?.matches('article[data-starter="true"]')).toBe(
+            true
+        );
     });
 });

@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ConversationNoticesInterface;
 use Modules\Forum\Application\Contracts\ConversationParticipantsInterface;
 use Modules\Forum\Application\Contracts\ConversationStartsInterface;
@@ -56,6 +57,7 @@ final readonly class ConversationService
         private PostRateLimiterInterface $rateLimiter,
         private ConversationNoticesInterface $notices,
         private ForumLiveSignalsInterface $live,
+        private AccountDirectoryInterface $accounts,
     ) {}
 
     /**
@@ -115,6 +117,11 @@ final readonly class ConversationService
             if (! $this->access->mayTakePart($recipient) || $this->access->isBlockedBy($authorId, $recipient)) {
                 throw ConversationRefusedException::because(ConversationRefusedException::UNAVAILABLE_PEOPLE);
             }
+        }
+
+        // Their names appear in the lists, the participants and the notes
+        if (array_diff($recipients, $this->accounts->withPublicName($recipients)) !== []) {
+            throw ConversationRefusedException::because(ConversationRefusedException::PEOPLE_WITHOUT_PUBLIC_NAME);
         }
 
         if ($this->startsLeft($author) === 0) {
@@ -204,6 +211,9 @@ final readonly class ConversationService
         $added = AccountId::normalize($accountId);
         if ($added === null || $added === $adderId || ! $this->access->mayTakePart($added) || $this->access->isBlockedBy($adderId, $added)) {
             throw ConversationRefusedException::because(ConversationRefusedException::UNAVAILABLE_PEOPLE);
+        }
+        if ($this->accounts->withPublicName([$added]) === []) {
+            throw ConversationRefusedException::because(ConversationRefusedException::PEOPLE_WITHOUT_PUBLIC_NAME);
         }
 
         $noteNumber = 0;

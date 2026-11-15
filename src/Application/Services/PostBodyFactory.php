@@ -56,6 +56,13 @@ final readonly class PostBodyFactory
         if (array_diff($mentioned, $this->accounts->mentionable($mentioned)) !== []) {
             throw InvalidDocumentException::because(InvalidDocumentException::UNKNOWN_ACCOUNT, '', 'A mentioned account cannot be mentioned');
         }
+        // A new mention paints the account's name: only accounts with a public name (an edit keeps
+        // the mentions the post already had, whatever the account chose since)
+        $kept = $previous instanceof PostBody ? $this->mentionsOf($previous) : [];
+        $added = array_values(array_diff($mentioned, $kept));
+        if (array_diff($added, $this->accounts->withPublicName($added)) !== []) {
+            throw InvalidDocumentException::because(InvalidDocumentException::UNKNOWN_ACCOUNT, '', 'A mentioned account has no public name');
+        }
 
         $this->assertQuotesHold($document, $author);
         $this->assertReferencesHold($document, $author, $previous);
@@ -66,6 +73,18 @@ final readonly class PostBodyFactory
         }
 
         return new PostBody($document->toArray(), $text);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function mentionsOf(PostBody $body): array
+    {
+        try {
+            return $this->schema->validate($body->document)->mentionedAccountIds();
+        } catch (InvalidDocumentException) {
+            return [];
+        }
     }
 
     /**

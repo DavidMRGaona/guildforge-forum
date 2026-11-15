@@ -132,7 +132,7 @@ Route::prefix('foro')
             // Revealing a hidden roll, for good
             Route::post('tiradas/{roll}/revelar', [RollController::class, 'reveal'])
                 ->whereUuid('roll')
-                ->middleware('throttle:30,1,forum-edits')
+                ->middleware([RequirePublicName::class, 'throttle:30,1,forum-edits'])
                 ->name('rolls.reveal');
             Route::get('mensajes/{post}/versiones', [PostVersionsController::class, 'index'])
                 ->whereUuid('post')
@@ -218,6 +218,7 @@ Route::prefix('foro')
             Route::middleware('throttle:30,1,forum-conversation-people-changes')->group(function (): void {
                 Route::post('{conversation}/personas', [ConversationController::class, 'add'])
                     ->whereUuid('conversation')
+                    ->middleware(RequirePublicName::class)
                     ->name('participants.store');
                 Route::post('{conversation}/salir', [ConversationController::class, 'leave'])
                     ->whereUuid('conversation')

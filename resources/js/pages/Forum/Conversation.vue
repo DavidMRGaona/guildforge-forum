@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -7,6 +7,7 @@ import { Ban, Flag, LogOut, Trash2, UserPlus } from '@lucide/vue';
 import HelpLink from '@/components/knowledge/HelpLink.vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PeoplePicker from '../../components/conversations/PeoplePicker.vue';
+import PublicNameGate from '../../components/forum/PublicNameGate.vue';
 import PostEditor from '../../components/editor/PostEditor.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
 import ReportDialog from '../../components/moderation/ReportDialog.vue';
@@ -52,6 +53,11 @@ const list = ref<ForumConversationEntry[]>([...props.entries]);
 const sending = ref(false);
 const replyError = ref<string | null>(null);
 const editor = ref<InstanceType<typeof PostEditor> | null>(null);
+
+/** The name was just saved: the editor takes the prompt's place, and the reader's focus */
+function focusEditor(): void {
+    void nextTick(() => editor.value?.focus());
+}
 const adding = ref(false);
 const addError = ref<string | null>(null);
 const leaving = ref(false);
@@ -483,18 +489,19 @@ async function remove(): Promise<void> {
             >
                 {{ write.refusal }}
             </p>
-            <PostEditor
-                v-else
-                ref="editor"
-                :label="t('forum.conversations.replyLabel')"
-                :draft-key="`forum-conversation-${conversation.id}`"
-                text-only
-                help-guide="forum.site.private-messages"
-                :submit-label="t('forum.conversations.send')"
-                :submitting="sending"
-                :error="replyError"
-                @submit="reply"
-            />
+            <PublicNameGate v-else @named="focusEditor">
+                <PostEditor
+                    ref="editor"
+                    :label="t('forum.conversations.replyLabel')"
+                    :draft-key="`forum-conversation-${conversation.id}`"
+                    text-only
+                    help-guide="forum.site.private-messages"
+                    :submit-label="t('forum.conversations.send')"
+                    :submitting="sending"
+                    :error="replyError"
+                    @submit="reply"
+                />
+            </PublicNameGate>
         </section>
     </div>
 

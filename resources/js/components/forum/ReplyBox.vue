@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { JSONContent } from '@tiptap/core';
@@ -71,8 +71,37 @@ const notice = computed<
     return props.isClosed ? 'closed' : 'forbidden';
 });
 
+// A quotation asked for while the prompt for a public name stands in place of the editor waits
+// for the editor, which then takes it and the focus
+type Quotation = { postId: string; text: string };
+const pendingQuote = ref<Quotation | null>(null);
+const focusWhenShown = ref(false);
+
+function quote(source: Quotation): void {
+    if (editor.value) {
+        editor.value.quote(source);
+
+        return;
+    }
+    pendingQuote.value = source;
+}
+
+watch(editor, (shown) => {
+    if (!shown) {
+        return;
+    }
+    if (pendingQuote.value) {
+        shown.quote(pendingQuote.value);
+        pendingQuote.value = null;
+    }
+    if (focusWhenShown.value) {
+        focusWhenShown.value = false;
+        void nextTick(() => shown.focus());
+    }
+});
+
 defineExpose({
-    quote: (source: { postId: string; text: string }) => editor.value?.quote(source),
+    quote,
     focus: () => editor.value?.focus(),
     clear: () => editor.value?.clear(),
 });
@@ -80,7 +109,7 @@ defineExpose({
 
 <template>
     <div v-if="reply.canPost" class="space-y-3">
-        <PublicNameGate>
+        <PublicNameGate @named="focusWhenShown = true">
             <slot name="intro" />
             <SpeakAsSelect
                 v-if="reply.characters"

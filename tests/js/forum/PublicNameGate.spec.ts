@@ -52,6 +52,58 @@ describe('PublicNameGate', () => {
         });
     });
 
+    it('sends the address in force, so a pending change of email is not cancelled', async () => {
+        signIn({ displayName: null });
+        const auth = page.props.auth as { user: Record<string, unknown> };
+        auth.user.verificationEmail = 'nuevo@example.com';
+        const wrapper = mounted();
+
+        await wrapper.get('input').setValue('Ana');
+        await wrapper.get('form').trigger('submit');
+
+        const [, data] = vi.mocked(router.post).mock.calls[0] ?? [];
+        expect(data).toMatchObject({ email: 'nuevo@example.com' });
+    });
+
+    it('says it is named once the saved name reaches the page', async () => {
+        signIn({ displayName: null });
+        vi.mocked(router.post).mockImplementation(((
+            _url: string,
+            _data: unknown,
+            options?: { onSuccess?: () => void }
+        ) => {
+            options?.onSuccess?.();
+        }) as never);
+        const wrapper = mounted();
+
+        await wrapper.get('input').setValue('Ana');
+        await wrapper.get('form').trigger('submit');
+        expect(wrapper.emitted('named')).toBeUndefined();
+
+        const auth = page.props.auth as { user: Record<string, unknown> };
+        page.props = { ...page.props, auth: { user: { ...auth.user, displayName: 'Ana' } } };
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.emitted('named')).toHaveLength(1);
+    });
+
+    it('answers too many attempts in plain words', async () => {
+        signIn({ displayName: null });
+        vi.mocked(router.post).mockImplementation(((
+            _url: string,
+            _data: unknown,
+            options?: { onHttpException?: (r: { status: number }) => void }
+        ) => {
+            options?.onHttpException?.({ status: 429 });
+        }) as never);
+        const wrapper = mounted();
+
+        await wrapper.get('input').setValue('Ana');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.get('[role="alert"]').text()).toContain('demasiadas veces');
+    });
+
     it('does not send an empty name', async () => {
         signIn({ displayName: null });
         const wrapper = mounted();

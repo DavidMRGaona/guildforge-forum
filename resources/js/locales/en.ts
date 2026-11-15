@@ -123,6 +123,7 @@ export default {
             label: 'Public name',
             save: 'Save public name',
             required: 'Enter the public name you want to use.',
+            tooMany: 'Too many attempts. Wait a moment and try again.',
             saveError: 'The public name could not be saved. Try again.',
         },
         posts: {

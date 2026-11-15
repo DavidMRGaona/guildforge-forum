@@ -40,6 +40,9 @@ final class ConversationRefusedException extends RuntimeException
     /** Not a message the person may delete or report */
     public const string NOT_ALLOWED = 'not_allowed';
 
+    /** Someone chosen has no public name: their account name would show to the others */
+    public const string PEOPLE_WITHOUT_PUBLIC_NAME = 'people_without_public_name';
+
     private function __construct(
         public readonly string $reason,
         string $message,

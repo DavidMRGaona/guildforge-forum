@@ -60,7 +60,7 @@ final class PublicNameRequiredTest extends ModuleTestCase
         $this->actingAs($this->nameless)->postJson($this->replyUrl(), ['document' => $this->messageDocument()])
             ->assertUnprocessable()
             ->assertJsonPath('reason', 'public_name_required')
-            ->assertJsonPath('errors.display_name.0', 'Para escribir en el foro necesitas un nombre público. Elígelo y vuelve a intentarlo.');
+            ->assertJsonPath('errors.display_name.0', 'Para hacer esto en el foro necesitas un nombre público. Elígelo en tu perfil y vuelve a intentarlo.');
 
         $this->actingAs($this->named)->postJson($this->replyUrl(), ['document' => $this->messageDocument()])->assertCreated();
     }
@@ -97,8 +97,7 @@ final class PublicNameRequiredTest extends ModuleTestCase
 
     public function test_private_messages_need_a_public_name(): void
     {
-        $conversation = $this->aConversation($this->named, $this->nameless);
-        $id = $conversation->id()->value;
+        $id = $this->conversationWithNameless();
 
         $this->actingAs($this->nameless)->postJson("/foro/conversaciones/{$id}/mensajes", ['document' => $this->messageDocument()])
             ->assertUnprocessable()
@@ -133,6 +132,82 @@ final class PublicNameRequiredTest extends ModuleTestCase
         $this->actingAs($this->named)->getJson('/foro/conversaciones/personas?q=an')
             ->assertOk()
             ->assertJsonPath('people.0.name', 'Ana');
+    }
+
+    public function test_a_forged_mention_of_an_account_without_a_public_name_is_refused(): void
+    {
+        $mention = fn (UserModel $who): array => ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'mention', 'attrs' => ['id' => strtolower($who->id)]]]]]];
+
+        $this->actingAs($this->named)->postJson($this->replyUrl(), ['document' => $mention($this->nameless)])
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'unknown_account');
+
+        $this->nameless->forceFill(['display_name' => 'Ana'])->save();
+        $this->actingAs($this->named)->postJson($this->replyUrl(), ['document' => $mention($this->nameless)])->assertCreated();
+    }
+
+    public function test_an_edit_keeps_a_mention_the_post_already_had(): void
+    {
+        $this->nameless->forceFill(['display_name' => 'Ana'])->save();
+        $mention = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'mention', 'attrs' => ['id' => strtolower($this->nameless->id)]]]]]];
+        $postId = $this->actingAs($this->named)->postJson($this->replyUrl(), ['document' => $mention])->assertCreated()->json('post.id');
+
+        // The mentioned person clears their public name afterwards: the published mention stays
+        $this->nameless->forceFill(['display_name' => null])->save();
+        $this->actingAs($this->named)->patchJson("/foro/mensajes/{$postId}", ['document' => $mention])->assertOk();
+    }
+
+    public function test_conversations_refuse_people_without_a_public_name(): void
+    {
+        $this->actingAs($this->named)->postJson('/foro/conversaciones', ['title' => 'Hola', 'recipients' => [$this->nameless->id], 'document' => $this->messageDocument()])
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'people_without_public_name')
+            ->assertJsonPath('message', 'Alguna de las personas elegidas aún no ha elegido un nombre público.');
+
+        $third = UserModel::factory()->create(['name' => 'Eva', 'display_name' => 'Eva']);
+        $id = $this->aConversation($this->named, $third)->id()->value;
+        $this->actingAs($this->named)->postJson("/foro/conversaciones/{$id}/personas", ['account' => $this->nameless->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'people_without_public_name');
+    }
+
+    public function test_adding_people_needs_a_public_name_of_the_one_who_adds(): void
+    {
+        $other = UserModel::factory()->create(['name' => 'Eva', 'display_name' => 'Eva']);
+        $id = $this->conversationWithNameless();
+
+        $this->actingAs($this->nameless)->postJson("/foro/conversaciones/{$id}/personas", ['account' => $other->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'public_name_required');
+    }
+
+    public function test_writing_to_someone_without_a_public_name_does_not_preselect_them(): void
+    {
+        $this->actingAs($this->named)->get('/foro/conversaciones/nueva?para='.$this->nameless->id)
+            ->assertInertia(fn ($page) => $page->where('preselected', null));
+
+        $this->nameless->forceFill(['display_name' => 'Ana'])->save();
+        $this->actingAs($this->named)->get('/foro/conversaciones/nueva?para='.$this->nameless->id)
+            ->assertInertia(fn ($page) => $page->where('preselected.name', 'Ana'));
+    }
+
+    public function test_revealing_a_roll_needs_a_public_name(): void
+    {
+        $this->actingAs($this->nameless)->postJson('/foro/tiradas/00000000-0000-4000-8000-000000000000/revelar')
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'public_name_required');
+    }
+
+    /**
+     * A conversation the nameless account is in, started while it still had a name (as older ones are).
+     */
+    private function conversationWithNameless(): string
+    {
+        $this->nameless->forceFill(['display_name' => 'Ana'])->save();
+        $id = $this->aConversation($this->named, $this->nameless)->id()->value;
+        $this->nameless->forceFill(['display_name' => null])->save();
+
+        return $id;
     }
 
     private function replyUrl(): string

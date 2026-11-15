@@ -124,6 +124,7 @@ export default {
             label: 'Nombre público',
             save: 'Guardar nombre público',
             required: 'Escribe el nombre público que quieras usar.',
+            tooMany: 'Has probado demasiadas veces. Espera un momento y vuelve a intentarlo.',
             saveError: 'No se ha podido guardar el nombre público. Inténtalo de nuevo.',
         },
         posts: {

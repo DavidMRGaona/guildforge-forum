@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -12,6 +12,9 @@ import { useRoutes } from '@/composables/useRoutes';
  * saved the page's shared props carry it and the slot (the editor) takes the prompt's place.
  * Only a help: the server refuses to write without a public name whatever this shows.
  */
+/** The name was saved and the slot is about to take the prompt's place: the page may move focus */
+const emit = defineEmits<{ named: [] }>();
+
 const { t } = useI18n();
 const { user } = useAuth();
 const routes = useRoutes();
@@ -20,6 +23,15 @@ const hasName = computed(() => (user.value?.displayName ?? '').trim() !== '');
 const name = ref('');
 const saving = ref(false);
 const error = ref<string | null>(null);
+const saved = ref(false);
+
+// The shared props bring the saved name: only then does the slot show, and only then is it «named»
+watch(hasName, (now) => {
+    if (now && saved.value) {
+        saved.value = false;
+        emit('named');
+    }
+});
 
 function save(): void {
     const account = user.value;
@@ -34,17 +46,32 @@ function save(): void {
     }
 
     error.value = null;
-    // The profile update takes the whole identity: the account's name and email go as they are
+    // The profile update takes the whole identity, and sending the account's email again would
+    // cancel a pending change of address: the address in force for verification (the pending one
+    // when there is one) goes, which the core keeps as it is
     router.post(
         routes.profile,
-        { name: account.name, email: account.email, display_name: publicName },
+        {
+            name: account.name,
+            email: account.verificationEmail ?? account.email,
+            display_name: publicName,
+        },
         {
             preserveScroll: true,
             preserveState: true,
             onStart: () => (saving.value = true),
             onFinish: () => (saving.value = false),
+            onSuccess: () => (saved.value = true),
+            // The core's validation of the field, shown at the field
             onError: (errors) => {
-                error.value = errors.display_name ?? t('forum.publicName.saveError');
+                error.value = errors.display_name ?? errors.name ?? t('forum.publicName.saveError');
+            },
+            // Too many attempts, or any other answer that is not a validation error
+            onHttpException: (response) => {
+                error.value =
+                    response.status === 429
+                        ? t('forum.publicName.tooMany')
+                        : t('forum.publicName.saveError');
             },
         }
     );

@@ -30,6 +30,16 @@ interface AccountDirectoryInterface
     public function mentionable(array $accountIds): array;
 
     /**
+     * Those of the ids whose account exists, is not anonymized and has a public name
+     * (`display_name`): the only people the forum puts in front of others by name when someone
+     * writes, mentions or chooses them. Lower-case ids, in no particular order.
+     *
+     * @param  list<string>  $accountIds
+     * @return list<string>
+     */
+    public function withPublicName(array $accountIds): array;
+
+    /**
      * The profile avatars (the stored public id) of those accounts that are active (neither
      * deactivated nor anonymized) and have one. Read when painting, never copied, so a changed
      * or removed avatar shows at once and erasing an account leaves nothing behind.

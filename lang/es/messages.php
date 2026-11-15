@@ -507,7 +507,7 @@ return [
 
     'errors' => [
         'forbidden' => 'No puedes hacer eso en este tema.',
-        'public_name_required' => 'Para escribir en el foro necesitas un nombre público. Elígelo y vuelve a intentarlo.',
+        'public_name_required' => 'Para hacer esto en el foro necesitas un nombre público. Elígelo en tu perfil y vuelve a intentarlo.',
         'too_fast' => 'Has publicado muchos mensajes seguidos. Espera :seconds segundos y vuelve a intentarlo.',
         'too_many_discussions' => 'Has abierto muchos temas en la última hora. Podrás abrir otro dentro de :minutes min.',
         'post_state' => 'Este mensaje ya no se puede cambiar.',
@@ -687,6 +687,7 @@ return [
             'daily_limit' => 'Ya has empezado 5 conversaciones en las últimas 24 horas. Puedes seguir respondiendo en las que tienes.',
             'already_in' => 'Esa persona ya está en la conversación.',
             'not_allowed' => 'No puedes hacer eso con este mensaje.',
+            'people_without_public_name' => 'Alguna de las personas elegidas aún no ha elegido un nombre público.',
         ],
         'errors' => [
             'title' => 'Escribe un título de 120 caracteres como máximo.',

@@ -86,7 +86,10 @@ final class DiscussionController extends Controller
         if (! $found instanceof Discussion || $post !== null) {
             $moved = $this->redirects->resolve($user, $number, $post === null ? null : (int) $post);
             if ($moved instanceof RedirectTargetDTO) {
-                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber), 301);
+                // A merged discussion's filter goes with it (the person's messages went there too)
+                $author = $post === null ? $request->query(self::AUTHOR_QUERY) : null;
+
+                return redirect()->to($this->urls->discussion($moved->discussion, $moved->postNumber).(is_string($author) ? '?'.http_build_query([self::AUTHOR_QUERY => $author]) : ''), 301);
             }
         }
         abort_unless($found instanceof Discussion, 404);

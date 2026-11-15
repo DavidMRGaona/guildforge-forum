@@ -82,11 +82,21 @@ final readonly class PostContentPresenter
                 hiddenReason: $own || $moderates ? $post->hiddenReason() : null,
                 character: $characters[$post->characterId()->value ?? ''] ?? null,
                 moderatesCharacter: $moderated[$post->characterId()->value ?? ''] ?? false,
-                authorHidden: ! $own && ! $moderates && (($characters[$post->characterId()->value ?? ''] ?? null)?->isNpc() ?? false)
-                    && ! ($moderated[$post->characterId()->value ?? ''] ?? false),
+                authorHidden: ! $own && ! $moderates && ($character = $characters[$post->characterId()->value ?? ''] ?? null) instanceof Character
+                    && self::hidesWriter($character, $moderated[$post->characterId()->value ?? ''] ?? false),
                 replyCount: $replies[$post->id()->value] ?? 0,
             );
         }, $posts);
+    }
+
+    /**
+     * The one rule that says a character hides the account behind its posts: a shared one, for
+     * a reader who does not moderate it. (Whoever wrote the post, or moderates the discussion,
+     * knows the writer either way: that is decided where the post is read.)
+     */
+    private static function hidesWriter(Character $character, bool $readerModeratesIt): bool
+    {
+        return $character->isNpc() && ! $readerModeratesIt;
     }
 
     /**
@@ -103,7 +113,7 @@ final readonly class PostContentPresenter
         $hiding = [];
         $found = $this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids))));
         foreach ($found as $id => $character) {
-            if ($character->isNpc() && $this->characterRules->maySee($reader, $character) && ! $this->characterRules->moderates($reader, $character)) {
+            if ($this->characterRules->maySee($reader, $character) && self::hidesWriter($character, $this->characterRules->moderates($reader, $character))) {
                 $hiding[] = (string) $id;
             }
         }

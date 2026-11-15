@@ -19,6 +19,7 @@ use Modules\Forum\Application\Queries\DiscussionListPageDTO;
 use Modules\Forum\Application\Queries\DiscussionRowDTO;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
 use Modules\Forum\Application\Services\PostReferenceLabels;
+use Modules\Forum\Http\Controllers\DiscussionController;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -284,7 +285,7 @@ final readonly class ForumPresenter
     {
         // One person's messages: the page is its place among them, never a post's number
         if ($page->filtered) {
-            $query = ['autor' => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
+            $query = [DiscussionController::AUTHOR_QUERY => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
 
             return $this->urls->discussion($page->discussion, absolute: $absolute).'?'.http_build_query($query);
         }

@@ -149,6 +149,18 @@ final readonly class ConversationReader
         $count = count($numbers);
         $pageStart = (min(max(1, $page), intdiv(max(0, $count - 1), $perPage) + 1) - 1) * $perPage + 1;
         $posts = $this->posts->withNumbers($id, array_slice($numbers, $pageStart - 1, $perPage));
+        $moderates = $this->access->canModerate($reader, $discussion);
+
+        // As in the discussion, the posts awaiting approval of that person come last: only for
+        // them and for moderation, and they are not counted, for they have no place yet
+        $readerId = ForumBrowser::accountId($reader);
+        if ($authorId !== null && $pageStart + $perPage > $count && $readerId !== null && ($moderates || $readerId === $authorId)) {
+            foreach ($this->posts->pendingIn($id) as $pending) {
+                if ($pending->authorId() === $authorId) {
+                    $posts[] = $pending;
+                }
+            }
+        }
 
         return new ConversationPageDTO(
             discussion: $discussion,
@@ -162,7 +174,7 @@ final readonly class ConversationReader
             focusNumber: null,
             lastReadNumber: null,
             canPost: $this->posting->canPost($reader, $discussion),
-            canModerate: $this->access->canModerate($reader, $discussion),
+            canModerate: $moderates,
             guestsRead: $this->access->canRead(null, $discussion),
             filtered: true,
             filterAuthorId: $authorId,

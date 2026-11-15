@@ -12,7 +12,10 @@ use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
+use App\Application\Services\UserServiceInterface;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Repositories\PostRepositoryInterface;
+use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Tests\Support\BuildsCharacters;
@@ -50,8 +53,8 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
         $this->useUtcStorage();
         config(['modules.settings.forum.posts_per_page' => 10]);
         $this->category = $this->aCategoryFor(CategoryAudience::everyone(), 'general');
-        $this->ana = UserModel::factory()->create(['name' => 'Ana', 'display_name' => 'Ana']);
-        $this->luis = UserModel::factory()->create(['name' => 'Luis', 'display_name' => 'Luis']);
+        $this->ana = UserModel::factory()->create(['name' => 'ana.login', 'display_name' => 'Ana']);
+        $this->luis = UserModel::factory()->create(['name' => 'luis.login', 'display_name' => 'Luis']);
         // Ana wrote the odd numbers of 1 to 25 (the opening one too), Luis the even ones of 2 to 24
         [$this->discussion] = $this->aDiscussion($this->category, authorId: $this->ana->id);
         for ($number = 2; $number <= 25; $number++) {
@@ -183,6 +186,115 @@ final class DiscussionAuthorFilterTest extends ModuleTestCase
     {
         $this->get($this->discussionUrl())
             ->assertInertia(fn (Assert $page) => $page->where('filter', null)->etc());
+    }
+
+    public function test_the_notice_names_the_public_name_not_the_login(): void
+    {
+        $this->get($this->url($this->ana->id))
+            ->assertInertia(fn (Assert $page) => $page->where('filter.authorName', 'Ana')->etc());
+    }
+
+    public function test_an_empty_or_upper_case_author_is_handled(): void
+    {
+        $this->get($this->discussionUrl().'?autor=')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('posts', [])->where('filter.count', 0)->etc());
+
+        $upper = strtoupper($this->ana->id);
+        $this->get($this->url($upper))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filter.count', 13)
+                ->where('pagination.nextUrl', $this->url(strtolower($this->ana->id)).'&pagina=2')
+                ->etc());
+    }
+
+    public function test_an_anonymized_account_keeps_its_messages_under_the_anonymous_name_as_in_the_discussion(): void
+    {
+        app(UserServiceInterface::class)->anonymize($this->ana->id);
+
+        $this->get($this->url($this->ana->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filter.authorName', 'Anónimo')->where('filter.count', 13)->where('posts.0.authorName', 'Anónimo')->etc());
+    }
+
+    public function test_a_deactivated_account_keeps_its_messages_under_its_name(): void
+    {
+        $this->luis->delete();
+
+        $this->get($this->url($this->luis->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filter.authorName', 'Luis')->where('filter.count', 12)->etc());
+    }
+
+    public function test_hidden_and_deleted_messages_count_as_in_the_discussion_but_only_their_readers_read_them(): void
+    {
+        $repository = app(PostRepositoryInterface::class);
+        $hidden = $repository->withNumbers($this->discussion->id(), [3])[0];
+        $hidden->hide('Spoiler');
+        $repository->save($hidden);
+        $deleted = $repository->withNumbers($this->discussion->id(), [5])[0];
+        $deleted->deleteByAuthor(new DateTimeImmutable('2026-11-11 10:00:00'));
+        $repository->save($deleted);
+
+        // A stranger sees the marker of each, without its content, and they count
+        $this->actingAs($this->luis)->get($this->url($this->ana->id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filter.count', 13)
+                ->where('posts.1.number', 3)->where('posts.1.status', 'hidden')->where('posts.1.html', null)->where('posts.1.placeholder', fn ($text): bool => $text !== null)
+                ->where('posts.2.number', 5)->where('posts.2.status', 'deleted')->where('posts.2.html', null)
+                ->etc());
+
+        // The author reads the hidden one (not the one they deleted); moderation reads both
+        $this->actingAs($this->ana)->get($this->url($this->ana->id))
+            ->assertInertia(fn (Assert $page) => $page->where('posts.1.html', fn ($html): bool => is_string($html) && str_contains($html, 'Mensaje 3'))->where('posts.2.html', null)->etc());
+        $this->actingAs($this->anAccount(CategoryAccessPolicy::MODERATE_FORUM))->get($this->url($this->ana->id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('posts.1.html', fn ($html): bool => is_string($html) && str_contains($html, 'Mensaje 3'))
+                ->where('posts.2.html', fn ($html): bool => is_string($html) && str_contains($html, 'Mensaje 5'))
+                ->etc());
+    }
+
+    public function test_messages_awaiting_approval_come_last_for_their_author_and_moderation_and_are_not_counted(): void
+    {
+        $pending = app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->ana->id), self::aBody('Pendiente de Ana'), new DateTimeImmutable('2026-11-11 09:00:00'), true);
+        $this->assertNull($pending->number());
+        $moderator = $this->anAccount(CategoryAccessPolicy::MODERATE_FORUM);
+
+        foreach ([$this->ana, $moderator] as $reader) {
+            // Not on the first page: they go with the last one, as in the discussion
+            $this->actingAs($reader)->get($this->url($this->ana->id))
+                ->assertInertia(fn (Assert $page) => $page->where('filter.count', 13)->where('posts', fn ($posts): bool => $posts->pluck('number')->all() === [1, 3, 5, 7, 9, 11, 13, 15, 17, 19])->etc());
+            $this->actingAs($reader)->get($this->url($this->ana->id).'&pagina=2')
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('filter.count', 13)
+                    ->where('posts', fn ($posts): bool => $posts->pluck('number')->all() === [21, 23, 25, null])
+                    ->where('posts.3.status', 'pending')
+                    ->etc());
+        }
+
+        // Somebody else does not see it
+        $this->actingAs($this->luis)->get($this->url($this->ana->id).'&pagina=2')
+            ->assertInertia(fn (Assert $page) => $page->where('posts', fn ($posts): bool => $posts->pluck('number')->all() === [21, 23, 25])->etc());
+    }
+
+    public function test_the_address_of_a_merged_discussion_keeps_the_filter(): void
+    {
+        $moderator = $this->anAccount('forum:forum.moderate');
+        [$into] = $this->aDiscussion($this->category, '2026-11-12 10:00:00', title: 'Destino');
+        app(ForumModeration::class)->merge($moderator, $this->discussion->id(), $into->id());
+
+        $this->get($this->url($this->ana->id))
+            ->assertRedirect($this->discussionUrl($into).'?autor='.$this->ana->id)
+            ->assertStatus(301);
+    }
+
+    public function test_a_wrong_slug_redirects_to_the_right_one_keeping_the_filter_and_the_page(): void
+    {
+        $number = (int) $this->discussion->number();
+
+        $this->get("/foro/t/{$number}-otro-titulo?autor={$this->ana->id}&pagina=2")
+            ->assertStatus(301)
+            ->assertRedirect($this->discussionUrl().'?autor='.$this->ana->id.'&pagina=2');
     }
 
     private function postAs(UserModel $author, string $text, ?Character $as = null): Post

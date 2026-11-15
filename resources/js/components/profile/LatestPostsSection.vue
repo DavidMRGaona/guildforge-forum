@@ -14,7 +14,7 @@ defineProps<{
 </script>
 
 <template>
-    <ul class="divide-y divide-default">
+    <ul class="divide-y divide-[var(--color-border)]">
         <li
             v-for="post in posts"
             :key="post.url"

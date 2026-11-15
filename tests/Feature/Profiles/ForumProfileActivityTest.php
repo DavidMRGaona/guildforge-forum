@@ -15,6 +15,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserProfileModel;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
@@ -378,11 +379,29 @@ final class ForumProfileActivityTest extends ModuleTestCase
                 ->where('profile.sections.main.0.component', 'components/profile/LatestPostsSection.vue')
                 ->where('profile.sections.main.0.label', 'Últimos mensajes en el foro')
                 ->where('profile.sections.main.0.props.posts.0.excerpt', 'Respuesta')
-                ->where('profile.stats', fn ($stats): bool => collect($stats)->mapWithKeys(fn (array $stat): array => [$stat['key'] => [$stat['label'], $stat['value'], $stat['url']]])->only([self::POSTS, self::TOPICS])->all() === [
+                ->where('profile.stats', fn (Collection $stats): bool => $this->forumStats($stats->all()) === [
                     self::POSTS => ['Mensajes en el foro', 2, null],
                     self::TOPICS => ['Temas abiertos', 1, null],
                 ])
                 ->etc());
+    }
+
+    /**
+     * The forum's counters on the page, by key: label, value and link.
+     *
+     * @param  array<array-key, mixed>  $stats
+     * @return array<string, list<mixed>>
+     */
+    private function forumStats(array $stats): array
+    {
+        $found = [];
+        foreach ($stats as $stat) {
+            if (is_array($stat) && in_array($stat['key'] ?? null, [self::POSTS, self::TOPICS], true)) {
+                $found[(string) $stat['key']] = [$stat['label'] ?? null, $stat['value'] ?? null, $stat['url'] ?? null];
+            }
+        }
+
+        return $found;
     }
 
     private function render(?Authenticatable $viewer, ?ProfileOwnerDTO $owner = null): ResolvedProfileDTO

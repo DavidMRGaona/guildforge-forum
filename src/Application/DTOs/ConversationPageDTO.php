@@ -14,6 +14,11 @@ use Modules\Forum\Domain\ValueObjects\DiscussionTopic;
  * (1–20, 21–40…), so a link to a number always opens the same page; where moderation moved
  * posts away the page holds fewer, and `moved` says where they went. `focusNumber` is the post
  * the page should scroll to: the one asked for, or the first the reader has not read.
+ *
+ * A page of one person's messages (`filtered`) is the same thing counted by their messages:
+ * `highestNumber` is how many the reader may see, `pageStart` the place of the page's first
+ * one among them (1, 21…), and there is no mark of reading, no focus and no moved posts.
+ * `filterAuthorId` is the person asked for, when what was asked for is an account id at all.
  */
 final readonly class ConversationPageDTO
 {
@@ -40,6 +45,8 @@ final readonly class ConversationPageDTO
         public bool $guestsRead,
         public array $moved = [],
         public array $pageAnchors = [],
+        public bool $filtered = false,
+        public ?string $filterAuthorId = null,
     ) {}
 
     /**

@@ -53,6 +53,9 @@ final class DiscussionController extends Controller
 {
     use RespondsWithForumErrors;
 
+    /** The query that shows one person's messages of a discussion */
+    public const string AUTHOR_QUERY = 'autor';
+
     public function __construct(
         private readonly DiscussionRepositoryInterface $discussions,
         private readonly ConversationReader $reader,
@@ -92,8 +95,15 @@ final class DiscussionController extends Controller
         $place = $request->query(ForumPresenter::PAGE_QUERY);
         $place = $post === null && is_string($place) && preg_match('/^[1-9][0-9]{0,5}$/', $place) === 1 ? (int) $place : null;
 
+        // One person's messages (?autor=): only for the discussion's own address, never for a post's.
+        // Whatever it holds is asked as it is: what is not an account's id is just a person without messages
+        $filtered = $post === null && $request->query->has(self::AUTHOR_QUERY);
+        $author = $request->query(self::AUTHOR_QUERY);
+
         try {
-            $page = $this->reader->open($user, $found->id(), $post === null ? null : (int) $post, $place);
+            $page = $filtered
+                ? $this->reader->openByAuthor($user, $found->id(), is_string($author) ? $author : '', $place ?? 1)
+                : $this->reader->open($user, $found->id(), $post === null ? null : (int) $post, $place);
         } catch (DiscussionNotFoundException) {
             abort(404);
         }
@@ -102,10 +112,10 @@ final class DiscussionController extends Controller
         $asked = $post === null ? null : (int) $post;
         $landed = $asked === null ? null : $page->focusNumber;
         if ($discussion !== DiscussionSlug::segment((int) $found->number(), $found->title()->value) || ($asked !== null && ($landed !== $asked || $asked === 1))) {
-            return redirect()->to($this->urls->discussion($found, $landed), 301);
+            return redirect()->to($this->urls->discussion($found, $landed).($filtered ? '?'.http_build_query($request->query()) : ''), 301);
         }
         // A page asked for by its place that has posts after all goes by its usual address
-        if ($place !== null && $page->anchorOf($page->pageStart) !== null) {
+        if (! $filtered && $place !== null && $page->anchorOf($page->pageStart) !== null) {
             return redirect()->to($this->presenter->pageUrl($page, $page->pageStart), 301);
         }
 
@@ -114,10 +124,13 @@ final class DiscussionController extends Controller
         $seo = $this->seo->forPage(new SeoPageDTO(
             title: $found->title()->value,
             description: $first instanceof Post && $first->number()?->value === 1 && $first->isVisible() ? Str::limit($first->body()->plainText, 300) : null,
-            noindex: ! $page->guestsRead,
+            // A person's messages are a view of the discussion, not a page of their own
+            noindex: ! $page->guestsRead || $filtered,
         ))->toArray();
         // Each page of posts is one address, whichever of its posts was asked for
-        $seo['canonicalUrl'] = $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
+        $seo['canonicalUrl'] = $filtered
+            ? $this->urls->discussion($found, absolute: true)
+            : $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
 
         $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
         $conversation['posts'] = $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($conversation['posts'], $user), $user);
@@ -133,7 +146,8 @@ final class DiscussionController extends Controller
                 // «Hablar como»: the characters the reader may write as here
                 'characters' => $page->canPost ? $this->characters->picker($user, $page->category, $found->id()) : null,
             ],
-            'readUrl' => $user === null ? null : route('forum.discussions.read', ['discussion' => $found->id()->value]),
+            // A page of one person's messages leaves gaps: it never marks anything read
+            'readUrl' => $user === null || $filtered ? null : route('forum.discussions.read', ['discussion' => $found->id()->value]),
             'moderation' => $page->canModerate && $user !== null ? $this->moderationMenu($user, $page->discussion) : null,
             'seo' => $seo,
         ]);

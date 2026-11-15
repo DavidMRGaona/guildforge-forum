@@ -66,6 +66,15 @@ interface PostRepositoryInterface
     public function numberedBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): array;
 
     /**
+     * The numbered posts of the discussion written by the account, whatever their status and
+     * the character they speak as: each number with the id of that character (null out of
+     * character), in order. Only references: the page loads the posts it shows by number.
+     *
+     * @return array<int, string|null> character id by post number
+     */
+    public function charactersByNumberOf(DiscussionId $discussionId, string $authorId): array;
+
+    /**
      * The lowest number of a numbered post of the discussion in the range (both ends included);
      * null when every number of it moved away.
      */

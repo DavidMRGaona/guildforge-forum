@@ -6,6 +6,7 @@ import type { JSONContent } from '@tiptap/core';
 import { EyeOff, Lock, Pin } from '@lucide/vue';
 import { FormCheckbox } from '@/components/form';
 import { useAuth } from '@/composables/useAuth';
+import AuthorFilterNotice from '../../components/forum/AuthorFilterNotice.vue';
 import FollowSelect from '../../components/forum/FollowSelect.vue';
 import MovedPostsNotice from '../../components/forum/MovedPostsNotice.vue';
 import ForumBreadcrumbs from '../../components/forum/ForumBreadcrumbs.vue';
@@ -25,6 +26,7 @@ import { DISCUSSION_EVENTS, discussionChannel, useChannelFeed } from '../../live
 import { liveNewPosts } from '../../live/transports';
 import { sendJson } from '../../forum/api';
 import type {
+    ForumAuthorFilter,
     ForumConversation,
     ForumDiscussionModeration,
     ForumMovedPosts,
@@ -39,6 +41,8 @@ const props = defineProps<{
     /** Where posts of this page's numbers went, when moderation moved them away */
     moved?: ForumMovedPosts[];
     pagination: ForumPagination;
+    /** Set when the page shows one person's messages only */
+    filter?: ForumAuthorFilter | null;
     focusNumber: number | null;
     lastReadNumber: number | null;
     mentionNames: Record<string, string>;
@@ -62,6 +66,8 @@ const breadcrumbs = computed(() => [
 ]);
 
 const isLastPage = computed(() => props.pagination.nextUrl === null);
+// The end of the discussion is where what comes in goes: not on a page of one person's messages
+const atTheEnd = computed(() => isLastPage.value && !props.filter);
 
 const tracker = useReadTracker({
     readUrl: props.readUrl,
@@ -69,7 +75,7 @@ const tracker = useReadTracker({
     container: list,
     // The address follows the post at the top of the screen, without a new history entry
     onTopPost: (url) => {
-        if (window.location.pathname !== url) {
+        if (!props.filter && window.location.pathname !== url) {
             window.history.replaceState(window.history.state, '', url);
         }
     },
@@ -84,7 +90,7 @@ const channel = useChannelFeed(() => discussionChannel(props.discussion.id), DIS
 const live = useNewPosts({
     posts: () => props.posts,
     transport: liveNewPosts(props.discussion.id, channel),
-    enabled: isLastPage,
+    enabled: atTheEnd,
 });
 // Following, mentioning or moderating from this page also learns that it was merged
 provideMergedDiscussion((target) => live.markMerged(target));
@@ -295,6 +301,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 {{ t('forum.moderation.discussion.splitChoosingHelp') }}
             </p>
         </div>
+        <AuthorFilterNotice v-if="filter" :filter="filter" />
         <nav
             v-if="pagination.pageCount > 1"
             :aria-label="t('forum.posts.pagesTop')"
@@ -379,7 +386,7 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 </template>
             </div>
             <NewPostsNotice :posts="live.unseen.value" @acknowledge="live.acknowledge" />
-            <TypingNotice v-if="isLastPage" :people="typing.people.value" />
+            <TypingNotice v-if="atTheEnd" :people="typing.people.value" />
             <MergedNotice :target="live.mergedInto.value" />
         </div>
 
@@ -426,9 +433,9 @@ async function send(document: JSONContent, characterId: string | null): Promise<
                 :sending="sending"
                 :error="replyError"
                 @submit="send"
-                @typing="isLastPage && typing.notify()"
+                @typing="atTheEnd && typing.notify()"
             >
-                <template v-if="!isLastPage" #intro>
+                <template v-if="!atTheEnd" #intro>
                     <p class="text-sm text-base-secondary">
                         {{ t('forum.posts.replyGoesLast') }}
                     </p>

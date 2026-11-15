@@ -90,6 +90,28 @@ final readonly class PostContentPresenter
     }
 
     /**
+     * Which of these characters hide the account that wrote a post from this reader: a shared
+     * one the reader does not moderate, seen as the post shows it. The one rule that says a
+     * post's writer is not shown, for whoever is neither its author nor a moderator of the
+     * discussion (they know the writer either way).
+     *
+     * @param  list<string>  $ids  character ids
+     * @return list<string> of those ids
+     */
+    public function hidingTheirWriter(?Authenticatable $reader, array $ids): array
+    {
+        $hiding = [];
+        $found = $this->characters->findMany(array_map(CharacterId::fromString(...), array_values(array_unique($ids))));
+        foreach ($found as $id => $character) {
+            if ($character->isNpc() && $this->characterRules->maySee($reader, $character) && ! $this->characterRules->moderates($reader, $character)) {
+                $hiding[] = (string) $id;
+            }
+        }
+
+        return $hiding;
+    }
+
+    /**
      * The characters the posts speak as that the reader may see, by id. A post whose character
      * the reader may not see shows its account, as one out of character.
      *

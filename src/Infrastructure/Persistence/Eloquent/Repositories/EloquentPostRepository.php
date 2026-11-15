@@ -125,6 +125,22 @@ final readonly class EloquentPostRepository implements PostRepositoryInterface
             ->all());
     }
 
+    public function charactersByNumberOf(DiscussionId $discussionId, string $authorId): array
+    {
+        $found = [];
+        foreach (PostModel::query()
+            ->where('discussion_id', $discussionId->value)
+            ->where('author_id', $authorId)
+            ->whereNotNull('number')
+            ->orderBy('number')
+            ->get(['number', 'character_id']) as $row) {
+            $character = $row->getAttribute('character_id');
+            $found[(int) $row->getAttribute('number')] = is_string($character) ? $character : null;
+        }
+
+        return $found;
+    }
+
     public function firstNumberBetween(DiscussionId $discussionId, PostNumber $from, PostNumber $through): ?PostNumber
     {
         $first = PostModel::query()

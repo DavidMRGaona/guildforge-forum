@@ -157,6 +157,11 @@ export default {
             next: 'Siguiente',
             last: 'Última',
             pageOf: 'Página {page} de {count}',
+            authorFilter: {
+                showing: 'Mostrando un mensaje de {name} | Mostrando {count} mensajes de {name}',
+                none: 'Este tema no tiene mensajes visibles de esa persona.',
+                clear: 'Ver todo el tema',
+            },
             errors: {
                 save: 'No se ha podido guardar el mensaje. Inténtalo de nuevo.',
                 delete: 'No se ha podido borrar el mensaje. Inténtalo de nuevo.',

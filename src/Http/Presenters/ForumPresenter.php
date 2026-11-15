@@ -209,6 +209,7 @@ final readonly class ForumPresenter
         }
 
         $pageUrl = fn (int $start): string => $this->pageUrl($page, $start);
+        $firstUrl = $page->filtered ? $pageUrl(1) : $this->urls->discussion($discussion);
         $lastStart = ($page->pageCount() - 1) * $page->perPage + 1;
 
         return [
@@ -232,7 +233,7 @@ final readonly class ForumPresenter
                 'pageCount' => $page->pageCount(),
                 'perPage' => $page->perPage,
                 'highestNumber' => $page->highestNumber,
-                'firstUrl' => $page->hasPrevious() ? $this->urls->discussion($discussion) : null,
+                'firstUrl' => $page->hasPrevious() ? $firstUrl : null,
                 'previousUrl' => $page->hasPrevious() ? $pageUrl(max(1, $page->pageStart - $page->perPage)) : null,
                 'nextUrl' => $page->hasNext() ? $pageUrl($page->pageStart + $page->perPage) : null,
                 'lastUrl' => $page->hasNext() ? $pageUrl($lastStart) : null,
@@ -245,10 +246,33 @@ final readonly class ForumPresenter
                 'title' => $moved->target?->title()->value,
                 'url' => $moved->target instanceof Discussion ? $this->urls->discussion($moved->target, $moved->targetNumber) : null,
             ], $page->moved),
+            // One person's messages only (?autor=): who, how many and the way back to the whole discussion
+            'filter' => $page->filtered ? [
+                'authorName' => $this->filteredAuthorName($page, $posts),
+                'count' => $page->highestNumber,
+                'clearUrl' => $this->urls->discussion($discussion),
+            ] : null,
             'focusNumber' => $page->focusNumber,
             'lastReadNumber' => $page->lastReadNumber,
             'mentionNames' => $mentionNames,
         ];
+    }
+
+    /**
+     * Who the filtered messages are by, as the page shows them: only when it shows any (every
+     * one of them already names its writer), so nothing is said about a person without messages.
+     *
+     * @param  list<array<string, mixed>>  $posts  as `posts()` built them
+     */
+    private function filteredAuthorName(ConversationPageDTO $page, array $posts): ?string
+    {
+        foreach ($posts as $post) {
+            if ($post['authorId'] === $page->filterAuthorId && is_string($post['authorName'])) {
+                return $post['authorName'];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -258,6 +282,13 @@ final readonly class ForumPresenter
      */
     public function pageUrl(ConversationPageDTO $page, int $start, bool $absolute = false): string
     {
+        // One person's messages: the page is its place among them, never a post's number
+        if ($page->filtered) {
+            $query = ['autor' => $page->filterAuthorId, ...($start > 1 ? [self::PAGE_QUERY => intdiv($start - 1, $page->perPage) + 1] : [])];
+
+            return $this->urls->discussion($page->discussion, absolute: $absolute).'?'.http_build_query($query);
+        }
+
         $anchor = $page->anchorOf($start);
         if ($anchor !== null) {
             return $this->urls->discussion($page->discussion, $anchor, $absolute);

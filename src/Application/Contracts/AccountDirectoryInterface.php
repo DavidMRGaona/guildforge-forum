@@ -21,6 +21,17 @@ interface AccountDirectoryInterface
     public function namesOf(array $accountIds): array;
 
     /**
+     * The public names (`display_name`) of those accounts that have one, never the account name
+     * `namesOf()` falls back to; an anonymized account keeps its generic name, which tells
+     * nothing. What names the writer of a post that speaks, or spoke, as a character
+     * (forum#139). Deactivated accounts included, like `namesOf()`.
+     *
+     * @param  list<string>  $accountIds
+     * @return array<string, string> by account id
+     */
+    public function publicNamesOf(array $accountIds): array;
+
+    /**
      * Those of the ids that may be mentioned: accounts that exist and are neither deactivated
      * nor anonymized.
      *

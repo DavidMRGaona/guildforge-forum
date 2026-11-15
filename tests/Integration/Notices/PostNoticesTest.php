@@ -127,6 +127,30 @@ final class PostNoticesTest extends ModuleTestCase
         $this->assertNull($line->actor_id);
     }
 
+    public function test_a_reply_as_a_personal_character_of_someone_without_public_name_names_the_character(): void
+    {
+        app(MailPreferenceServiceInterface::class)->update($this->follower, [ForumMailCategories::REPLIES => MailDelivery::Digest]);
+        $arwen = $this->aCharacterOf($this->author->id);
+
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->author->id), $this->body('Llego al alba'), CarbonImmutable::now(), needsApproval: false, characterId: $arwen->id());
+
+        $notice = $this->latest($this->follower);
+        $this->assertSame('Arwen ha respondido en «La tumba»', $notice->title);
+        $this->assertStringNotContainsString('Ana', $notice->title.$notice->body);
+        $line = DB::table('user_mail_digest_items')->where('user_id', $this->follower->id)->sole();
+        $this->assertNull($line->actor_id);
+    }
+
+    public function test_a_reply_as_a_personal_character_names_its_writers_public_name_when_there_is_one(): void
+    {
+        $this->author->forceFill(['display_name' => 'Anita'])->save();
+        $arwen = $this->aCharacterOf($this->author->id);
+
+        app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->author->id), $this->body('Llego al alba'), CarbonImmutable::now(), needsApproval: false, characterId: $arwen->id());
+
+        $this->assertSame('Anita ha respondido en «La tumba»', $this->latest($this->follower)->title);
+    }
+
     public function test_a_reply_line_of_the_digest_names_who_wrote_and_goes_when_that_account_is_anonymized(): void
     {
         app(MailPreferenceServiceInterface::class)->update($this->follower, [ForumMailCategories::REPLIES => MailDelivery::Digest]);

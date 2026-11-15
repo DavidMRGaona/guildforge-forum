@@ -109,6 +109,10 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
             ->leftJoin('forum_characters as lc', static function (JoinClause $join): void {
                 $join->on('lc.id', '=', 'p.character_id')->whereNull('lc.owner_id');
             })
+            // The first post, for the character its author may have opened it as (forum#139)
+            ->leftJoin('forum_posts as fp', static function (JoinClause $join): void {
+                $join->on('fp.discussion_id', '=', 'd.id')->where('fp.number', '=', 1);
+            })
             ->whereIn('d.category_id', $criteria->categoryIds)
             // A discussion with no visible post (its first awaits approval) is not listed yet
             ->where('d.post_count', '>', 0)
@@ -118,6 +122,8 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
             ->select([
                 'd.id', 'd.number', 'd.title', 'd.category_id', 'd.author_id', 'd.status', 'd.is_pinned', 'd.is_hidden',
                 'd.post_count', 'd.last_activity_at', 'd.created_at', 'p.number as last_post_number', 'p.author_id as last_post_author_id', 'lc.name as last_post_shared_name',
+                'p.character_id as last_post_character_id', 'p.character_removed as last_post_character_removed',
+                'fp.author_id as starter_author_id', 'fp.character_id as starter_character_id', 'fp.character_removed as starter_character_removed',
             ]);
 
         $moderated = $criteria->moderatedCategoryIds;
@@ -198,7 +204,21 @@ final readonly class EloquentDiscussionListQuery implements DiscussionListQueryI
             topics: $topics[strtolower((string) $row->id)] ?? [],
             lastReadNumber: $this->readThrough($row),
             lastPostSharedName: $row->last_post_shared_name === null ? null : (string) $row->last_post_shared_name,
+            lastPostCharacterId: $row->last_post_character_id === null ? null : strtolower((string) $row->last_post_character_id),
+            lastPostCharacterRemoved: (bool) $row->last_post_character_removed,
+            starterCharacterId: $this->startedByTheAuthor($row) && $row->starter_character_id !== null ? strtolower((string) $row->starter_character_id) : null,
+            starterCharacterRemoved: $this->startedByTheAuthor($row) && (bool) $row->starter_character_removed,
         ), $rows));
+    }
+
+    /**
+     * Whether the first post is by the discussion's author: after a split or a merge it may not
+     * be, and then its character says nothing about how the author is named.
+     */
+    private function startedByTheAuthor(stdClass $row): bool
+    {
+        return $row->author_id !== null && $row->starter_author_id !== null
+            && strtolower((string) $row->author_id) === strtolower((string) $row->starter_author_id);
     }
 
     /**

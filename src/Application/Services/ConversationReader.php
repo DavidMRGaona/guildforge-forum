@@ -120,7 +120,8 @@ final readonly class ConversationReader
      * anything: an id that is not an account's, or one without messages, gives the same empty
      * page, so nothing tells who exists. A message that speaks as a shared character hides its
      * writer, so it does not count either, except for its writer and for moderation, as in the
-     * discussion itself.
+     * discussion itself; nor do those as a personal character (or a deleted one) of someone
+     * without a public name, which never name the account (forum#139).
      *
      * @throws DiscussionNotFoundException when the reader may not read it
      */
@@ -139,7 +140,12 @@ final readonly class ConversationReader
         if ($authorId !== null) {
             $characters = $this->posts->charactersByNumberOf($id, $authorId);
             $hiding = array_flip($this->presenter->charactersHidingTheirWriter($reader, $readerId === $authorId, $moderates, array_values(array_filter($characters))));
+            $inCharacter = $this->presenter->hidesCharacterPostsOf($authorId, $readerId === $authorId, $moderates);
+            $removed = $inCharacter ? array_flip($this->posts->removedCharacterNumbersOf($id, $authorId)) : [];
             foreach ($characters as $number => $character) {
+                if ($inCharacter && ($character !== null || isset($removed[$number]))) {
+                    continue;
+                }
                 if ($character === null || ! isset($hiding[$character])) {
                     $numbers[] = $number;
                 }

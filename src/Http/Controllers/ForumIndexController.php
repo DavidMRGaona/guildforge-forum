@@ -39,7 +39,7 @@ final class ForumIndexController extends Controller
         $readable = $this->browser->readableCategories($reader);
 
         return Inertia::render('Forum/Index', [
-            'categories' => $this->presenter->categoryTree($readable),
+            'categories' => $this->presenter->categoryTree($readable, reader: $reader),
             ...$this->listProps($request, $readable, pinnedFirst: false, baseUrl: $this->urls->index()),
             'search' => $this->presenter->searchBox($readable),
             'canStart' => array_filter($readable, static fn (CategoryAccessDTO $access): bool => $access->canStartDiscussions()) !== [],

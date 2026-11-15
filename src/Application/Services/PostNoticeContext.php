@@ -10,6 +10,8 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\PostNoticeDTO;
+use Modules\Forum\Application\DTOs\PostWriterDTO;
+use Modules\Forum\Application\DTOs\WriterNameDTO;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
@@ -39,6 +41,7 @@ final readonly class PostNoticeContext
         private AccountDirectoryInterface $accounts,
         private ForumUrlsInterface $urls,
         private CharacterRepositoryInterface $characters,
+        private CharacterWriterNames $writerNames,
     ) {}
 
     /**
@@ -67,17 +70,25 @@ final readonly class PostNoticeContext
         // A post that speaks as a shared character names it, never the account that wrote it
         $shared = $post->characterId() instanceof CharacterId ? $this->characters->find($post->characterId()) : null;
         $shared = $shared instanceof Character && $shared->isNpc() ? $shared : null;
+        // As a personal character, never the account of someone without a public name (forum#139):
+        // the character, or nobody in particular when the person may not see it
+        $inCharacter = $shared instanceof Character ? null : ($this->writerNames->namesFor([new PostWriterDTO($authorId, $post->characterId()?->value, $post->spokeAsRemovedCharacter())], $notifiable)[0] ?? null);
+        $unnamed = $inCharacter instanceof WriterNameDTO && ! $inCharacter->isPublicName;
 
         return new PostNoticeDTO(
             post: $post,
             discussion: $discussion,
             category: $category,
             recipientId: $recipientId,
-            authorName: $shared instanceof Character ? $shared->name() : ($authorId === null ? null : ($this->accounts->namesOf([$authorId])[$authorId] ?? null)),
+            authorName: match (true) {
+                $shared instanceof Character => $shared->name(),
+                $unnamed => $inCharacter->seenCharacter instanceof Character ? $inCharacter->name : null,
+                default => $authorId === null ? null : ($this->accounts->namesOf([$authorId])[$authorId] ?? null),
+            },
             excerpt: Str::limit(trim((string) preg_replace('/\s+/u', ' ', $post->body()->plainText)), self::EXCERPT_LENGTH),
             path: $this->urls->discussion($discussion, $number),
             url: $this->urls->discussion($discussion, $number, absolute: true),
-            anonymousAuthor: $shared instanceof Character,
+            anonymousAuthor: $shared instanceof Character || $unnamed,
         );
     }
 

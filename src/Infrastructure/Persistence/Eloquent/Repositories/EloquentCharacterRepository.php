@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Exceptions\CharacterNotFoundException;
@@ -144,8 +145,13 @@ final class EloquentCharacterRepository implements CharacterRepositoryInterface
 
     public function delete(CharacterId $id): void
     {
-        // Through the model, so the media library is told
-        CharacterModel::query()->find($id->value)?->delete();
+        DB::transaction(static function () use ($id): void {
+            // Before the foreign key empties `character_id`: afterwards nothing tells these posts
+            // from those written out of character. No timestamps: nothing in the post changed
+            PostModel::query()->where('character_id', $id->value)->toBase()->update(['character_removed' => true]);
+            // Through the model, so the media library is told
+            CharacterModel::query()->find($id->value)?->delete();
+        });
     }
 
     private function toEntity(CharacterModel $model): Character

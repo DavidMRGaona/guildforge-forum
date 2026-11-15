@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Modules\Forum\Domain\Entities\Post;
 use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Domain\Exceptions\InvalidPostException;
+use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
@@ -172,6 +173,18 @@ final class PostTest extends TestCase
 
         $this->assertSame('Corregido', $post->body()->plainText);
         $this->assertEquals($at, $post->editedAt());
+    }
+
+    public function test_a_post_of_a_deleted_character_stays_so_until_it_speaks_as_another(): void
+    {
+        $post = new Post(PostId::generate(), DiscussionId::generate(), PostNumber::first(), null, $this->body(), PostStatus::Visible, new DateTimeImmutable, new DateTimeImmutable, characterRemoved: true);
+
+        // Kept by an edit that keeps the speaker, or that writes out of character
+        $post->edit($this->body(), new DateTimeImmutable, null);
+        $this->assertTrue($post->spokeAsRemovedCharacter());
+
+        $post->edit($this->body(), new DateTimeImmutable, CharacterId::generate());
+        $this->assertFalse($post->spokeAsRemovedCharacter());
     }
 
     public function test_a_deleted_post_is_never_edited(): void

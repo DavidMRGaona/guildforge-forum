@@ -35,7 +35,7 @@ final readonly class EloquentCategoryStatsQuery implements CategoryStatsQueryInt
                 $join->on('lc.id', '=', 'p.character_id')->whereNull('lc.owner_id');
             })
             ->whereIn('c.id', $categoryIds)
-            ->get(['c.id', 'c.discussion_count', 'c.post_count', 'c.last_activity_at', 'd.id as discussion_id', 'd.number as discussion_number', 'd.title', 'd.is_hidden', 'p.number', 'p.author_id', 'lc.name as shared_name']);
+            ->get(['c.id', 'c.discussion_count', 'c.post_count', 'c.last_activity_at', 'd.id as discussion_id', 'd.number as discussion_number', 'd.title', 'd.is_hidden', 'p.number', 'p.author_id', 'p.character_id', 'p.character_removed', 'lc.name as shared_name']);
 
         $stats = [];
         foreach ($rows as $row) {
@@ -53,6 +53,8 @@ final readonly class EloquentCategoryStatsQuery implements CategoryStatsQueryInt
                 lastPostNumber: $shown && $row->number !== null ? (int) $row->number : null,
                 lastPostAuthorId: $shown && $row->author_id !== null && $row->shared_name === null ? strtolower((string) $row->author_id) : null,
                 lastPostSharedName: $shown && $row->shared_name !== null ? (string) $row->shared_name : null,
+                lastPostCharacterId: $shown && $row->character_id !== null ? strtolower((string) $row->character_id) : null,
+                lastPostCharacterRemoved: $shown && (bool) $row->character_removed,
             );
         }
 

@@ -75,6 +75,14 @@ interface PostRepositoryInterface
     public function charactersByNumberOf(DiscussionId $discussionId, string $authorId): array;
 
     /**
+     * The numbers of the posts of the discussion written by the account that spoke as a
+     * character deleted since (forum#139), whatever their status, in order.
+     *
+     * @return list<int>
+     */
+    public function removedCharacterNumbersOf(DiscussionId $discussionId, string $authorId): array;
+
+    /**
      * The lowest number of a numbered post of the discussion in the range (both ends included);
      * null when every number of it moved away.
      */

@@ -243,6 +243,9 @@ return [
         'deleted' => 'Mensaje borrado',
         'hidden' => 'Mensaje oculto por la moderación',
         'pending' => 'Pendiente de aprobación',
+        // A post as a character whose writer has no public name (forum#139)
+        'removed_character' => 'Personaje eliminado',
+        'unavailable_character' => 'Personaje no disponible',
     ],
 
     'reports' => [
@@ -340,7 +343,7 @@ return [
             'until' => 'Hasta el :date',
             'no_end' => 'Sin fecha de fin',
             'character' => 'Personaje: :name',
-            'character_with_posts' => 'Personaje: :name (tenía mensajes, que ahora muestran la cuenta)',
+            'character_with_posts' => 'Personaje: :name (tenía mensajes, que ahora muestran el nombre público de quien lo jugaba o «Personaje eliminado»)',
         ],
         'deleted_account' => 'Cuenta eliminada',
         'nobody' => '—',

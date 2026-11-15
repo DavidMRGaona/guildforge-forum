@@ -21,6 +21,7 @@ use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\PostImageStorageInterface;
 use Modules\Forum\Application\Contracts\PostLinksInterface;
+use Modules\Forum\Application\DTOs\PostWriterDTO;
 use Modules\Forum\Domain\Entities\DiceRoll;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
@@ -58,6 +59,7 @@ final readonly class PostRenderer
         private EmbedViews $embedViews,
         private CharacterRepositoryInterface $characters,
         private HiddenRolls $hiddenRolls,
+        private CharacterWriterNames $writerNames,
     ) {}
 
     /**
@@ -191,7 +193,7 @@ final readonly class PostRenderer
 
         return new RenderContext(
             accountNames: $this->accounts->namesOf($this->distinct($accountIds)),
-            quotes: $this->quoteSources(array_intersect_key($found['readable'], array_flip($quoted))),
+            quotes: $this->quoteSources(array_intersect_key($found['readable'], array_flip($quoted)), $reader),
             imageUrl: fn (string $path): ?string => $this->images->url($path),
             rolls: $this->rollViews($this->distinct($rollIds), $reader, $offerReveal),
             embeds: $this->embedViews->for($embeds),
@@ -273,7 +275,7 @@ final readonly class PostRenderer
      * @param  array<string, array{Post, Discussion}>  $readable  the quoted posts the reader may read
      * @return array<string, QuoteSource>
      */
-    private function quoteSources(array $readable): array
+    private function quoteSources(array $readable, ?Authenticatable $reader): array
     {
         if ($readable === []) {
             return [];
@@ -288,11 +290,22 @@ final readonly class PostRenderer
             }
         }
 
+        // In character, never the account of someone without a public name (forum#139), except
+        // for the reader's own posts
+        $readerId = ForumBrowser::accountId($reader);
+        $writers = [];
+        foreach ($readable as $id => [$post]) {
+            if ($readerId === null || $post->authorId() !== $readerId) {
+                $writers[$id] = new PostWriterDTO($post->authorId(), $post->characterId()?->value, $post->spokeAsRemovedCharacter());
+            }
+        }
+        $inCharacter = $this->writerNames->namesFor($writers, $reader);
+
         $sources = [];
-        foreach ($readable as [$post, $discussion]) {
+        foreach ($readable as $id => [$post, $discussion]) {
             $sharedName = $shared[$post->characterId()->value ?? ''] ?? null;
             $sources[$post->id()->value] = new QuoteSource(
-                authorName: $sharedName ?? ($post->authorId() === null ? null : ($names[$post->authorId()] ?? null)),
+                authorName: $sharedName ?? $inCharacter[$id]->name ?? ($post->authorId() === null ? null : ($names[$post->authorId()] ?? null)),
                 url: $this->links->urlFor($post, $discussion),
             );
         }

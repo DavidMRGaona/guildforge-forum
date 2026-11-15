@@ -187,7 +187,8 @@ final readonly class CharacterService
 
     /**
      * Its owner deletes it only while no post speaks as it (otherwise it is retired); a
-     * moderator deletes any, and its posts show their account from then on.
+     * moderator deletes any. Its posts then name their writer by the public name only, or say
+     * the character was deleted (forum#139).
      *
      * @throws CharacterNotFoundException
      * @throws InvalidCharacterException when its owner deletes one with posts

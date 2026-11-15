@@ -63,7 +63,8 @@ interface CharacterRepositoryInterface
     public function lastUsedIn(DiscussionId $discussionId, string $accountId): ?CharacterId;
 
     /**
-     * Deletes it; posts that spoke as it show their account instead.
+     * Deletes it. Its posts lose the character and are marked as having spoken as a deleted one,
+     * in the same step, so they never name their writer by the account (forum#139).
      */
     public function delete(CharacterId $id): void;
 }

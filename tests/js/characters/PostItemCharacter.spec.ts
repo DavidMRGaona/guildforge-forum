@@ -76,6 +76,23 @@ describe('a post written as a character', () => {
         expect(wrapper.find('#post-2-author').text()).toContain('Arwen');
     });
 
+    it('leaves out who plays it when the server names nobody, and says so for a deleted account', () => {
+        // A writer without a public name (forum#139): the account stays, its name does not
+        const unnamed = mounted({
+            ...aPost(arwen),
+            authorId: null,
+            authorName: null,
+            writerUnnamed: true,
+        });
+        expect(unnamed.find('[data-testid="post-character"]').text()).toContain('Arwen');
+        expect(unnamed.find('[data-testid="post-character-player"]').exists()).toBe(false);
+
+        const deletedAccount = mounted({ ...aPost(arwen), authorId: null, authorName: null });
+        expect(deletedAccount.find('[data-testid="post-character-player"]').text()).toBe(
+            'por Cuenta eliminada'
+        );
+    });
+
     it('keeps the badges out of the truncated name, so on a phone they wrap whole', () => {
         const retired = mounted(aPost(arwen));
         expect(retired.find('#post-2-author .truncate').text()).toBe('Arwen');

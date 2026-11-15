@@ -206,6 +206,17 @@ const reported = ref(false);
 const suspending = ref(false);
 const suspended = ref(false);
 
+/**
+ * Whether the line under a character names who writes it. A shared PNJ names its writer only to
+ * whoever may know; a personal character names its player, except when the server names nobody
+ * for an account that still exists (no public name, forum#139). A deleted account says so.
+ */
+const namesPlayer = computed(
+    () =>
+        props.post.authorName !== null ||
+        (!props.post.character?.isShared && !props.post.writerUnnamed)
+);
+
 /** Whether the author may be suspended from here: someone else's post, by an account */
 const canSuspendAuthor = computed(
     () =>
@@ -630,7 +641,7 @@ async function remove(): Promise<void> {
                 </p>
             </header>
             <p
-                v-if="post.character"
+                v-if="post.character && (post.character.isShared || namesPlayer)"
                 class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
                 data-testid="post-character-player"
             >
@@ -645,20 +656,15 @@ async function remove(): Promise<void> {
                             : t('forum.characters.shared.badge')
                     }}
                 </span>
-                <!-- A shared PNJ names its writer only to whoever may know -->
-                <span
-                    v-if="!post.character.isShared || post.authorName !== null"
-                    class="min-w-0 truncate"
-                    >{{
-                        post.character.isShared
-                            ? t('forum.characters.shared.writtenBy', {
-                                  name: post.authorName,
-                              })
-                            : t('forum.characters.playedBy', {
-                                  name: post.authorName ?? t('forum.posts.deletedAccount'),
-                              })
-                    }}</span
-                >
+                <span v-if="namesPlayer" class="min-w-0 truncate">{{
+                    post.character.isShared
+                        ? t('forum.characters.shared.writtenBy', {
+                              name: post.authorName,
+                          })
+                        : t('forum.characters.playedBy', {
+                              name: post.authorName ?? t('forum.posts.deletedAccount'),
+                          })
+                }}</span>
             </p>
 
             <div class="mt-1">

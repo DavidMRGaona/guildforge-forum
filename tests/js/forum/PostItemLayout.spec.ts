@@ -187,13 +187,16 @@ describe('a compact post', () => {
         expect(group.classes()).not.toContain('flex-1');
     });
 
-    it('cuts the title before the name, and never the name below a few letters', () => {
+    it('cuts the title before the name, keeping a few letters of each', () => {
         const wrapper = mounted(
             aPost({ isStarter: true, authorTitle: 'Lanzador de dados oficial' })
         );
 
         expect(wrapper.get('[data-testid="post-author-name"]').classes()).toContain('min-w-[6ch]');
-        expect(wrapper.get('[data-testid="post-author-title"]').classes()).toContain('shrink-[4]');
+        // It shrinks faster than the name but never vanishes (its whole text is in its tooltip)
+        expect(wrapper.get('[data-testid="post-author-title"]').classes()).toEqual(
+            expect.arrayContaining(['shrink-[2]', 'min-w-[5ch]'])
+        );
     });
 
     it('keeps a few letters of a character name next to «Retirado»', () => {

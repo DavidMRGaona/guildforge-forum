@@ -540,10 +540,10 @@ async function remove(): Promise<void> {
                         <span class="min-w-[6ch] truncate" data-testid="post-author-name">{{
                             post.authorName ?? t('forum.posts.deletedAccount')
                         }}</span>
-                        <!-- Given by moderation; escaped like any text. Cut before the name -->
+                        <!-- Given by moderation; escaped like any text. Cut before the name, never to nothing -->
                         <span
                             v-if="post.authorTitle"
-                            class="min-w-0 shrink-[4] truncate text-xs font-normal text-base-secondary"
+                            class="min-w-[5ch] shrink-[2] truncate text-xs font-normal text-base-secondary"
                             :title="post.authorTitle"
                             data-testid="post-author-title"
                             >{{ post.authorTitle }}</span

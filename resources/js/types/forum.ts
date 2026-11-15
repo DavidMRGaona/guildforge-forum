@@ -164,6 +164,33 @@ export interface ForumPost {
     character: ForumPostCharacter | null;
     /** The character its editor starts from, only for posts the reader may edit */
     characterId: string | null;
+    /** The visible posts that reply to it (by «#N» or quoting it) the reader may read */
+    replyCount?: number;
+    /** Where those replies are listed; null without any */
+    repliesUrl?: string | null;
+}
+
+/** A post as a reference to it opens it (GET /foro/mensajes/{post}/vista) */
+export interface ForumPostPreview {
+    id: string;
+    number: number | null;
+    url: string | null;
+    status: string;
+    authorId: string | null;
+    authorName: string | null;
+    authorAvatarPublicId?: string | null;
+    authorTitle?: string | null;
+    character: ForumPostCharacter | null;
+    publishedAt: string;
+    publishedLabel: string;
+    html: string | null;
+    replyCount?: number;
+    repliesUrl?: string | null;
+    discussionTitle: string;
+    /** A long post: shown shortened, without its images and embeds */
+    truncated: boolean;
+    hiddenImages: number;
+    hiddenEmbeds: number;
 }
 
 export interface ForumConversation {

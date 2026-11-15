@@ -136,7 +136,7 @@ export default {
             closedNotice: 'Este tema está cerrado: ya no admite respuestas.',
             cannotReply: 'No puedes responder en esta categoría.',
             deletedAccount: 'Cuenta eliminada',
-            starter: 'Autor del tema',
+            starter: '(autor del tema)',
             edited: 'editado el {at}',
             pendingBadge: 'pendiente de aprobación',
             permalink: 'Enlace al mensaje {number}',

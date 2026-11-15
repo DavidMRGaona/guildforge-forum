@@ -513,11 +513,15 @@ async function remove(): Promise<void> {
     <article
         :id="anchor"
         tabindex="-1"
-        class="group scroll-mt-24 px-4 pt-3 focus:outline-none sm:grid sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-4"
+        class="group scroll-mt-24 pt-3 focus:outline-none sm:grid sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-4"
         :class="[
             hasFooter ? 'pb-1' : 'pb-3',
+            // The 3 px border is taken from the left padding, so the content never shifts.
+            // Its tint lives in module.css (`[data-starter]`)
+            post.isStarter ? 'border-l-[3px] border-primary pl-[13px] pr-4' : 'px-4',
             focused ? 'ring-2 ring-inset ring-primary-500/40' : '',
         ]"
+        :data-starter="post.isStarter ? 'true' : undefined"
         :data-post-number="post.number ?? undefined"
         :data-post-url="post.url ?? undefined"
         :aria-labelledby="`${anchor}-author`"
@@ -574,6 +578,12 @@ async function remove(): Promise<void> {
                         >
                             {{ t('forum.characters.retiredBadge') }}
                         </span>
+                        <span
+                            v-if="post.isStarter"
+                            class="sr-only"
+                            data-testid="post-starter-label"
+                            >{{ t('forum.posts.starter') }}</span
+                        >
                     </p>
                     <p
                         v-else
@@ -593,10 +603,10 @@ async function remove(): Promise<void> {
                         >
                         <span
                             v-if="post.isStarter"
-                            class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
+                            class="sr-only"
+                            data-testid="post-starter-label"
+                            >{{ t('forum.posts.starter') }}</span
                         >
-                            {{ t('forum.posts.starter') }}
-                        </span>
                     </p>
                 </div>
                 <!-- Date, «editado» and «pendiente» wrap on narrow screens instead of widening the page -->
@@ -650,13 +660,6 @@ async function remove(): Promise<void> {
                               })
                     }}</span
                 >
-
-                <span
-                    v-if="post.isStarter"
-                    class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-base-secondary"
-                >
-                    {{ t('forum.posts.starter') }}
-                </span>
             </p>
 
             <div class="mt-1">

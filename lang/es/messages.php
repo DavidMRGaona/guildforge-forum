@@ -510,7 +510,7 @@ return [
 
     'errors' => [
         'forbidden' => 'No puedes hacer eso en este tema.',
-        'public_name_required' => 'Para hacer esto en el foro necesitas un nombre público. Elígelo en tu perfil y vuelve a intentarlo.',
+        'public_name_required' => 'Para hacer esto en el foro necesitas un nombre público. Elígelo en Ajustes de la cuenta y vuelve a intentarlo.',
         'too_fast' => 'Has publicado muchos mensajes seguidos. Espera :seconds segundos y vuelve a intentarlo.',
         'too_many_discussions' => 'Has abierto muchos temas en la última hora. Podrás abrir otro dentro de :minutes min.',
         'post_state' => 'Este mensaje ya no se puede cambiar.',

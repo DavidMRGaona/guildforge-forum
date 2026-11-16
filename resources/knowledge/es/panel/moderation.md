@@ -71,7 +71,7 @@ Se hace desde el foro, no desde esta página: mira la guía de moderar desde el 
 
 ## Avisos de moderación
 
-- Quien modera recibe un aviso cuando alguien denuncia un mensaje que le toca revisar: por correo solo la primera denuncia de cada mensaje, y en la campana agrupadas por mensaje. Se elige en el tipo **Denuncias de mensajes** de **Avisos**, en su perfil. Las denuncias de mensajes privados avisan a quien modera todo el foro, sin decir quién lo escribió ni qué dice.
+- Quien modera recibe un aviso cuando alguien denuncia un mensaje que le toca revisar: por correo solo la primera denuncia de cada mensaje, y en la campana agrupadas por mensaje. Se elige en el tipo **Denuncias de mensajes** de **Avisos**, en sus Ajustes de la cuenta. Las denuncias de mensajes privados avisan a quien modera todo el foro, sin decir quién lo escribió ni qué dice.
 - El autor recibe aviso cuando se aprueba su mensaje o tema, y cuando se le suspende o se levanta la suspensión.
 
 ## Si algo no sale bien

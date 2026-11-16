@@ -120,8 +120,8 @@ Las funciones propias del foro (dados, personajes, apartes fuera de personaje, m
 
 - **Me gusta**: uno por persona y mensaje (`forum_post_likes`), que se quita con otro clic. Lo da cualquiera con sesión que pueda leer el mensaje, también en temas cerrados o espacios de solo lectura, salvo su autor, y nunca en los mensajes de la cuenta del sistema, en temas ocultos ni en mensajes pendientes de aprobación. Cada mensaje enseña el número y, al pasar el ratón o tocarlo, los nombres de los 10 últimos.
 - **Seguir un tema**: «Seguir» (cada respuesta), «Normal» (menciones y citas) o «Silenciar» (nada).
-  - Se guarda en `forum_discussion_follows`. «Silenciar» es el silencio del core del tema (`MailSubjectMuteServiceInterface`, tipo `forum.discussion`), el mismo que ofrece el pie de cada correo, así que el foro, el correo y la pestaña «Avisos» del perfil siempre coinciden.
-  - Abrir un tema o responder en él lo sigue, salvo que la persona lo haya quitado en la pestaña «Foro» del perfil (`forum_user_preferences`) o ya hubiera elegido algo para ese tema: una elección explícita no se pisa.
+  - Se guarda en `forum_discussion_follows`. «Silenciar» es el silencio del core del tema (`MailSubjectMuteServiceInterface`, tipo `forum.discussion`), el mismo que ofrece el pie de cada correo, así que el foro, el correo y la pestaña «Avisos» de Ajustes de la cuenta siempre coinciden.
+  - Abrir un tema o responder en él lo sigue, salvo que la persona lo haya quitado en la pestaña «Foro» de Ajustes de la cuenta (`forum_user_preferences`) o ya hubiera elegido algo para ese tema: una elección explícita no se pisa.
 - **Seguir una categoría** (`forum_category_follows`, botón en su página): avisa de cada tema nuevo en ella y en sus subcategorías. Al entrar en la plantilla de una campaña se sigue su espacio y llega el aviso «Te han añadido a la campaña X», una sola vez; al salir se deja de seguir, salvo que la persona lo siguiera por su cuenta. Lo hace `SpaceRosterFollows`, que relee el roster al ejecutarse.
 - **Avisos**, en la campana del core y por correo, con siete categorías en la sección «Foro» de la pestaña «Avisos»:
 
@@ -267,8 +267,8 @@ Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 ca
 | `POST` / `DELETE /foro/mensajes/{mensaje}/me-gusta` | Dar y quitar «me gusta» |
 | `PUT /foro/temas/{tema}/seguimiento` | Nivel de seguimiento (`{"level": "following" \| "normal" \| "muted"}`) |
 | `PUT /foro/c/{categoría}/seguimiento` | Seguir una categoría (`{"follow": true}`) |
-| `GET` / `PUT /foro/preferencias` | Pestaña «Foro» del perfil: seguimiento automático y lo que se sigue |
-| `GET /foro/personajes` | Pestaña «Personajes» del perfil: los personajes propios, las categorías a las que se pueden atar y los límites |
+| `GET` / `PUT /foro/preferencias` | Pestaña «Foro» de Ajustes de la cuenta: seguimiento automático y lo que se sigue |
+| `GET /foro/personajes` | Pestaña «Personajes» de Ajustes de la cuenta: los personajes propios, las categorías a las que se pueden atar y los límites |
 | `POST /foro/personajes` | Crear un personaje (multipart: `name`, `description`, `category`, `portrait`) |
 | `POST /foro/personajes/{personaje}` | Cambiarlo (multipart; `remove_portrait` quita el retrato) |
 | `POST /foro/personajes/{personaje}/retirar` y `/recuperar` | Retirarlo y recuperarlo |
@@ -360,7 +360,7 @@ Todo se decide para quien mira con las reglas del propio foro (`Application\Serv
 
 Cada cuenta escribe como sus personajes, para que las partidas se lean como una historia.
 
-- **Personaje** (`forum_characters`, `Domain\Entities\Character`): nombre (60 caracteres), descripción corta (300) y retrato opcional; sin retrato se muestran las iniciales. 30 por cuenta, retirados incluidos. Se gestionan en la pestaña «Personajes» del perfil (ranura `profile-sections`) y desde el editor, con «Nuevo personaje…».
+- **Personaje** (`forum_characters`, `Domain\Entities\Character`): nombre (60 caracteres), descripción corta (300) y retrato opcional; sin retrato se muestran las iniciales. 30 por cuenta, retirados incluidos. Se gestionan en la pestaña «Personajes» de Ajustes de la cuenta (ranura `profile-sections`) y desde el editor, con «Nuevo personaje…».
 - **Retratos**: se suben con el formulario, en los formatos de imagen de los ajustes (nunca SVG), hasta 2048 KB (o menos, si los ajustes piden menos), y se reducen a 512 px. Se guardan en `forum/characters/<año>/<mes>/`, carpeta de la fuente de medios `forum.characters`: la biblioteca de medios sabe de dónde vienen y da por sin uso los que se cambian o quedan de un personaje borrado.
 - **Atado a una categoría**: solo se ofrece en ella y en sus subcategorías, y solo lo ve quien puede leerla (`CategoryAccessPolicy`). A quien no la lee, sus mensajes le muestran la cuenta, como fuera de personaje. Si la categoría se borra, el personaje deja de estar atado.
 - **Hablar como**: encima del editor (responder, editar el mensaje propio y abrir tema) se elige el personaje o «Fuera de personaje». Al responder se propone el último personaje que la persona usó en ese tema, sin contar sus mensajes fuera de personaje, si aún puede usarlo. El mensaje muestra el retrato y el nombre del personaje y, debajo, «por» quien lo lleva. Las tiradas de un mensaje en personaje dicen quién tira («Arwen tira»), salvo las de un aparte `ooc`.
@@ -398,7 +398,7 @@ Conversaciones privadas entre personas con sesión (forum#18). Solo las leen qui
 | `DELETE /foro/conversaciones/mensajes/{uuid}` | Borrar un mensaje propio |
 | `POST /foro/conversaciones/mensajes/{uuid}/denuncias` | Denunciar |
 | `POST /foro/conversaciones/denuncias/{uuid}/resolver` | Resolver (quien modera todo el foro) |
-| `GET\|POST /foro/bloqueos`, `DELETE /foro/bloqueos/{uuid}` | Lista de bloqueos del perfil, bloquear y desbloquear |
+| `GET\|POST /foro/bloqueos`, `DELETE /foro/bloqueos/{uuid}` | Lista de bloqueos de Ajustes de la cuenta, bloquear y desbloquear |
 
 ## Cuentas anonimizadas, desactivadas y restauradas
 
@@ -421,8 +421,8 @@ El ajuste *Acceso al foro* (`access`) decide quién ve el foro en el sitio: **So
 
 - Todas las rutas de `/foro` (páginas, JSON, novedades, subidas) responden 404 (`EnsureForumIsVisible`).
 - `CategoryAccessPolicy::canView()` / `canWrite()` y la lectura de temas dicen que no, así que el buscador del sitio, los canales en tiempo real del tema y de la categoría, la conversación de las fichas y los anuncios de temas nuevos (que exigen que un invitado lea la categoría) se quedan sin nada. Los canales de la cuenta y de las conversaciones privadas también se niegan.
-- Ningún aviso sale (`shouldSend()` de cada uno) y sus categorías de correo no aparecen en el perfil (audiencia).
-- La web recibe `forumVisible` (prop compartida): las pestañas «Foro» y «Personajes» del perfil la usan como `visibleKey`, y la conversación de las fichas y el aviso del menú no piden nada.
+- Ningún aviso sale (`shouldSend()` de cada uno) y sus categorías de correo no aparecen en Ajustes de la cuenta (audiencia).
+- La web recibe `forumVisible` (prop compartida): las pestañas «Foro» y «Personajes» de Ajustes de la cuenta la usan como `visibleKey`, y la conversación de las fichas y el aviso del menú no piden nada.
 - Las guías del sitio exigen la capacidad `forum.visible`.
 - La sección y los contadores del perfil público no se dibujan.
 - El enlace «Foro» del menú (`ForumMenuLink`) pasa a visibilidad por permiso con `forum:forum.preview` y, al abrir el foro, recupera la visibilidad que tenía (guardada en el ajuste `forum_menu_link_before_preview`). Se aplica al guardar los ajustes y al habilitar o actualizar el módulo, así que un sitio que ya tenía el foro lo deja en vista previa con esta versión. Un enlace nuevo nace con la visibilidad del acceso.

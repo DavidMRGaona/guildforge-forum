@@ -14,7 +14,7 @@ El foro te avisa de lo que pasa en lo que sigues, en la campana de la cabecera y
 
 ## Los cuatro tipos de aviso
 
-En tu perfil, en la pestaña **Avisos**, el foro tiene su propia sección **Foro**. Estos son los cuatro tipos de los temas:
+En Ajustes de la cuenta, en la pestaña **Avisos**, el foro tiene su propia sección **Foro**. Estos son los cuatro tipos de los temas:
 
 - **Respuestas en temas que sigues**: cuando alguien responde en un tema que sigues. Por correo llega uno por tema hasta que lo vuelves a leer, para no llenarte la bandeja; en la campana, las respuestas de un mismo tema se agrupan en una.
 - **Temas nuevos y espacios de campaña**: temas nuevos en las categorías que sigues y los espacios de campaña a los que te añaden. El aviso «Te han añadido a la campaña…» sale solo en la campana.
@@ -40,7 +40,7 @@ Lo que eliges a mano manda: el seguimiento automático nunca pisa un tema que si
 Si te llegan demasiados avisos, tienes tres palancas, de más a menos fina:
 
 1. Cambiar un tema concreto a **Normal: menciones y citas** o **Silenciar**.
-2. Dejar de seguir categorías y temas desde la pestaña **Foro** de tu perfil, o quitar el seguimiento automático.
+2. Dejar de seguir categorías y temas desde la pestaña **Foro** de Ajustes de la cuenta, o quitar el seguimiento automático.
 3. Apagar un tipo de aviso en la pestaña **Avisos**, o pausar todos los correos optativos un tiempo.
 
 ## Qué no te avisa

@@ -104,7 +104,7 @@ describe('PublicNameGate', () => {
         expect(wrapper.emitted('named')).toBeUndefined();
     });
 
-    it('shows the core email error as a pointer to the profile, never under the name', async () => {
+    it('shows the core email error as a pointer to the account settings, never under the name', async () => {
         signIn({ displayName: null });
         vi.mocked(router.post).mockImplementation(((
             _url: string,
@@ -118,7 +118,7 @@ describe('PublicNameGate', () => {
         await wrapper.get('input').setValue('Ana');
         await wrapper.get('form').trigger('submit');
 
-        expect(wrapper.get('[role="alert"]').text()).toContain('en tu perfil');
+        expect(wrapper.get('[role="alert"]').text()).toContain('en Ajustes de la cuenta');
         expect(wrapper.text()).not.toContain('Ya está en uso');
     });
 

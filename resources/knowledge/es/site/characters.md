@@ -14,7 +14,7 @@ Un personaje te deja escribir en el foro con otro nombre y otro rostro, como en 
 
 ## Crear uno
 
-1. Abre tu perfil y entra en la pestaña **Personajes**.
+1. Abre Ajustes de la cuenta y entra en la pestaña **Personajes**.
 2. Pulsa **Nuevo personaje**.
 3. Rellena el **Nombre** y, si quieres, la **Descripción corta** y el **Retrato** (con **Elegir retrato**). Sin retrato se muestran las iniciales.
 4. En **Categoría**, deja **Cualquier categoría** o elige una: un personaje atado a una categoría solo se ofrece en ella y en sus subcategorías, y solo lo ve quien puede leerla.

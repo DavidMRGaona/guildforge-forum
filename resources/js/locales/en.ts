@@ -125,7 +125,7 @@ export default {
             required: 'Enter the public name you want to use.',
             tooMany: 'Too many attempts. Wait a moment and try again.',
             emailProblem:
-                'It could not be saved: check the email address of your account in your profile.',
+                'It could not be saved: check the email address in your account settings.',
             saveError: 'The public name could not be saved. Try again.',
         },
         posts: {
@@ -460,7 +460,7 @@ export default {
                 unblock: 'Unblock',
                 confirmTitle: 'Block {name}?',
                 confirmMessage:
-                    'They will not be able to write to you or add you to conversations, not even the ones you share. They are not told. You can unblock them any time from this conversation or your profile.',
+                    'They will not be able to write to you or add you to conversations, not even the ones you share. They are not told. You can unblock them any time from this conversation or your account settings.',
                 confirm: 'Block',
                 blocked: 'You blocked {name}',
                 unblocked: 'You unblocked {name}',

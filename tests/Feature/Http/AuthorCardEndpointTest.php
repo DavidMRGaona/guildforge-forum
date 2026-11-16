@@ -29,9 +29,9 @@ use Modules\Forum\ForumServiceProvider;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\RecordingProfileCards;
-use Tests\Support\Modules\ModuleTestCase;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
 /**

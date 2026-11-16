@@ -11,6 +11,10 @@ use App\Application\Profiles\DTOs\ResolvedProfileStatDTO;
 use App\Application\Profiles\Services\ProfileRendererInterface;
 use App\Application\Profiles\Services\ProfileSectionRegistryInterface;
 use App\Application\Profiles\Services\ProfileStatRegistryInterface;
+use App\Application\Publications\DTOs\PublicationDTO;
+use App\Application\Publications\DTOs\PublicationRosterDTO;
+use App\Application\Publications\Enums\PublicationState;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserProfileModel;
 use DateTimeImmutable;
@@ -18,6 +22,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Modules\Forum\Application\Publications\CampaignSpaceSync;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumVisibility;
@@ -34,15 +39,19 @@ use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\CategoryModerators;
 use Modules\Forum\Domain\ValueObjects\CategorySlug;
+use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 use Modules\Forum\Domain\ValueObjects\DiscussionTitle;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
+use Modules\Forum\Domain\ValueObjects\PublicationKey;
 use Modules\Forum\Infrastructure\Profiles\LatestPostsProfileSection;
 use Modules\Forum\Infrastructure\Profiles\PostsProfileStat;
 use Modules\Forum\Infrastructure\Profiles\TopicsProfileStat;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeCampaignSource;
+use Modules\Forum\Tests\Support\FakePublicationSource;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -71,6 +80,14 @@ final class ForumProfileActivityTest extends ModuleTestCase
     private UserModel $ana;
 
     private UserModel $luis;
+
+    protected function tearDown(): void
+    {
+        FakePublicationSource::reset();
+        FakeCampaignSource::resetRosters();
+
+        parent::tearDown();
+    }
 
     protected function setUp(): void
     {
@@ -379,6 +396,46 @@ final class ForumProfileActivityTest extends ModuleTestCase
         $this->assertSame($few, $many);
     }
 
+    public function test_campaign_spaces_open_to_everyone_read_their_rosters_once_whatever_the_characters(): void
+    {
+        FakePublicationSource::reset();
+        FakeCampaignSource::resetRosters();
+        app(PublicationSourceRegistryInterface::class)->register(FakeCampaignSource::class, 'example');
+        $first = $this->anOpenCampaignSpace('c-1', 'La caída de Arrakis');
+        $second = $this->anOpenCampaignSpace('c-2', 'Las minas de Moria');
+        [$discussion] = $this->aDiscussion($first, '2026-11-10 10:00:00', $this->anaId(), title: 'Sesión uno');
+        $this->postAs($this->ana, $discussion, 'Como mercader', '2026-11-10 11:00:00', $this->aSharedCharacterIn($first));
+
+        $measure = function (): array {
+            FakeCampaignSource::$rosterReads = 0;
+            $queries = $this->countQueries(fn () => $this->render($this->luis));
+
+            return [$queries, FakeCampaignSource::rosterReads()];
+        };
+        // The first render also warms what any request reads once (roles, settings)
+        $this->render($this->luis);
+        [$fewQueries, $fewRosters] = $measure();
+
+        // More shared and personal characters in the first space, and a shared one in the second
+        for ($i = 1; $i <= 4; $i++) {
+            $this->postAs($this->ana, $discussion, "Como mercader {$i}", sprintf('2026-11-10 12:0%d:00', $i), $this->aSharedCharacterIn($first, "Mercader {$i}"));
+            $this->postAs($this->ana, $discussion, "Como elfa {$i}", sprintf('2026-11-10 13:0%d:00', $i), $this->aCharacterOf($this->anaId(), "Elfa {$i}", boundTo: $first));
+        }
+        [$other] = $this->aDiscussion($second, '2026-11-11 10:00:00', $this->anaId(), title: 'Sesión dos');
+        $this->postAs($this->ana, $other, 'Como guía', '2026-11-11 11:00:00', $this->aSharedCharacterIn($second, 'Guía'));
+        [$manyQueries, $manyRosters] = $measure();
+
+        // The rosters are read once per space and request, as on every forum page (the categories a reader
+        // may read and moderate ask them), not once per character
+        $this->assertSame($fewQueries, $manyQueries);
+        $this->assertSame($fewRosters, $manyRosters);
+        $this->assertLessThanOrEqual(2, $manyRosters);
+        // A guest reads the spaces, never who speaks as their shared characters
+        $guest = $this->posts($this->render(null));
+        $this->assertSame([], array_values(array_filter(array_column($guest, 'excerpt'), static fn ($excerpt): bool => str_starts_with((string) $excerpt, 'Como mercader') || $excerpt === 'Como guía')));
+        $this->assertContains('Como elfa 4', array_column($guest, 'excerpt'));
+    }
+
     public function test_a_hidden_first_message_as_a_shared_character_still_hides_the_topic(): void
     {
         $shared = $this->aSharedCharacterIn($this->general);
@@ -463,8 +520,9 @@ final class ForumProfileActivityTest extends ModuleTestCase
     {
         $merchant = $this->aSharedCharacterIn($this->general);
         [$discussion, $opening] = $this->aDiscussion($this->general, '2026-11-10 10:00:00', $this->anaId(), title: 'Tema');
-        $this->postAs($this->ana, $discussion, 'Respuesta', '2026-11-10 11:00:00');
-        // What a split or a merge may leave: the first message is someone else's, as a shared character
+        // Ana speaks as the merchant herself, so the writer rules apply to her messages
+        $this->postAs($this->ana, $discussion, 'Respuesta', '2026-11-10 11:00:00', $merchant);
+        // What a split or a merge may leave: the first message is someone else's, as the same shared character
         DB::table('forum_posts')->where('id', $opening->id()->value)->update([
             'author_id' => strtolower((string) $this->luis->id),
             'character_id' => $merchant->id()->value,
@@ -472,8 +530,10 @@ final class ForumProfileActivityTest extends ModuleTestCase
 
         $profile = $this->render(null);
 
+        // Her message as the merchant stays out; the topic counts, for its first message is not hers
+        $this->assertNull($this->section($profile));
+        $this->assertNull($this->stat($profile, self::POSTS));
         $this->assertSame(1, $this->stat($profile, self::TOPICS)?->value);
-        $this->assertSame(['Respuesta'], array_column($this->posts($profile), 'excerpt'));
     }
 
     public function test_the_profile_page_draws_the_section_and_the_counters_with_the_forum_component(): void
@@ -541,6 +601,23 @@ final class ForumProfileActivityTest extends ModuleTestCase
         app(CategoryRepositoryInterface::class)->save($category);
 
         return [$moderator, $category];
+    }
+
+    /**
+     * The space of a campaign of the example source, opened to everyone.
+     */
+    private function anOpenCampaignSpace(string $id, string $title): Category
+    {
+        FakeCampaignSource::$rosters[$id] = new PublicationRosterDTO([], [strtolower((string) $this->ana->id)]);
+        FakePublicationSource::put(new PublicationDTO(FakeCampaignSource::TYPE, $id, $title, 'Campaña.', 'https://example.test/'.$id, PublicationState::Active));
+        app(CampaignSpaceSync::class)->sync(new PublicationKey(FakeCampaignSource::TYPE, $id));
+        $repository = app(CategoryRepositoryInterface::class);
+        $space = $repository->findBySubject(new CategorySubject(FakeCampaignSource::TYPE, $id));
+        $this->assertInstanceOf(Category::class, $space);
+        $space->changeAccess(CategoryAudience::everyone(), $space->writeAudience(), $space->moderators());
+        $repository->save($space);
+
+        return $space;
     }
 
     private function render(?Authenticatable $viewer, ?ProfileOwnerDTO $owner = null): ResolvedProfileDTO

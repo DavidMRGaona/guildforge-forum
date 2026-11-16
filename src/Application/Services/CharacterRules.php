@@ -240,7 +240,9 @@ final readonly class CharacterRules
     /**
      * The categories the characters are tied to, read at once, by character id (null where the
      * category is gone or none), so the rules above decide many characters without a read each.
-     * An unreadable read gives an empty map, and each rule then reads its own (and fails closed).
+     * It fails closed and is reported once: when the categories cannot be read, every character
+     * is taken as tied to none that exists (seen and moderated by nobody but whoever moderates the
+     * whole forum), and no rule reads its own again.
      *
      * @param  iterable<Character>  $characters
      * @return array<string, Category|null>
@@ -257,7 +259,7 @@ final readonly class CharacterRules
         } catch (Throwable $exception) {
             report($exception);
 
-            return [];
+            return array_map(static fn (): ?Category => null, $tied);
         }
 
         return array_map(static fn (?CategoryId $id): ?Category => $id instanceof CategoryId ? ($found[strtolower($id->value)] ?? null) : null, $tied);

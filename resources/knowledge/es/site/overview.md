@@ -39,7 +39,7 @@ Seguir es decirle al foro de qué quieres enterarte. Cada tema tiene un selector
 
 En la página de una categoría, **Seguir la categoría** te avisa de cada tema nuevo que se abra en ella, y también en sus subcategorías.
 
-Por defecto el foro te hace seguir los temas que abres o en los que respondes. Puedes cambiarlo en tu perfil, en la pestaña **Foro**, donde también ves y dejas de seguir lo que sigues.
+Por defecto el foro te hace seguir los temas que abres o en los que respondes. Puedes cambiarlo en Ajustes de la cuenta, en la pestaña **Foro**, donde también ves y dejas de seguir lo que sigues.
 
 [[action:profile.show?tab=forum|Abrir mis ajustes del foro]]
 

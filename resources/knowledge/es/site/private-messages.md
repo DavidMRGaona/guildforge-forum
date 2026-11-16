@@ -51,7 +51,7 @@ Junto al nombre de cada persona de la conversación hay un botón para **bloquea
 
 **No se le avisa de que la has bloqueado.** Tú puedes seguir escribiendo donde estéis los dos.
 
-Para ver a quién has bloqueado, o desbloquear a alguien, ve a la pestaña **Foro** de tu perfil, sección **Personas bloqueadas**.
+Para ver a quién has bloqueado, o desbloquear a alguien, ve a la pestaña **Foro** de Ajustes de la cuenta, sección **Personas bloqueadas**.
 
 [[action:profile.show?tab=forum|Ver las personas bloqueadas]]
 
@@ -65,7 +65,7 @@ La moderación del foro no lee las conversaciones privadas. Con la denuncia le l
 
 Cuando te añaden a una conversación o te escriben en una, te llega un aviso en la campana y, si quieres, por correo. Por correo llega uno por conversación hasta que la vuelves a leer. **Ningún aviso incluye lo que se ha escrito**, solo quién escribe y el título.
 
-Se elige en el tipo **Mensajes privados** de la sección **Foro**, en la pestaña **Avisos** de tu perfil. Desde el pie de un correo también puedes silenciar una conversación concreta.
+Se elige en el tipo **Mensajes privados** de la sección **Foro**, en la pestaña **Avisos** de Ajustes de la cuenta. Desde el pie de un correo también puedes silenciar una conversación concreta.
 
 ## Otras cosas que conviene saber
 

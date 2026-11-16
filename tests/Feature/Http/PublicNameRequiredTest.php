@@ -60,7 +60,7 @@ final class PublicNameRequiredTest extends ModuleTestCase
         $this->actingAs($this->nameless)->postJson($this->replyUrl(), ['document' => $this->messageDocument()])
             ->assertUnprocessable()
             ->assertJsonPath('reason', 'public_name_required')
-            ->assertJsonPath('errors.display_name.0', 'Para hacer esto en el foro necesitas un nombre público. Elígelo en tu perfil y vuelve a intentarlo.');
+            ->assertJsonPath('errors.display_name.0', 'Para hacer esto en el foro necesitas un nombre público. Elígelo en Ajustes de la cuenta y vuelve a intentarlo.');
 
         $this->actingAs($this->named)->postJson($this->replyUrl(), ['document' => $this->messageDocument()])->assertCreated();
     }

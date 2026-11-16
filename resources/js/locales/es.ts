@@ -126,7 +126,7 @@ export default {
             required: 'Escribe el nombre público que quieras usar.',
             tooMany: 'Has probado demasiadas veces. Espera un momento y vuelve a intentarlo.',
             emailProblem:
-                'No se ha podido guardar: revisa en tu perfil la dirección de email de tu cuenta.',
+                'No se ha podido guardar: revisa la dirección de email en Ajustes de la cuenta.',
             saveError: 'No se ha podido guardar el nombre público. Inténtalo de nuevo.',
         },
         posts: {
@@ -463,7 +463,7 @@ export default {
                 unblock: 'Desbloquear',
                 confirmTitle: '¿Bloquear a {name}?',
                 confirmMessage:
-                    'No podrá escribirte ni añadirte a conversaciones, tampoco en las que ya compartís. No se le avisa. Puedes quitar el bloqueo cuando quieras desde esta conversación o desde tu perfil.',
+                    'No podrá escribirte ni añadirte a conversaciones, tampoco en las que ya compartís. No se le avisa. Puedes quitar el bloqueo cuando quieras desde esta conversación o desde Ajustes de la cuenta.',
                 confirm: 'Bloquear',
                 blocked: 'Has bloqueado a {name}',
                 unblocked: 'Has desbloqueado a {name}',

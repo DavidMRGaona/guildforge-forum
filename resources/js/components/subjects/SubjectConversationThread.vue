@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import PostItem from '../forum/PostItem.vue';
+import { provideAuthorCards } from '../../composables/useAuthorCards';
 import { useReadTracker } from '../../composables/useReadTracker';
 import type { ForumEditorSettings, ForumPost } from '../../types/forum';
 
@@ -26,6 +27,9 @@ const emit = defineEmits<{
 }>();
 
 const list = ref<HTMLElement | null>(null);
+
+// One card per person while the conversation is shown
+provideAuthorCards();
 
 const tracker = useReadTracker({
     readUrl: props.readUrl,

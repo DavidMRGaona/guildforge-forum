@@ -18,6 +18,7 @@ import ReplyBox from '../../components/forum/ReplyBox.vue';
 import DiscussionModeration from '../../components/moderation/DiscussionModeration.vue';
 import SplitPosts from '../../components/moderation/SplitPosts.vue';
 import { useNewPosts } from '../../composables/useNewPosts';
+import { provideAuthorCards } from '../../composables/useAuthorCards';
 import { provideMergedDiscussion } from '../../composables/useMergedDiscussion';
 import { useReadTracker } from '../../composables/useReadTracker';
 import { useSplitSelection } from '../../composables/useSplitSelection';
@@ -94,6 +95,13 @@ const live = useNewPosts({
 });
 // Following, mentioning or moderating from this page also learns that it was merged
 provideMergedDiscussion((target) => live.markMerged(target));
+
+// The authors' cards, kept while the page shows this discussion (their counts are of this one)
+const authorCards = provideAuthorCards();
+watch(
+    () => props.discussion.id,
+    () => authorCards.clear()
+);
 const allMentionNames = computed(() => ({ ...props.mentionNames, ...live.mentionNames.value }));
 
 // «Typing…» among the readers of the last page, named only from what the page shows

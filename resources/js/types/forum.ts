@@ -170,6 +170,41 @@ export interface ForumPost {
     replyCount?: number;
     /** Where those replies are listed; null without any */
     repliesUrl?: string | null;
+    /** The card its writer's name opens (forum#134); null where the post names nobody */
+    authorCardUrl?: string | null;
+}
+
+/**
+ * A public profile's summary card, as the core answers it (core#744, `ProfileCardDTO`): what the
+ * profile page shows the reader, never the account's id, name or email.
+ */
+export interface ForumProfileCard {
+    handle: string;
+    publicName: string | null;
+    /** The profile page, absolute */
+    url: string;
+    /** `https` image, 128 × 128; null for the initials */
+    avatarUrl: string | null;
+    /** `https` image, 600 × 200; null when there is none */
+    bannerUrl: string | null;
+    /** When the account was created, ISO 8601 with the display zone's offset */
+    memberSince: string | null;
+    showsMembership: boolean;
+    isOwner: boolean;
+}
+
+/** The card a post's author opens with (GET /foro/mensajes/{post}/autor, forum#134) */
+export interface ForumAuthorCard {
+    /** Null when the reader may not see the profile: the card keeps what the post shows */
+    profile: ForumProfileCard | null;
+    /** The title the forum's moderation gave the person */
+    title: string | null;
+    /** Their messages the reader may read in the forum; null for none, or without a profile */
+    postCount: number | null;
+    /** Their messages in this topic, and the topic filtered by them (null without any) */
+    topic: { count: number; url: string | null };
+    /** «Ignorar»; null for guests, on one's own posts and for an account that is gone */
+    block: { blocked: boolean; blockUrl: string; unblockUrl: string } | null;
 }
 
 /** A post as a reference to it opens it (GET /foro/mensajes/{post}/vista) */

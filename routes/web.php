@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\ThrottleWhereListed;
 use Illuminate\Support\Facades\Route;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Http\Controllers\AuthorCardController;
 use Modules\Forum\Http\Controllers\BlocksController;
 use Modules\Forum\Http\Controllers\CategoryController;
 use Modules\Forum\Http\Controllers\CharacterController;
@@ -74,6 +76,14 @@ Route::prefix('foro')
                 ->whereUuid('post')
                 ->name('posts.replies');
         });
+
+        // The card of a post's author (JSON, forum#134): from the post, never from an account, so
+        // whoever may not see it or may not know its writer gets what a missing post gets. Its limit
+        // is listed after the web group, so during an impersonation it counts inside the safety net
+        Route::get('mensajes/{post}/autor', [AuthorCardController::class, 'show'])
+            ->whereUuid('post')
+            ->middleware(ThrottleWhereListed::class.':'.ForumServiceProvider::AUTHOR_CARDS_LIMITER)
+            ->name('posts.author');
 
         // The conversation a record's page shows (JSON). Any type and id reach the controller,
         // which answers an empty conversation for what it cannot show, never an error

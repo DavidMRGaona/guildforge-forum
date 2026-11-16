@@ -94,6 +94,27 @@ final readonly class PostContentPresenter
     }
 
     /**
+     * Whether the post names its writer's account to the reader, by the very rules `present()`
+     * draws it with (no `authorHidden`, no `unnamedWriter`), without rendering anything: for
+     * what only needs to know who the post shows (the author's card, forum#134).
+     */
+    public function namesWriter(Post $post, Discussion $discussion, ?Authenticatable $reader): bool
+    {
+        if ($post->authorId() === null) {
+            return false;
+        }
+
+        $readerId = $reader instanceof Authenticatable ? strtolower(is_scalar($reader->getAuthIdentifier()) ? (string) $reader->getAuthIdentifier() : '') : null;
+        $own = $readerId !== null && $post->authorId() === $readerId;
+        $moderates = $this->access->canModerate($reader, $discussion);
+        $character = $this->charactersOf([$post], $reader)[$post->characterId()->value ?? ''] ?? null;
+        $moderatesCharacter = $character instanceof Character && $this->characterRules->moderates($reader, $character);
+
+        return ! $this->hidesWriter($own, $moderates, $character, $moderatesCharacter)
+            && ! isset($this->unnamedWriters([$post], $reader, $readerId, $moderates)[$post->id()->value]);
+    }
+
+    /**
      * The posts that name their writer as a character or with a neutral label, by post id: those
      * that speak, or spoke, as a personal character of someone without a public name. Never for
      * their writer or whoever moderates the discussion, who see the account as always.

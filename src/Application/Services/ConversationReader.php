@@ -136,21 +136,7 @@ final readonly class ConversationReader
         $authorId = AccountId::normalize($author);
         $moderates = $this->access->canModerate($reader, $discussion);
         $readerId = ForumBrowser::accountId($reader);
-        $numbers = [];
-        if ($authorId !== null) {
-            $characters = $this->posts->charactersByNumberOf($id, $authorId);
-            $hiding = array_flip($this->presenter->charactersHidingTheirWriter($reader, $readerId === $authorId, $moderates, array_values(array_filter($characters))));
-            $inCharacter = $this->presenter->hidesCharacterPostsOf($authorId, $readerId === $authorId, $moderates);
-            $removed = $inCharacter ? array_flip($this->posts->removedCharacterNumbersOf($id, $authorId)) : [];
-            foreach ($characters as $number => $character) {
-                if ($inCharacter && ($character !== null || isset($removed[$number]))) {
-                    continue;
-                }
-                if ($character === null || ! isset($hiding[$character])) {
-                    $numbers[] = $number;
-                }
-            }
-        }
+        $numbers = $authorId === null ? [] : $this->authorNumbers($reader, $id, $authorId, $moderates);
 
         $perPage = $this->settings->postsPerPage();
         $count = count($numbers);
@@ -184,6 +170,47 @@ final readonly class ConversationReader
             filtered: true,
             filterAuthorId: $authorId,
         );
+    }
+
+    /**
+     * How many messages of the person the filter by author (`openByAuthor()`) lists in the
+     * discussion for the reader, by the same rules; 0 for an id that is not an account's.
+     *
+     * @throws DiscussionNotFoundException when the reader may not read it
+     */
+    public function countByAuthor(?Authenticatable $reader, DiscussionId $id, string $author): int
+    {
+        $discussion = $this->readable($reader, $id);
+        $authorId = AccountId::normalize($author);
+
+        return $authorId === null ? 0 : count($this->authorNumbers($reader, $id, $authorId, $this->access->canModerate($reader, $discussion)));
+    }
+
+    /**
+     * The numbers of the person's messages the reader may see under their account: a message
+     * that speaks as a shared character hiding its writer from the reader is left out, and so
+     * are those as a personal character (or a deleted one) of someone without a public name.
+     *
+     * @return list<int>
+     */
+    private function authorNumbers(?Authenticatable $reader, DiscussionId $id, string $authorId, bool $moderates): array
+    {
+        $own = ForumBrowser::accountId($reader) === $authorId;
+        $characters = $this->posts->charactersByNumberOf($id, $authorId);
+        $hiding = array_flip($this->presenter->charactersHidingTheirWriter($reader, $own, $moderates, array_values(array_filter($characters))));
+        $inCharacter = $this->presenter->hidesCharacterPostsOf($authorId, $own, $moderates);
+        $removed = $inCharacter ? array_flip($this->posts->removedCharacterNumbersOf($id, $authorId)) : [];
+        $numbers = [];
+        foreach ($characters as $number => $character) {
+            if ($inCharacter && ($character !== null || isset($removed[$number]))) {
+                continue;
+            }
+            if ($character === null || ! isset($hiding[$character])) {
+                $numbers[] = $number;
+            }
+        }
+
+        return $numbers;
     }
 
     /**

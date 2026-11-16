@@ -6,6 +6,7 @@ import { Link } from '@inertiajs/vue3';
 import { ChevronDown, Flag, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import PostEditor from '../editor/PostEditor.vue';
+import AuthorCard, { type AuthorCardModeration } from './AuthorCard.vue';
 import LikeButton from './LikeButton.vue';
 import PostAvatar from './PostAvatar.vue';
 import PostPreview from './PostPreview.vue';
@@ -268,6 +269,20 @@ const titleItems = computed<ModerationMenuItem[]>(() => {
         : [{ key: 'title-set', label: t('forum.titles.set') }];
 });
 const titling = ref(false);
+/** The title the card knew (in character the post carries none); null from the post's menu */
+const cardTitle = ref<string | null>(null);
+/** Giving a title from the author's card: in character too, since the card knows the title */
+const canTitleFromCard = computed(() => Boolean(props.titleUrl) && props.post.authorId !== null);
+
+function moderateFromCard(action: AuthorCardModeration, title: string | null): void {
+    if (action === 'title') {
+        cardTitle.value = title;
+        titling.value = true;
+
+        return;
+    }
+    suspending.value = true;
+}
 
 async function removeTitle(): Promise<void> {
     if (!props.titleUrl || props.post.authorId === null) {
@@ -371,6 +386,7 @@ function selectModeration(key: string): void {
         return;
     }
     if (key === 'title-set' || key === 'title-change') {
+        cardTitle.value = null;
         titling.value = true;
 
         return;
@@ -600,7 +616,19 @@ async function remove(): Promise<void> {
                         :id="`${anchor}-author`"
                         class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                     >
-                        <span class="min-w-[6ch] truncate" data-testid="post-author-name">{{
+                        <!-- The name opens the writer's card, where the post names a person -->
+                        <AuthorCard
+                            v-if="post.authorCardUrl && post.authorName"
+                            class="min-w-[6ch]"
+                            :post="post"
+                            :name="post.authorName"
+                            :can-title="canTitleFromCard"
+                            :can-suspend="canSuspendAuthor"
+                            @moderate="moderateFromCard"
+                        >
+                            <span data-testid="post-author-name">{{ post.authorName }}</span>
+                        </AuthorCard>
+                        <span v-else class="min-w-[6ch] truncate" data-testid="post-author-name">{{
                             post.authorName ?? t('forum.posts.deletedAccount')
                         }}</span>
                         <!-- Given by moderation; escaped like any text. Cut before the name, never to nothing -->
@@ -656,7 +684,32 @@ async function remove(): Promise<void> {
                             : t('forum.characters.shared.badge')
                     }}
                 </span>
-                <span v-if="namesPlayer" class="min-w-0 truncate">{{
+                <!-- «por <name>»: the name opens the card of who plays the character. Not cut by
+                     its line, which would clip the card: the name cuts itself -->
+                <i18n-t
+                    v-if="namesPlayer && post.authorCardUrl && post.authorName"
+                    :keypath="
+                        post.character.isShared
+                            ? 'forum.characters.shared.writtenBy'
+                            : 'forum.characters.playedBy'
+                    "
+                    tag="span"
+                    scope="global"
+                    class="flex min-w-0 items-baseline whitespace-pre"
+                    data-testid="post-character-writer"
+                >
+                    <template #name>
+                        <AuthorCard
+                            class="whitespace-normal"
+                            :post="post"
+                            :name="post.authorName"
+                            :can-title="canTitleFromCard"
+                            :can-suspend="canSuspendAuthor"
+                            @moderate="moderateFromCard"
+                        />
+                    </template>
+                </i18n-t>
+                <span v-else-if="namesPlayer" class="min-w-0 truncate">{{
                     post.character.isShared
                         ? t('forum.characters.shared.writtenBy', {
                               name: post.authorName,
@@ -950,7 +1003,7 @@ async function remove(): Promise<void> {
                 :title-url="titleUrl"
                 :user-id="post.authorId"
                 :user-name="post.authorName"
-                :current="post.authorTitle ?? null"
+                :current="cardTitle ?? post.authorTitle ?? null"
                 @saved="emit('changed')"
             />
 

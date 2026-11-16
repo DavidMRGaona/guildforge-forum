@@ -213,6 +213,11 @@ final class ForumServiceProvider extends ModuleServiceProvider
 
     public const string IMAGE_UPLOADS_LIMITER = 'forum-images';
 
+    /** Author cards opened per person (or network address) and minute (forum#134) */
+    public const string AUTHOR_CARDS_LIMITER = 'forum-author-cards';
+
+    public const int AUTHOR_CARDS_PER_MINUTE = 30;
+
     public function moduleName(): string
     {
         return 'forum';
@@ -310,6 +315,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         // Image uploads per person and hour, from the settings
         RateLimiter::for(self::IMAGE_UPLOADS_LIMITER, static fn (Request $request): Limit => Limit::perHour(app(ForumSettingsInterface::class)->imageUploadsPerHour())
             ->by('forum-images:'.self::requesterKey($request)));
+        // Each card reads a profile and counts messages: about as much as the core's own card
+        RateLimiter::for(self::AUTHOR_CARDS_LIMITER, static fn (Request $request): Limit => Limit::perMinute(self::AUTHOR_CARDS_PER_MINUTE)
+            ->by('forum-author-cards:'.self::requesterKey($request)));
 
         if ($this->app->runningInConsole()) {
             $this->commands([PurgeDeletedPostsCommand::class, SyncPublicationDiscussionsCommand::class, IndexPostReferencesCommand::class]);

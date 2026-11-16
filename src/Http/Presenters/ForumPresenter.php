@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Modules\Forum\Application\Contracts\AccountDirectoryInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\DTOs\CategoryAccessDTO;
 use Modules\Forum\Application\DTOs\ConversationPageDTO;
 use Modules\Forum\Application\DTOs\MovedPostsDTO;
@@ -60,6 +61,7 @@ final readonly class ForumPresenter
         private MemberTitleRepositoryInterface $titles,
         private PostReferenceLabels $referenceLabels,
         private CharacterWriterNames $writerNames,
+        private SystemAccountInterface $systemAccount,
     ) {}
 
     /**
@@ -412,6 +414,10 @@ final readonly class ForumPresenter
                 'authorAvatarPublicId' => $shown[$index] === null || $content->character instanceof Character ? null : ($avatars[$shown[$index]] ?? null),
                 // In character the fiction rules: neither the account's avatar nor its title
                 'authorTitle' => $shown[$index] === null || $content->character instanceof Character ? null : ($titles[$shown[$index]] ?? null),
+                // The card the writer's name opens (forum#134): only where the post names a person
+                'authorCardUrl' => $shown[$index] === null || $this->systemAccount->isSystemAccount($shown[$index])
+                    ? null
+                    : route('forum.posts.author', ['post' => $post->id()->value]),
                 'isStarter' => $shown[$index] !== null && $shown[$index] === $discussion->authorId(),
                 'status' => $post->status()->value,
                 'html' => $content->html,

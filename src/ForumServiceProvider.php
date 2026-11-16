@@ -11,6 +11,8 @@ use App\Application\Modules\DTOs\ModuleRouteDTO;
 use App\Application\Modules\DTOs\PagePrefixDTO;
 use App\Application\Modules\DTOs\PermissionDTO;
 use App\Application\Modules\DTOs\SlotRegistrationDTO;
+use App\Application\Profiles\Contracts\ProfileSectionInterface;
+use App\Application\Profiles\Contracts\ProfileStatInterface;
 use App\Application\Realtime\Contracts\RealtimeChannelInterface;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Application\Security\Services\ContentSecurityPolicySourcesInterface;
@@ -71,12 +73,14 @@ use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
 use Modules\Forum\Application\Queries\ForumActivityQueryInterface;
 use Modules\Forum\Application\Queries\ModerationQueueQueryInterface;
 use Modules\Forum\Application\Queries\MovedPostsQueryInterface;
+use Modules\Forum\Application\Queries\ProfileActivityQueryInterface;
 use Modules\Forum\Application\Queries\SearchHitsQueryInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\EmbedFrameOrigins;
 use Modules\Forum\Application\Services\ForumSuspensions;
 use Modules\Forum\Application\Services\ForumVisibility;
 use Modules\Forum\Application\Services\HiddenRolls;
+use Modules\Forum\Application\Services\ProfileActivity;
 use Modules\Forum\Console\Commands\IndexPostReferencesCommand;
 use Modules\Forum\Console\Commands\PurgeDeletedPostsCommand;
 use Modules\Forum\Console\Commands\SyncPublicationDiscussionsCommand;
@@ -146,12 +150,16 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentRedir
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentReportRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSubjectDiscussionRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSuspensionRepository;
+use Modules\Forum\Infrastructure\Profiles\LatestPostsProfileSection;
+use Modules\Forum\Infrastructure\Profiles\PostsProfileStat;
+use Modules\Forum\Infrastructure\Profiles\TopicsProfileStat;
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentConversationListQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentForumActivityQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentModerationQueueQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentMovedPostsQuery;
+use Modules\Forum\Infrastructure\Queries\EloquentProfileActivityQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentSearchHitsQuery;
 use Modules\Forum\Infrastructure\Realtime\AccountRealtimeChannel;
 use Modules\Forum\Infrastructure\Realtime\CategoryRealtimeChannel;
@@ -275,6 +283,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(CategoryStatsQueryInterface::class, EloquentCategoryStatsQuery::class);
         $this->app->bind(ModerationQueueQueryInterface::class, EloquentModerationQueueQuery::class);
         $this->app->bind(SearchHitsQueryInterface::class, EloquentSearchHitsQuery::class);
+        $this->app->bind(ProfileActivityQueryInterface::class, EloquentProfileActivityQuery::class);
+        // What a profile shows of the forum: each owner and viewer worked out once per request (or queue job)
+        $this->app->scoped(ProfileActivity::class);
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
 
@@ -388,6 +399,26 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerSearchSources(): array
     {
         return [DiscussionSearchSource::class, PostSearchSource::class];
+    }
+
+    /**
+     * The person's latest messages on their public profile (forum#135).
+     *
+     * @return list<class-string<ProfileSectionInterface>>
+     */
+    public function registerProfileSections(): array
+    {
+        return [LatestPostsProfileSection::class];
+    }
+
+    /**
+     * How many messages and topics of the person the viewer may read, on their public profile (forum#135).
+     *
+     * @return list<class-string<ProfileStatInterface>>
+     */
+    public function registerProfileStats(): array
+    {
+        return [PostsProfileStat::class, TopicsProfileStat::class];
     }
 
     /**

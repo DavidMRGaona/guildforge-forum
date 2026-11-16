@@ -100,15 +100,19 @@ final readonly class CharacterRules
         return $user instanceof Authenticatable && $character->isOwnedBy((string) ForumBrowser::accountId($user));
     }
 
-    /** Whether the person moderates the character: the whole forum, or the category it is tied to */
-    public function moderates(?Authenticatable $user, Character $character): bool
+    /**
+     * Whether the person moderates the character: the whole forum, or the category it is tied to.
+     *
+     * @param  array<string, Category|null>|null  $bound  the tied categories already read (boundCategoriesOf())
+     */
+    public function moderates(?Authenticatable $user, Character $character, ?array $bound = null): bool
     {
-        return $this->decide(function () use ($user, $character): bool {
+        return $this->decide(function () use ($user, $character, $bound): bool {
             if ($this->policy->canModerateForum($user)) {
                 return true;
             }
 
-            $category = $this->boundCategory($character);
+            $category = $this->boundCategory($character, $bound);
 
             // The directors of a campaign moderate the shared characters of its space
             return $category instanceof Category
@@ -119,16 +123,18 @@ final readonly class CharacterRules
     /**
      * Whether a reader sees the character where a post shows it: one tied to a category only
      * whoever may read that category. Its owner and its moderators always do.
+     *
+     * @param  array<string, Category|null>|null  $bound  the tied categories already read (boundCategoriesOf())
      */
-    public function maySee(?Authenticatable $reader, Character $character): bool
+    public function maySee(?Authenticatable $reader, Character $character, ?array $bound = null): bool
     {
         // A post that speaks as a shared character is already read: showing its name tells nothing
         if ($character->isNpc() || ! $character->categoryId() instanceof CategoryId || $this->owns($reader, $character)) {
             return true;
         }
 
-        return $this->decide(function () use ($reader, $character): bool {
-            $category = $this->boundCategory($character);
+        return $this->decide(function () use ($reader, $character, $bound): bool {
+            $category = $this->boundCategory($character, $bound);
 
             return $category instanceof Category && $this->policy->canView($reader, $category);
         });
@@ -212,13 +218,51 @@ final readonly class CharacterRules
     }
 
     /**
-     * The category a character is tied to, if it still exists.
+     * The category a character is tied to, if it still exists. Taken from `$bound` when it holds
+     * the character (read before for many at once), else read now.
+     *
+     * @param  array<string, Category|null>|null  $bound  by character id
      */
-    public function boundCategory(Character $character): ?Category
+    public function boundCategory(Character $character, ?array $bound = null): ?Category
     {
         $id = $character->categoryId();
+        if (! $id instanceof CategoryId) {
+            return null;
+        }
 
-        return $id instanceof CategoryId ? $this->categories->find($id) : null;
+        if ($bound !== null && array_key_exists($character->id()->value, $bound)) {
+            return $bound[$character->id()->value];
+        }
+
+        return $this->categories->find($id);
+    }
+
+    /**
+     * The categories the characters are tied to, read at once, by character id (null where the
+     * category is gone or none), so the rules above decide many characters without a read each.
+     * It fails closed and is reported once: when the categories cannot be read, every character
+     * is taken as tied to none that exists (seen and moderated by nobody but whoever moderates the
+     * whole forum), and no rule reads its own again.
+     *
+     * @param  iterable<Character>  $characters
+     * @return array<string, Category|null>
+     */
+    public function boundCategoriesOf(iterable $characters): array
+    {
+        $tied = [];
+        foreach ($characters as $character) {
+            $tied[$character->id()->value] = $character->categoryId();
+        }
+
+        try {
+            $found = $this->categories->findMany(array_values(array_filter($tied)));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return array_map(static fn (): ?Category => null, $tied);
+        }
+
+        return array_map(static fn (?CategoryId $id): ?Category => $id instanceof CategoryId ? ($found[strtolower($id->value)] ?? null) : null, $tied);
     }
 
     /**

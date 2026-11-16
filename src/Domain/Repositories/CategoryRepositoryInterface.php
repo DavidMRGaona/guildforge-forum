@@ -25,6 +25,16 @@ interface CategoryRepositoryInterface
     public function find(CategoryId $id): ?Category;
 
     /**
+     * The categories that exist among those asked for, in one read.
+     *
+     * @param  list<CategoryId>  $ids
+     * @return array<string, Category> by id, in lower case
+     *
+     * @throws InvalidCategoryException when the stored rules of one cannot be read
+     */
+    public function findMany(array $ids): array;
+
+    /**
      * @throws CategoryNotFoundException
      * @throws InvalidCategoryException when its stored rules cannot be read
      */

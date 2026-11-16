@@ -22,10 +22,19 @@ final class FakeCampaignSource extends FakePublicationSource implements Publicat
 
     public static bool $rosterFails = false;
 
+    /** How many times a roster was asked for */
+    public static int $rosterReads = 0;
+
+    public static function rosterReads(): int
+    {
+        return self::$rosterReads;
+    }
+
     public static function resetRosters(): void
     {
         self::$rosters = [];
         self::$rosterFails = false;
+        self::$rosterReads = 0;
     }
 
     public function type(): string
@@ -35,6 +44,7 @@ final class FakeCampaignSource extends FakePublicationSource implements Publicat
 
     public function roster(string $id): ?PublicationRosterDTO
     {
+        self::$rosterReads++;
         if (self::$rosterFails) {
             throw new RuntimeException('Roster unavailable');
         }

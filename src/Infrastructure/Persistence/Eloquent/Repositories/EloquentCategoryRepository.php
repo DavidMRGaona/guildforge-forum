@@ -51,6 +51,20 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
         return $model instanceof CategoryModel ? $this->toEntity($model) : null;
     }
 
+    public function findMany(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $found = [];
+        foreach (CategoryModel::query()->whereKey(array_values(array_unique(array_map(static fn (CategoryId $id): string => $id->value, $ids))))->get() as $model) {
+            $found[strtolower((string) $model->id)] = $this->toEntity($model);
+        }
+
+        return $found;
+    }
+
     public function findOrFail(CategoryId $id): Category
     {
         return $this->find($id) ?? throw CategoryNotFoundException::withId($id->value);

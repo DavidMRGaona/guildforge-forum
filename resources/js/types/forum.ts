@@ -671,3 +671,21 @@ export interface ForumBlock {
     sinceLabel: string;
     unblockUrl: string;
 }
+
+/** One of a person's latest messages on their public profile (`forum.latest-posts`, forum#135) */
+export interface ForumProfilePost {
+    /** The topic's title */
+    title: string;
+    /** The message's own address */
+    url: string;
+    category: string;
+    categoryUrl: string;
+    /**
+     * Plain text, cut short, without the messages it quotes: images by their description, embeds by
+     * their address, rolls by their expression and reason (never their result). Empty when nothing
+     * is left (only quotes, references or images without a description).
+     */
+    excerpt: string;
+    publishedAt: string;
+    publishedLabel: string;
+}

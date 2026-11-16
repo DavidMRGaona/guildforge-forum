@@ -174,16 +174,14 @@ final readonly class ConversationReader
 
     /**
      * How many messages of the person the filter by author (`openByAuthor()`) lists in the
-     * discussion for the reader, by the same rules; 0 for an id that is not an account's.
-     *
-     * @throws DiscussionNotFoundException when the reader may not read it
+     * discussion for the reader, by the same rules; 0 for an id that is not an account's. The
+     * caller already found the discussion and checked that the reader may read it.
      */
-    public function countByAuthor(?Authenticatable $reader, DiscussionId $id, string $author): int
+    public function countByAuthor(?Authenticatable $reader, Discussion $discussion, string $author): int
     {
-        $discussion = $this->readable($reader, $id);
         $authorId = AccountId::normalize($author);
 
-        return $authorId === null ? 0 : count($this->authorNumbers($reader, $id, $authorId, $this->access->canModerate($reader, $discussion)));
+        return $authorId === null ? 0 : count($this->authorNumbers($reader, $discussion->id(), $authorId, $this->access->canModerate($reader, $discussion)));
     }
 
     /**

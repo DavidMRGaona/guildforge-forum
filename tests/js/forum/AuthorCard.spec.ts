@@ -224,7 +224,8 @@ describe('AuthorCard', () => {
     it('without a profile it keeps what the post shows and links to no profile', async () => {
         answers[`GET ${CARD_URL}`] = {
             status: 200,
-            body: aCard({ profile: null, title: null, postCount: null }),
+            // As the server answers it: the title the post shows, and no count without a profile
+            body: aCard({ profile: null, title: 'Narradora', postCount: null }),
         };
         const wrapper = mounted(aPost({ authorTitle: 'Narradora' }));
         await opened(wrapper);

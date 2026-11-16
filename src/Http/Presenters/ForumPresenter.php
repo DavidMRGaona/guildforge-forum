@@ -397,6 +397,13 @@ final readonly class ForumPresenter
         // Titles of the authors the reader may know, read the same way and in one query
         $titles = $this->titles->titlesOf(array_values(array_unique(array_filter($shown))));
 
+        // The forum's own account has no card. Asked once per author shown, never per post: there
+        // is no plain read of its id (`id()` creates the account when it is missing)
+        $forumAccount = array_flip(array_filter(
+            array_values(array_unique(array_filter($shown))),
+            $this->systemAccount->isSystemAccount(...),
+        ));
+
         $items = [];
         foreach ($posts as $index => $post) {
             $content = $contents[$index];
@@ -415,7 +422,7 @@ final readonly class ForumPresenter
                 // In character the fiction rules: neither the account's avatar nor its title
                 'authorTitle' => $shown[$index] === null || $content->character instanceof Character ? null : ($titles[$shown[$index]] ?? null),
                 // The card the writer's name opens (forum#134): only where the post names a person
-                'authorCardUrl' => $shown[$index] === null || $this->systemAccount->isSystemAccount($shown[$index])
+                'authorCardUrl' => $shown[$index] === null || isset($forumAccount[$shown[$index]])
                     ? null
                     : route('forum.posts.author', ['post' => $post->id()->value]),
                 'isStarter' => $shown[$index] !== null && $shown[$index] === $discussion->authorId(),

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Impersonation\Services\ImpersonationServiceInterface;
 use App\Application\Profiles\Services\ProfileCardServiceInterface;
+use App\Application\Services\SettingsServiceInterface;
+use App\Domain\Impersonation\Enums\ImpersonationEndReason;
+use App\Domain\Impersonation\Enums\ImpersonationMode;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserProfileModel;
 use DateTimeImmutable;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
@@ -25,6 +30,8 @@ use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\RecordingProfileCards;
 use Tests\Support\Modules\ModuleTestCase;
+use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Time\UsesUtcStorage;
 
 /**
@@ -106,13 +113,14 @@ final class AuthorCardEndpointTest extends ModuleTestCase
             ->assertJsonPath('topic.count', 2);
     }
 
-    public function test_a_guest_who_may_not_see_the_profile_still_gets_the_forum_part_without_ignoring(): void
+    public function test_a_guest_who_may_not_see_the_profile_gets_only_the_forum_actions(): void
     {
-        // Profiles are for members by default
+        // Profiles are for members by default: no profile, so no count of the person's messages,
+        // only what the post shows and the topic filtered by them
         $this->getJson($this->cardUrl($this->anaReply))
             ->assertOk()
             ->assertJsonPath('profile', null)
-            ->assertJsonPath('postCount', 2)
+            ->assertJsonPath('postCount', null)
             ->assertJsonPath('topic.count', 2)
             ->assertJsonPath('block', null);
     }
@@ -124,13 +132,16 @@ final class AuthorCardEndpointTest extends ModuleTestCase
         $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))
             ->assertOk()
             ->assertJsonPath('profile', null)
-            ->assertJsonPath('postCount', 2);
+            ->assertJsonPath('postCount', null)
+            ->assertJsonPath('topic.count', 2);
     }
 
     public function test_the_counts_only_take_in_what_the_reader_may_read(): void
     {
         $members = $this->aCategoryFor(CategoryAudience::signedIn(), 'socios', position: 1);
         $this->aDiscussion($members, authorId: strtolower($this->ana->id), title: 'Solo socios');
+        // A public profile, so a guest gets the count too
+        UserProfileModel::query()->whereKey($this->ana->id)->update(['visibility' => 'public']);
 
         $this->getJson($this->cardUrl($this->anaReply))->assertJsonPath('postCount', 2);
         $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))->assertJsonPath('postCount', 3);
@@ -243,6 +254,7 @@ final class AuthorCardEndpointTest extends ModuleTestCase
         $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))
             ->assertOk()
             ->assertJsonPath('profile', null)
+            ->assertJsonPath('postCount', null)
             ->assertJsonPath('topic.count', 2);
     }
 
@@ -266,9 +278,60 @@ final class AuthorCardEndpointTest extends ModuleTestCase
             $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))->assertOk();
         }
 
-        $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))->assertStatus(429);
+        $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))
+            ->assertStatus(429)
+            ->assertHeader('Retry-After')
+            // The web group's own headers: the limit answers inside it (ThrottleWhereListed)
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'DENY');
         // Another person keeps theirs
         $this->actingAs($this->ana)->getJson($this->cardUrl($this->anaReply))->assertOk();
+    }
+
+    public function test_every_post_that_has_no_card_answers_exactly_what_a_missing_post_answers(): void
+    {
+        $missing = '/foro/mensajes/'.PostId::generate()->value.'/autor';
+        $shared = $this->postAs($this->ana, 'Habla el mercader', $this->aSharedCharacterIn($this->general));
+        $pending = app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower($this->luis->id), self::aBody('Pendiente'), new DateTimeImmutable('2026-11-11 09:00:00'), true);
+        $forumPost = app(ForumWriter::class)->reply($this->discussion->id(), PostId::generate(), strtolower(app(SystemAccountInterface::class)->id()), self::aBody('Aviso'), new DateTimeImmutable('2026-11-11 09:00:00'), false);
+        $members = $this->aCategoryFor(CategoryAudience::signedIn(), 'socios', position: 1);
+        [, $unreadable] = $this->aDiscussion($members, authorId: strtolower($this->ana->id), title: 'Solo socios');
+
+        // Each one asked by somebody who may not have its card, next to a missing post asked by the same
+        $this->assertSameNotFound($this->getJson($missing), $this->getJson($this->cardUrl($unreadable)));
+        $this->assertSameNotFound($this->actingAs($this->luis)->getJson($missing), $this->actingAs($this->luis)->getJson($this->cardUrl($shared)));
+        $this->assertSameNotFound($this->actingAs($this->ana)->getJson($missing), $this->actingAs($this->ana)->getJson($this->cardUrl($pending)));
+        $this->assertSameNotFound($this->actingAs($this->luis)->getJson($missing), $this->actingAs($this->luis)->getJson($this->cardUrl($forumPost)));
+    }
+
+    public function test_while_impersonating_only_to_look_the_card_opens_for_the_impersonated_account(): void
+    {
+        $admin = UserModel::factory()->admin()->create();
+        $impersonation = app(ImpersonationServiceInterface::class);
+        // The administrator's own card: they could ignore Ana too
+        $this->actingAs($admin)->getJson($this->cardUrl($this->anaReply))->assertOk();
+
+        $impersonation->start($admin, $this->luis, ImpersonationMode::ReadOnly);
+        // A GET, never refused as a change; decided for Luis, who is not the owner
+        $this->getJson($this->cardUrl($this->anaReply))
+            ->assertOk()
+            ->assertJsonPath('profile.isOwner', false)
+            ->assertJsonPath('block.blocked', false);
+        $impersonation->stop(ImpersonationEndReason::Stopped);
+    }
+
+    public function test_a_reader_who_must_verify_their_email_gets_the_card_without_ignoring(): void
+    {
+        app(SettingsServiceInterface::class)->set('auth_email_verification_required', '1');
+        $unverified = UserModel::factory()->unverified()->create(['name' => 'nuevo.login', 'display_name' => 'Nuevo']);
+
+        // The card is public, but `foro/bloqueos` would refuse them, and a members' profile too
+        $this->actingAs($unverified)->getJson($this->cardUrl($this->anaReply))
+            ->assertOk()
+            ->assertJsonPath('profile', null)
+            ->assertJsonPath('block', null)
+            ->assertJsonPath('topic.count', 2);
+        $this->actingAs($this->luis)->getJson($this->cardUrl($this->anaReply))->assertJsonPath('block.blocked', false);
     }
 
     private function recordingCards(): RecordingProfileCards
@@ -277,6 +340,35 @@ final class AuthorCardEndpointTest extends ModuleTestCase
         $this->app->instance(ProfileCardServiceInterface::class, $cards);
 
         return $cards;
+    }
+
+    /**
+     * The same answer, body and headers, but for the date, the session cookies' values and the
+     * limit's own counters.
+     *
+     * @param  TestResponse<Response>  $expected
+     * @param  TestResponse<Response>  $actual
+     */
+    private function assertSameNotFound(TestResponse $expected, TestResponse $actual): void
+    {
+        $expected->assertNotFound();
+        $actual->assertNotFound();
+        $this->assertSame($expected->getContent(), $actual->getContent());
+        $this->assertSame($this->comparableHeaders($expected), $this->comparableHeaders($actual));
+    }
+
+    /**
+     * @param  TestResponse<Response>  $response
+     * @return array<string, mixed>
+     */
+    private function comparableHeaders(TestResponse $response): array
+    {
+        $headers = $response->headers->all();
+        unset($headers['date'], $headers['set-cookie'], $headers['x-ratelimit-limit'], $headers['x-ratelimit-remaining']);
+        ksort($headers);
+        $headers['cookie-names'] = array_map(static fn (Cookie $cookie): string => $cookie->getName(), $response->headers->getCookies());
+
+        return $headers;
     }
 
     private function postAs(UserModel $author, string $text, ?Character $as = null): Post

@@ -199,7 +199,7 @@ export interface ForumAuthorCard {
     profile: ForumProfileCard | null;
     /** The title the forum's moderation gave the person */
     title: string | null;
-    /** Their messages the reader may read in the forum; null for none */
+    /** Their messages the reader may read in the forum; null for none, or without a profile */
     postCount: number | null;
     /** Their messages in this topic, and the topic filtered by them (null without any) */
     topic: { count: number; url: string | null };

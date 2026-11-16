@@ -9,7 +9,9 @@ use Modules\Forum\Domain\Entities\Discussion;
 
 /**
  * The card a post's author opens with (forum#134), for one reader: the core's profile card when the
- * reader may see the profile, and what the forum adds. Never the account's name, email or id.
+ * reader may see the profile, and what the forum adds. Never the account's name or email. The id
+ * only goes where the page already carries it: in the addresses of the filter by author and of
+ * «Dejar de ignorar», never shown.
  */
 final readonly class AuthorCardDTO
 {

@@ -237,7 +237,7 @@ const actionClass =
                         >
                     </span>
                     <span
-                        v-if="card?.postCount"
+                        v-if="profile && card?.postCount"
                         class="mt-1 block text-xs text-base-secondary"
                         data-testid="author-card-posts"
                         >{{ t('forum.authorCard.posts', card.postCount) }}</span

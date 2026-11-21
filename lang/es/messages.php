@@ -717,6 +717,11 @@ return [
         // How an excerpt names a mentioned account without a public name
         'someone' => 'alguien',
     ],
+    'activity' => [
+        'posts' => 'Mensajes del foro',
+        'discussions' => 'Temas del foro',
+        'post_title' => 'Mensaje :number de «:title»',
+    ],
     'search' => [
         'discussions' => [
             'label' => 'Temas del foro',

@@ -45,8 +45,9 @@ final class ModuleBootsTest extends ModuleTestCase
         // the seeders run with the module's provider in 3.55.4, the menu badges in 3.56 and the
         // frame-src origins of the embedded players in 3.57, and the searchable tree of
         // FormSelect for the category pickers in 3.69, the public profile sections and stats in 3.79,
-        // and the profile card (ProfileCardServiceInterface, ThrottleWhereListed) in 3.81
-        $this->assertSame('^3.81.0', $manifest['requires']['core']);
+        // the profile card (ProfileCardServiceInterface, ThrottleWhereListed) in 3.81, and the
+        // activity contract (ActivitySourceInterface, ActivityPublisherInterface) in 3.86
+        $this->assertSame('^3.86.0', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }
 

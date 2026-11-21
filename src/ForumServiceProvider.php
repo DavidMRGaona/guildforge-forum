@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum;
 
+use App\Application\Activity\Contracts\ActivitySourceInterface;
 use App\Application\Knowledge\Contracts\KnowledgeCapabilityInterface;
 use App\Application\Mail\DTOs\MailCategoryDTO;
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
@@ -67,6 +68,7 @@ use Modules\Forum\Application\Contracts\UserBlocksInterface;
 use Modules\Forum\Application\Conversations\ConversationDocuments;
 use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Publications\PublicationAvailability;
+use Modules\Forum\Application\Queries\ActivitySubjectsQueryInterface;
 use Modules\Forum\Application\Queries\CategoryStatsQueryInterface;
 use Modules\Forum\Application\Queries\ConversationListQueryInterface;
 use Modules\Forum\Application\Queries\DiscussionListQueryInterface;
@@ -109,6 +111,9 @@ use Modules\Forum\Domain\Repositories\SuspensionRepositoryInterface;
 use Modules\Forum\Filament\Pages\ForumModerationPage;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Filament\Widgets\ForumActivityWidget;
+use Modules\Forum\Infrastructure\Activity\DiscussionActivitySource;
+use Modules\Forum\Infrastructure\Activity\ForumActivityObserver;
+use Modules\Forum\Infrastructure\Activity\PostActivitySource;
 use Modules\Forum\Infrastructure\Dice\RandomIntNumbers;
 use Modules\Forum\Infrastructure\Fetching\DnsHostResolver;
 use Modules\Forum\Infrastructure\Fetching\GuardedRemoteFetcher;
@@ -153,6 +158,7 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentSuspe
 use Modules\Forum\Infrastructure\Profiles\LatestPostsProfileSection;
 use Modules\Forum\Infrastructure\Profiles\PostsProfileStat;
 use Modules\Forum\Infrastructure\Profiles\TopicsProfileStat;
+use Modules\Forum\Infrastructure\Queries\EloquentActivitySubjectsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentCategoryStatsQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentConversationListQuery;
 use Modules\Forum\Infrastructure\Queries\EloquentDiscussionListQuery;
@@ -289,6 +295,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(ModerationQueueQueryInterface::class, EloquentModerationQueueQuery::class);
         $this->app->bind(SearchHitsQueryInterface::class, EloquentSearchHitsQuery::class);
         $this->app->bind(ProfileActivityQueryInterface::class, EloquentProfileActivityQuery::class);
+        // What counts as activity for the core's contract (forum#151)
+        $this->app->bind(ActivitySubjectsQueryInterface::class, EloquentActivitySubjectsQuery::class);
         // What a profile shows of the forum: each owner and viewer worked out once per request (or queue job)
         $this->app->scoped(ProfileActivity::class);
         // The category rules, per request like the policy they read
@@ -386,6 +394,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
 
         // The site search learns at once what was written, moved, hidden, approved or deleted
         ForumSearchObserver::register();
+        // And so does the activity contract (forum#151)
+        ForumActivityObserver::register();
     }
 
     /**
@@ -407,6 +417,17 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerSearchSources(): array
     {
         return [DiscussionSearchSource::class, PostSearchSource::class];
+    }
+
+    /**
+     * Posts and discussions for the core's activity contract (forum#151): who wrote what, in the
+     * categories every signed-in member reads.
+     *
+     * @return list<class-string<ActivitySourceInterface>>
+     */
+    public function registerActivitySources(): array
+    {
+        return [PostActivitySource::class, DiscussionActivitySource::class];
     }
 
     /**

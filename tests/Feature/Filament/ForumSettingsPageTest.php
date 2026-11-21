@@ -14,6 +14,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use App\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Filament\Forms\Components\CheckboxList;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Database\Seeders\ForumMenuLinkSeeder;
@@ -22,6 +23,7 @@ use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\ForumServiceProvider;
+use Modules\Forum\Infrastructure\Jobs\PublishForumActivityJob;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use Tests\Support\Modules\InteractsWithModulePanel;
 use Tests\Support\Modules\ModuleTestCase;
@@ -96,6 +98,32 @@ final class ForumSettingsPageTest extends ModuleTestCase
         $this->assertSame(3, $settings->postsPerMinute());
         $this->assertSame([PostImageType::Jpeg, PostImageType::Webp], $settings->imageTypes());
         $this->assertSame(1600, $settings->imageMaxDimension());
+    }
+
+    public function test_changing_the_forum_access_publishes_its_activity_again(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+        Queue::fake();
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.access', ForumAccessMode::Preview->value)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(PublishForumActivityJob::class, static fn (PublishForumActivityJob $job): bool => $job->scope === PublishForumActivityJob::EVERYTHING);
+    }
+
+    public function test_saving_with_the_same_access_publishes_no_activity(): void
+    {
+        $this->actingAs($this->userWith([self::MANAGE]));
+        Queue::fake();
+
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.posts_per_page', 15)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Queue::assertNotPushed(PublishForumActivityJob::class);
     }
 
     public function test_short_checkbox_lists_use_two_columns_until_the_form_is_wide(): void

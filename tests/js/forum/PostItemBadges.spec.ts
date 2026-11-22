@@ -1,17 +1,14 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import PostItem from '../../../resources/js/components/forum/PostItem.vue';
-import type {
-    ForumPost,
-    ForumPostCharacter,
-    ForumProfileBadge,
-} from '../../../resources/js/types/forum';
+import type { ProfileBadge } from '@/types/profileSections';
+import type { ForumPost, ForumPostCharacter } from '../../../resources/js/types/forum';
 
 afterEach(() => {
     document.body.innerHTML = '';
 });
 
-const badge: ForumProfileBadge = {
+const badge: ProfileBadge = {
     key: 'achievements.first',
     label: 'Primera partida',
     description: 'Jugó su primera partida en la asociación.',

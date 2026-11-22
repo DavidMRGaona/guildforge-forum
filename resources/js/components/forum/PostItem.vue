@@ -622,7 +622,8 @@ async function remove(): Promise<void> {
                         class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
                         data-testid="post-author-line"
                     >
-                        <p
+                        <!-- A div, not a p: the card it opens holds lists (its badges) -->
+                        <div
                             :id="`${anchor}-author`"
                             class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                         >
@@ -658,7 +659,7 @@ async function remove(): Promise<void> {
                                 data-testid="post-starter-label"
                                 >{{ t('forum.posts.starter') }}</span
                             >
-                        </p>
+                        </div>
                         <ProfileBadges
                             v-if="authorBadges.length > 0"
                             class="shrink-0"
@@ -713,7 +714,7 @@ async function remove(): Promise<void> {
                             ? 'forum.characters.shared.writtenBy'
                             : 'forum.characters.playedBy'
                     "
-                    tag="span"
+                    tag="div"
                     scope="global"
                     class="flex min-w-0 items-baseline whitespace-pre"
                     data-testid="post-character-writer"

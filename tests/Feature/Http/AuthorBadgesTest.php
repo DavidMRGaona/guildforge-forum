@@ -4,21 +4,25 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Profiles\Services\ProfileBadgesInterface;
 use App\Application\Profiles\Services\ProfileBadgeSourceRegistryInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use App\Infrastructure\Persistence\Eloquent\Models\UserProfileModel;
 use DateTimeImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
+use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\RecordingProfileBadges;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Profiles\FakeProfileBadgeSource;
 use Tests\Support\Time\UsesUtcStorage;
@@ -52,6 +56,9 @@ final class AuthorBadgesTest extends ModuleTestCase
     private UserModel $reader;
 
     private FakeProfileBadgeSource $source;
+
+    /** What the forum sends to the core, before the core's profile rule filters anybody */
+    private RecordingProfileBadges $asked;
 
     protected function setUp(): void
     {
@@ -165,9 +172,59 @@ final class AuthorBadgesTest extends ModuleTestCase
                     ->where('posts.3.authorBadges', [])
                     ->etc());
         }
-        foreach ($this->source->calls as $asked) {
-            $this->assertNotContains(strtolower($player->id), $asked);
+        // The forum never asks: the core's own rule is not what keeps them out
+        $this->assertCount(3, $this->asked->asked);
+        $this->assertNotContains(strtolower($player->id), $this->asked->everyAccountAsked());
+    }
+
+    public function test_a_deleted_character_shows_the_badges_of_a_writer_with_a_public_name_only(): void
+    {
+        $this->registerSource();
+        $player = UserModel::factory()->create(['name' => 'Laura Gómez Ruiz', 'display_name' => null]);
+        $arwen = $this->aCharacterOf($player->id);
+        $this->postAs($player, 'Como Arwen', $arwen);
+        $elrond = $this->aCharacterOf($this->luis->id, 'Elrond');
+        $this->postAs($this->luis, 'Como Elrond', $elrond);
+        app(CharacterRepositoryInterface::class)->delete($arwen->id());
+        app(CharacterRepositoryInterface::class)->delete($elrond->id());
+
+        foreach ([$this->reader, $this->anAccount(CategoryAccessPolicy::MODERATE_FORUM), $player] as $viewer) {
+            $this->actingAs($viewer)->get($this->discussionUrl())->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('posts.3.authorBadges', [])
+                    ->where('posts.4.authorName', 'Luis')
+                    ->where('posts.4.authorBadges.0.key', 'achievements.first')
+                    ->etc());
         }
+        $this->assertNotContains(strtolower($player->id), $this->asked->everyAccountAsked());
+    }
+
+    public function test_a_personal_character_the_reader_may_not_see_still_shows_the_named_writers_badges(): void
+    {
+        $this->registerSource();
+        // Tied to a category the reader cannot view: the post names its writer by their public name
+        $hidden = $this->aCategoryFor(CategoryAudience::associationMembers(), 'oculta');
+        $this->postAs($this->luis, 'Desde Rivendel', $this->aCharacterOf($this->luis->id, 'Elrond', boundTo: $hidden));
+
+        $this->actingAs($this->reader)->get($this->discussionUrl())->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('posts.3.character', null)
+                ->where('posts.3.authorName', 'Luis')
+                ->where('posts.3.authorBadges.0.key', 'achievements.first')
+                ->etc());
+    }
+
+    public function test_the_forums_own_account_carries_no_badges(): void
+    {
+        $this->registerSource();
+        $system = app(SystemAccountInterface::class)->id();
+        $this->postAs(UserModel::query()->findOrFail($system), 'Aviso automático');
+
+        $this->actingAs($this->reader)->get($this->discussionUrl())->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('posts.3.authorBadges', [])
+                ->etc());
+        $this->assertNotContains(strtolower($system), $this->asked->everyAccountAsked());
     }
 
     public function test_a_shared_character_never_carries_the_badges_of_who_writes_it(): void
@@ -197,6 +254,22 @@ final class AuthorBadgesTest extends ModuleTestCase
         $this->assertCount(1, $this->source->calls);
     }
 
+    public function test_the_author_card_of_a_shared_character_post_shows_no_badges_even_to_moderation(): void
+    {
+        $this->registerSource();
+        $npcPost = $this->postAs($this->ana, 'Habla el mercader', $this->aSharedCharacterIn($this->general));
+        $own = $this->postAs($this->ana, 'Fuera de personaje');
+        $moderator = $this->anAccount(CategoryAccessPolicy::MODERATE_FORUM);
+
+        $this->actingAs($moderator)->getJson('/foro/mensajes/'.$npcPost->id()->value.'/autor')
+            ->assertOk()
+            ->assertJsonPath('profile.publicName', 'Ana')
+            ->assertJsonPath('profile.badges', []);
+        $this->actingAs($moderator)->getJson('/foro/mensajes/'.$own->id()->value.'/autor')
+            ->assertOk()
+            ->assertJsonPath('profile.badges.0.key', 'achievements.first');
+    }
+
     public function test_the_author_card_carries_the_profile_badges(): void
     {
         $this->registerSource();
@@ -213,6 +286,8 @@ final class AuthorBadgesTest extends ModuleTestCase
         $this->source = new FakeProfileBadgeSource('achievements');
         $this->app->instance(self::SOURCE, $this->source);
         $this->app->make(ProfileBadgeSourceRegistryInterface::class)->register(self::SOURCE, 'achievements');
+        $this->asked = new RecordingProfileBadges($this->app->make(ProfileBadgesInterface::class));
+        $this->app->instance(ProfileBadgesInterface::class, $this->asked);
     }
 
     private function postAs(UserModel $author, string $text, ?Character $as = null): Post

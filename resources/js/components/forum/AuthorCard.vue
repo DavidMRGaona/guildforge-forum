@@ -162,7 +162,8 @@ const actionClass =
 </script>
 
 <template>
-    <span ref="root" class="relative inline-flex min-w-0" @keydown.esc.stop="close()">
+    <!-- Divs, not spans, wherever the card holds its badges' list; inline-flex keeps it in the line -->
+    <div ref="root" class="relative inline-flex min-w-0" @keydown.esc.stop="close()">
         <button
             ref="toggle"
             type="button"
@@ -183,7 +184,7 @@ const actionClass =
             data-testid="author-card-veil"
             @click.stop="close(false)"
         />
-        <span
+        <div
             v-show="open"
             :id="panelId"
             ref="panel"
@@ -199,7 +200,7 @@ const actionClass =
                 aria-hidden="true"
                 data-testid="author-card-banner"
             />
-            <span class="flex items-start gap-3 p-4" :class="{ '-mt-8': profile?.bannerUrl }">
+            <div class="flex items-start gap-3 p-4" :class="{ '-mt-8': profile?.bannerUrl }">
                 <img
                     v-if="avatarUrl"
                     :src="avatarUrl"
@@ -213,9 +214,9 @@ const actionClass =
                     aria-hidden="true"
                     >{{ initial }}</span
                 >
-                <span class="min-w-0 flex-1 pt-1" :class="{ 'pt-9': profile?.bannerUrl }">
+                <div class="min-w-0 flex-1 pt-1" :class="{ 'pt-9': profile?.bannerUrl }">
                     <!-- The badges go whole below the name when they do not fit beside it -->
-                    <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                         <span
                             class="min-w-0 truncate text-base font-semibold text-base-primary"
                             data-testid="author-card-name"
@@ -227,7 +228,7 @@ const actionClass =
                             size="sm"
                             :badges="badges"
                         />
-                    </span>
+                    </div>
                     <span
                         v-if="title"
                         class="block truncate text-xs text-base-secondary"
@@ -254,7 +255,7 @@ const actionClass =
                         data-testid="author-card-posts"
                         >{{ t('forum.authorCard.posts', card.postCount) }}</span
                     >
-                </span>
+                </div>
                 <button
                     type="button"
                     class="-mr-2 -mt-2 inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-base-secondary hover:bg-muted sm:hidden"
@@ -263,7 +264,7 @@ const actionClass =
                 >
                     <X class="h-5 w-5" aria-hidden="true" />
                 </button>
-            </span>
+            </div>
 
             <span v-if="loading" class="block px-4 pb-4 text-sm text-base-muted" role="status">{{
                 t('forum.authorCard.loading')
@@ -370,6 +371,6 @@ const actionClass =
                     </button>
                 </template>
             </span>
-        </span>
-    </span>
+        </div>
+    </div>
 </template>

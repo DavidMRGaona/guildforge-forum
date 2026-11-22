@@ -174,7 +174,7 @@ describe('a compact post', () => {
 
         const group = wrapper.get('[data-testid="post-author"]');
         expect(group.find('[data-testid="post-avatar"]').exists()).toBe(true);
-        expect(group.find('p').text()).toContain('Un nombre bastante largo');
+        expect(group.find('[id$="-author"]').text()).toContain('Un nombre bastante largo');
         expect(group.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0']));
         expect(group.classes()).not.toContain('flex-wrap');
     });

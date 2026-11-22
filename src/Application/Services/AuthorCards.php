@@ -52,6 +52,7 @@ final readonly class AuthorCards
         private BlockService $blocks,
         private AccountDirectoryInterface $accounts,
         private EmailVerificationPolicyInterface $verification,
+        private PostAuthorBadges $badges,
     ) {}
 
     /**
@@ -66,6 +67,21 @@ final readonly class AuthorCards
         }
 
         $profile = $this->cards->card($authorId, $reader);
+        // The badges follow the rule of the post's header (forum#152): never as a shared
+        // character, not even for moderation, and in character only with a public name
+        if ($profile instanceof ProfileCardDTO && $profile->badges !== [] && ! $this->badges->cardShowsBadges($post)) {
+            $profile = new ProfileCardDTO(
+                handle: $profile->handle,
+                publicName: $profile->publicName,
+                url: $profile->url,
+                avatarUrl: $profile->avatarUrl,
+                bannerUrl: $profile->bannerUrl,
+                memberSince: $profile->memberSince,
+                showsMembership: $profile->showsMembership,
+                isOwner: $profile->isOwner,
+                stats: $profile->stats,
+            );
+        }
 
         return new AuthorCardDTO(
             authorId: $authorId,

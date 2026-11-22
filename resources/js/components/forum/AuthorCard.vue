@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Link } from '@inertiajs/vue3';
 import { Ban, Mail, MessagesSquare, ShieldCheck, UserRound, X } from '@lucide/vue';
+import ProfileBadges from '@/components/ui/ProfileBadges.vue';
 import { buildAvatarUrl } from '@/utils/cloudinary';
 import { sendJson } from '../../forum/api';
 import { useAuthorCards } from '../../composables/useAuthorCards';
@@ -53,6 +54,8 @@ const panelId = `forum-author-card-${Math.random().toString(36).slice(2, 10)}`;
 const cacheKey = computed(() => props.post.authorId ?? props.post.id);
 
 const profile = computed(() => card.value?.profile ?? null);
+/** The profile's featured badges (forum#152), only with a profile the reader may see */
+const badges = computed(() => profile.value?.badges ?? []);
 const shownName = computed(() => profile.value?.publicName ?? props.name);
 const title = computed(() => card.value?.title ?? props.post.authorTitle ?? null);
 /** The profile's avatar, else the one the post shows (none in character), else the initial */
@@ -211,11 +214,20 @@ const actionClass =
                     >{{ initial }}</span
                 >
                 <span class="min-w-0 flex-1 pt-1" :class="{ 'pt-9': profile?.bannerUrl }">
-                    <span
-                        class="block truncate text-base font-semibold text-base-primary"
-                        data-testid="author-card-name"
-                        >{{ shownName }}</span
-                    >
+                    <!-- The badges go whole below the name when they do not fit beside it -->
+                    <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                            class="min-w-0 truncate text-base font-semibold text-base-primary"
+                            data-testid="author-card-name"
+                            >{{ shownName }}</span
+                        >
+                        <ProfileBadges
+                            v-if="badges.length > 0"
+                            class="shrink-0"
+                            size="sm"
+                            :badges="badges"
+                        />
+                    </span>
                     <span
                         v-if="title"
                         class="block truncate text-xs text-base-secondary"

@@ -399,6 +399,16 @@ El nombre de quien escribe un mensaje abre su tarjeta (forum#134, core ≥ 3.81)
 - **Límite**: 30 tarjetas por minuto y persona (o dirección), `forum-author-cards`, con `ThrottleWhereListed` del core: cuenta dentro de la red de seguridad de la impersonación y su 429 lleva las cabeceras del grupo web.
 - **Navegador**: `components/forum/AuthorCard.vue`, un botón con `aria-expanded` como el menú de moderación; Escape o un clic fuera la cierran y el foco vuelve al nombre. En pantallas estrechas es una hoja que sube desde abajo. La página del tema y el hilo de una ficha guardan las tarjetas por persona mientras están abiertos (`composables/useAuthorCards.ts`); una petición fallida no se guarda.
 
+## Insignias destacadas
+
+Junto al nombre de quien escribe van hasta tres insignias destacadas de su perfil (forum#152, core ≥ 3.86, #776), en la cabecera de cada mensaje y en la tarjeta del autor. El foro no sabe de dónde salen: las pide al contrato del core (`ProfileBadgesInterface::forAuthors()`), así que funciona igual con cualquier módulo que las dé, y sin ninguno no aparece nada.
+
+- **Una llamada por respuesta**: `Application\Services\PostAuthorBadges` reúne los autores de todos los mensajes (cada uno una vez) y llama una sola vez a `forAuthors()` con quien mira; `Http\Presenters\AuthorBadgesPresenter` añade `authorBadges` (lista, vacía si no hay) a cada mensaje en la página del tema, en sus novedades (`/foro/temas/{id}/novedades`) y en el hilo de una ficha. Las vistas previas de las referencias no las llevan.
+- **Visibilidad**: la decide el core con la regla del perfil público (nada de un perfil oculto o que quien mira no puede ver, y falla cerrado). El foro no hace comprobaciones propias de visibilidad.
+- **Personajes**: solo donde el mensaje nombra a una persona (los mismos `authorHidden` y `unnamedWriter` que el nombre). Nunca en un personaje compartido, tampoco para la moderación ni para quien lo escribe; nunca en un personaje que quien mira no puede ver; y en personaje, solo si quien escribe tiene nombre público (`AccountDirectoryInterface::publicNamesOf()`, la misma regla que `CharacterWriterNames`), también para la moderación y para la propia persona. Esos autores ni siquiera se le preguntan al core. La cuenta del foro no lleva insignias.
+- **Tarjeta del autor**: son las `badges` de la tarjeta del core (`profile.badges`), que ya pasan por la misma regla.
+- **Navegador**: `ProfileBadges.vue` del core (API pública) con `size="sm"`. Fuera de personaje van al lado del nombre, fuera del `<p>` que da nombre al mensaje; en personaje, en la línea «por …» de quien lo lleva, nunca junto al personaje. Si no caben bajan enteras a la línea siguiente (como las marcas de #76); solo se recorta un nombre muy largo.
+
 ## Personajes
 
 Cada cuenta escribe como sus personajes, para que las partidas se lean como una historia.

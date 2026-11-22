@@ -5,7 +5,7 @@ summary: Categorías, seguir temas, mensajes sin leer, novedades sin recargar, q
 category: community
 audience: site
 order: 10
-keywords: [foro, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, al momento, escribiendo, quién escribe, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
+keywords: [foro, insignias, tarjeta del autor, categorías, temas, mensajes, hilos, conversaciones, seguir, no leídos, sin leer, marcar como leído, novedades, mensajes nuevos, al momento, escribiendo, quién escribe, indicador, menú, buscar en el foro, denunciar, responder, nuevo tema, abrir un tema]
 related: [forum.site.writing, forum.site.notices, forum.site.play-by-post, forum.site.private-messages]
 conditions:
   capabilities: [forum.visible]
@@ -24,6 +24,10 @@ Para abrir un tema pulsa **Nuevo tema**, elige la categoría, escribe un título
 
 > [!TIP]
 > Si no puedes responder, la caja te dice por qué: el tema está cerrado, la categoría es de solo lectura, tienes que verificar tu email o estás suspendido en el foro.
+
+## Quién escribe cada mensaje
+
+Cada mensaje lleva arriba el nombre de quien lo escribió. Pulsa el nombre para abrir su tarjeta, con su perfil y sus mensajes en el tema. Junto al nombre pueden aparecer hasta tres **insignias**: las que esa persona destaca en su perfil. Solo las ves si puedes ver su perfil, y si no caben al lado del nombre pasan a la línea de debajo. Pasa el ratón por encima de una insignia para leer qué significa.
 
 ## Mensajes que esperan aprobación
 

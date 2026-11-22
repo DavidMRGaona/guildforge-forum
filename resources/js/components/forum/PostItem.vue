@@ -5,6 +5,7 @@ import type { JSONContent } from '@tiptap/core';
 import { Link } from '@inertiajs/vue3';
 import { ChevronDown, Flag, Mail, Pencil, Quote, Trash2 } from '@lucide/vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
+import ProfileBadges from '@/components/ui/ProfileBadges.vue';
 import PostEditor from '../editor/PostEditor.vue';
 import AuthorCard, { type AuthorCardModeration } from './AuthorCard.vue';
 import LikeButton from './LikeButton.vue';
@@ -217,6 +218,9 @@ const namesPlayer = computed(
         props.post.authorName !== null ||
         (!props.post.character?.isShared && !props.post.writerUnnamed)
 );
+
+/** The author's featured badges (forum#152); the server sends none where they could tell who writes */
+const authorBadges = computed(() => props.post.authorBadges ?? []);
 
 /** Whether the author may be suspended from here: someone else's post, by an account */
 const canSuspendAuthor = computed(
@@ -611,41 +615,57 @@ async function remove(): Promise<void> {
                             >{{ t('forum.posts.starter') }}</span
                         >
                     </p>
-                    <p
+                    <!-- Name and badges: the badges go whole to the next line when they do not fit
+                         beside the name; only a very long name is cut -->
+                    <div
                         v-else
-                        :id="`${anchor}-author`"
-                        class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
+                        class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
+                        data-testid="post-author-line"
                     >
-                        <!-- The name opens the writer's card, where the post names a person -->
-                        <AuthorCard
-                            v-if="post.authorCardUrl && post.authorName"
-                            class="min-w-[6ch]"
-                            :post="post"
-                            :name="post.authorName"
-                            :can-title="canTitleFromCard"
-                            :can-suspend="canSuspendAuthor"
-                            @moderate="moderateFromCard"
+                        <p
+                            :id="`${anchor}-author`"
+                            class="flex min-w-0 items-center gap-x-2 font-semibold text-base-primary"
                         >
-                            <span data-testid="post-author-name">{{ post.authorName }}</span>
-                        </AuthorCard>
-                        <span v-else class="min-w-[6ch] truncate" data-testid="post-author-name">{{
-                            post.authorName ?? t('forum.posts.deletedAccount')
-                        }}</span>
-                        <!-- Given by moderation; escaped like any text. Cut before the name, never to nothing -->
-                        <span
-                            v-if="post.authorTitle"
-                            class="min-w-[5ch] shrink-[2] truncate text-xs font-normal text-base-secondary"
-                            :title="post.authorTitle"
-                            data-testid="post-author-title"
-                            >{{ post.authorTitle }}</span
-                        >
-                        <span
-                            v-if="post.isStarter"
-                            class="sr-only"
-                            data-testid="post-starter-label"
-                            >{{ t('forum.posts.starter') }}</span
-                        >
-                    </p>
+                            <!-- The name opens the writer's card, where the post names a person -->
+                            <AuthorCard
+                                v-if="post.authorCardUrl && post.authorName"
+                                class="min-w-[6ch]"
+                                :post="post"
+                                :name="post.authorName"
+                                :can-title="canTitleFromCard"
+                                :can-suspend="canSuspendAuthor"
+                                @moderate="moderateFromCard"
+                            >
+                                <span data-testid="post-author-name">{{ post.authorName }}</span>
+                            </AuthorCard>
+                            <span
+                                v-else
+                                class="min-w-[6ch] truncate"
+                                data-testid="post-author-name"
+                                >{{ post.authorName ?? t('forum.posts.deletedAccount') }}</span
+                            >
+                            <!-- Given by moderation; escaped like any text. Cut before the name, never to nothing -->
+                            <span
+                                v-if="post.authorTitle"
+                                class="min-w-[5ch] shrink-[2] truncate text-xs font-normal text-base-secondary"
+                                :title="post.authorTitle"
+                                data-testid="post-author-title"
+                                >{{ post.authorTitle }}</span
+                            >
+                            <span
+                                v-if="post.isStarter"
+                                class="sr-only"
+                                data-testid="post-starter-label"
+                                >{{ t('forum.posts.starter') }}</span
+                            >
+                        </p>
+                        <ProfileBadges
+                            v-if="authorBadges.length > 0"
+                            class="shrink-0"
+                            size="sm"
+                            :badges="authorBadges"
+                        />
+                    </div>
                 </div>
                 <!-- Date, «editado» and «pendiente» wrap on narrow screens instead of widening the page -->
                 <p
@@ -668,7 +688,7 @@ async function remove(): Promise<void> {
                     >
                 </p>
             </header>
-            <p
+            <div
                 v-if="post.character && (post.character.isShared || namesPlayer)"
                 class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-secondary"
                 data-testid="post-character-player"
@@ -718,7 +738,14 @@ async function remove(): Promise<void> {
                               name: post.authorName ?? t('forum.posts.deletedAccount'),
                           })
                 }}</span>
-            </p>
+                <!-- In character the badges are those of who plays it, on their line, never the character's -->
+                <ProfileBadges
+                    v-if="namesPlayer && authorBadges.length > 0"
+                    class="shrink-0"
+                    size="sm"
+                    :badges="authorBadges"
+                />
+            </div>
 
             <div class="mt-1">
                 <template v-if="editing">

@@ -172,6 +172,39 @@ export interface ForumPost {
     repliesUrl?: string | null;
     /** The card its writer's name opens (forum#134); null where the post names nobody */
     authorCardUrl?: string | null;
+    /**
+     * The author's featured badges (forum#152), drawn next to whoever the post names: empty when
+     * the reader may not see the profile, without any badge source, and always for a shared
+     * character or in character for a writer without a public name
+     */
+    authorBadges?: ForumProfileBadge[];
+}
+
+/**
+ * A featured badge of a profile, as the core sends it (core#776, `ProfileBadgeDTO`): what
+ * `ProfileBadges.vue` draws. Only badges of profiles the reader may see reach the page.
+ */
+export interface ForumProfileBadge {
+    key: string;
+    label: string;
+    description: string;
+    /** One of the core's badge icons, drawn when there is no image */
+    icon: string;
+    colour:
+        | 'slate'
+        | 'red'
+        | 'orange'
+        | 'amber'
+        | 'green'
+        | 'teal'
+        | 'sky'
+        | 'blue'
+        | 'violet'
+        | 'pink';
+    /** `https` image; null for the icon */
+    imageUrl: string | null;
+    /** Where the badge leads; null for none */
+    url: string | null;
 }
 
 /**
@@ -191,6 +224,8 @@ export interface ForumProfileCard {
     memberSince: string | null;
     showsMembership: boolean;
     isOwner: boolean;
+    /** The featured badges (core#776), at most 3; absent from a core before them */
+    badges?: ForumProfileBadge[];
 }
 
 /** The card a post's author opens with (GET /foro/mensajes/{post}/autor, forum#134) */

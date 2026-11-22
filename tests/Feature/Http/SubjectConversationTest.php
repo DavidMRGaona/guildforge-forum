@@ -119,7 +119,9 @@ final class SubjectConversationTest extends ModuleTestCase
             ->assertJsonPath('conversation.lastReadNumber', null)
             // Likes as the discussion page shows them; a guest gives none
             ->assertJsonPath('conversation.posts.4.likes.count', 0)
-            ->assertJsonPath('conversation.posts.4.likes.canLike', false);
+            ->assertJsonPath('conversation.posts.4.likes.canLike', false)
+            // Badges as the discussion page shows them (forum#152): none without a source
+            ->assertJsonPath('conversation.posts.4.authorBadges', []);
         self::assertStringContainsString('Mensaje 8', (string) $response->json('conversation.posts.4.html'));
     }
 

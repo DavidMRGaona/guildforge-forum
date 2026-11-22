@@ -409,3 +409,42 @@ describe('PostItem with the author card', () => {
         expect(input?.value).toBe('Veterana');
     });
 });
+
+describe('AuthorCard badges', () => {
+    const badge = {
+        key: 'achievements.first',
+        label: 'Primera partida',
+        description: 'Jugó su primera partida en la asociación.',
+        icon: 'trophy',
+        colour: 'amber' as const,
+        imageUrl: null,
+        url: null,
+    };
+
+    it('shows the profile’s featured badges next to the name', async () => {
+        const card = aCard();
+        answers[`GET ${CARD_URL}`] = {
+            status: 200,
+            body: { ...card, profile: { ...card.profile, badges: [badge] } },
+        };
+        const wrapper = mounted();
+
+        await opened(wrapper);
+
+        const badges = wrapper.get('[data-testid="author-card"] [data-testid="profile-badges"]');
+        expect(badges.find('[data-badge="achievements.first"]').exists()).toBe(true);
+        expect(badges.text()).toContain('Primera partida');
+    });
+
+    it('shows none without a profile the reader may see, nor with a profile without badges', async () => {
+        answers[`GET ${CARD_URL}`] = { status: 200, body: aCard({ profile: null }) };
+        const hidden = mounted();
+        await opened(hidden);
+        expect(hidden.find('[data-testid="profile-badges"]').exists()).toBe(false);
+
+        answers[`GET ${CARD_URL}`] = { status: 200, body: aCard() };
+        const without = mounted(aPost({ id: 'post-2', authorId: 'author-2' }));
+        await opened(without);
+        expect(without.find('[data-testid="profile-badges"]').exists()).toBe(false);
+    });
+});

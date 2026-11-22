@@ -16,6 +16,7 @@ use Modules\Forum\Application\Services\ForumPulse;
 use Modules\Forum\Application\Services\NewPostsReader;
 use Modules\Forum\Domain\Exceptions\DiscussionNotFoundException;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
+use Modules\Forum\Http\Presenters\AuthorBadgesPresenter;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
 use Modules\Forum\Http\Presenters\MergedDiscussionAnswer;
@@ -41,6 +42,7 @@ final class LiveUpdatesController extends Controller
         private readonly EngagementPresenter $engagement,
         private readonly ModerationProps $moderationProps,
         private readonly PrivateMessageLinks $messageLinks,
+        private readonly AuthorBadgesPresenter $authorBadges,
         private readonly MergedDiscussionAnswer $merged,
         private readonly ConversationListQueryInterface $conversations,
     ) {}
@@ -76,7 +78,7 @@ final class LiveUpdatesController extends Controller
 
         return response()
             ->json([
-                'posts' => $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->engagement->withLikes($posts, $news->posts, $news->discussion, $user), $user), $user),
+                'posts' => $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->authorBadges->withBadges($this->engagement->withLikes($posts, $news->posts, $news->discussion, $user), $news->posts, $news->contents, $user), $user), $user),
                 'mentionNames' => $mentionNames,
                 'highestNumber' => $news->highestNumber,
                 'more' => $news->more,

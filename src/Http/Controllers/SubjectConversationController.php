@@ -12,6 +12,7 @@ use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\DTOs\SubjectConversationDTO;
 use Modules\Forum\Application\Services\SubjectConversationReader;
 use Modules\Forum\Domain\Enums\DiscussionStatus;
+use Modules\Forum\Http\Presenters\AuthorBadgesPresenter;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
 use Modules\Forum\Http\Presenters\ForumPresenter;
@@ -33,6 +34,7 @@ final class SubjectConversationController extends Controller
         private readonly EngagementPresenter $engagement,
         private readonly ModerationProps $moderationProps,
         private readonly PrivateMessageLinks $messageLinks,
+        private readonly AuthorBadgesPresenter $authorBadges,
     ) {}
 
     public function show(Request $request, string $type, string $id): JsonResponse
@@ -75,7 +77,7 @@ final class SubjectConversationController extends Controller
                 'isClosed' => $discussion->status() === DiscussionStatus::Closed,
                 'closedReason' => $conversation->closedReason?->value,
             ],
-            'posts' => $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->engagement->withLikes($posts, $conversation->posts, $discussion, $user), $user), $user),
+            'posts' => $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->authorBadges->withBadges($this->engagement->withLikes($posts, $conversation->posts, $discussion, $user), $conversation->posts, $conversation->contents, $user), $user), $user),
             'mentionNames' => $mentionNames,
             'olderCount' => $conversation->olderCount,
             'olderNext' => min(SubjectConversationReader::EARLIER, $conversation->olderCount),

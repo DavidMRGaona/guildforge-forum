@@ -37,6 +37,7 @@ use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\AccountId;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
 use Modules\Forum\Domain\ValueObjects\DiscussionSlug;
+use Modules\Forum\Http\Presenters\AuthorBadgesPresenter;
 use Modules\Forum\Http\Presenters\CharacterPresenter;
 use Modules\Forum\Http\Presenters\EditorProps;
 use Modules\Forum\Http\Presenters\EngagementPresenter;
@@ -70,6 +71,7 @@ final class DiscussionController extends Controller
         private readonly MemberTitleService $titles,
         private readonly ModerationProps $moderationProps,
         private readonly PrivateMessageLinks $messageLinks,
+        private readonly AuthorBadgesPresenter $authorBadges,
         private readonly CharacterPresenter $characters,
         private readonly ForumRedirects $redirects,
     ) {}
@@ -131,7 +133,7 @@ final class DiscussionController extends Controller
             : $this->presenter->pageUrl($page, $page->pageStart, absolute: true);
 
         $conversation = $this->engagement->conversation($this->presenter->conversation($page, $readable), $page, $user);
-        $conversation['posts'] = $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($conversation['posts'], $user), $user);
+        $conversation['posts'] = $this->messageLinks->withMessageLinks($this->moderationProps->withReportLinks($this->authorBadges->withBadges($conversation['posts'], $page->posts, $page->contents, $user), $user), $user);
 
         return Inertia::render('Forum/Discussion', [
             ...$conversation,

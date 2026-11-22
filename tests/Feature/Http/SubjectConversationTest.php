@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Feature\Http;
 
+use App\Application\Profiles\Services\ProfileBadgeSourceRegistryInterface;
 use App\Application\Publications\Enums\PublicationState;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Modules\Forum\Application\Contracts\DiscussionReadsInterface;
 use Modules\Forum\Application\Publications\PublicationFacts;
@@ -24,6 +26,7 @@ use Modules\Forum\Tests\Support\BuildsForumContent;
 use Modules\Forum\Tests\Support\FakeGameTableSource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\Modules\ModuleTestCase;
+use Tests\Support\Profiles\FakeProfileBadgeSource;
 use Tests\Support\Time\UsesUtcStorage;
 
 /**
@@ -119,8 +122,30 @@ final class SubjectConversationTest extends ModuleTestCase
             ->assertJsonPath('conversation.lastReadNumber', null)
             // Likes as the discussion page shows them; a guest gives none
             ->assertJsonPath('conversation.posts.4.likes.count', 0)
-            ->assertJsonPath('conversation.posts.4.likes.canLike', false);
+            ->assertJsonPath('conversation.posts.4.likes.canLike', false)
+            // Badges as the discussion page shows them (forum#152): none without a source
+            ->assertJsonPath('conversation.posts.4.authorBadges', []);
         self::assertStringContainsString('Mensaje 8', (string) $response->json('conversation.posts.4.html'));
+    }
+
+    public function test_posts_carry_their_authors_badges_from_one_call(): void
+    {
+        $source = new FakeProfileBadgeSource('achievements');
+        $this->app->instance('tests.forum-badge-source', $source);
+        app(ProfileBadgeSourceRegistryInterface::class)->register('tests.forum-badge-source', 'achievements');
+        [$discussion] = $this->aSubjectDiscussion('table-1', $this->public);
+        $ana = UserModel::factory()->create(['display_name' => 'Ana']);
+        $luis = UserModel::factory()->create(['display_name' => 'Luis']);
+        foreach ([$ana, $luis, $ana] as $i => $author) {
+            app(ForumWriter::class)->reply($discussion->id(), PostId::generate(), strtolower($author->id), self::aBody('Mensaje'), new DateTimeImmutable(sprintf('2026-11-10 10:%02d:00', $i + 2)), false);
+        }
+
+        $this->actingAs($this->anAccount())->getJson('/foro/fichas/game-table/table-1')->assertOk()
+            ->assertJsonPath('conversation.posts.0.authorBadges.0.key', 'achievements.first')
+            ->assertJsonPath('conversation.posts.1.authorBadges.0.key', 'achievements.first')
+            ->assertJsonPath('conversation.posts.2.authorBadges.0.key', 'achievements.first');
+        $this->assertCount(1, $source->calls);
+        $this->assertEqualsCanonicalizing([strtolower($ana->id), strtolower($luis->id)], $source->calls[0]);
     }
 
     public function test_posts_offer_to_write_privately_to_their_author_when_the_reader_may(): void

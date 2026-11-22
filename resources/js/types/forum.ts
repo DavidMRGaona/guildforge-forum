@@ -1,5 +1,6 @@
 import type { EmbedService } from '../editor/document';
 import type { JSONContent } from '@tiptap/core';
+import type { ProfileBadge } from '@/types/profileSections';
 
 /** Props the forum pages receive from the server (see ForumPresenter). */
 
@@ -172,6 +173,12 @@ export interface ForumPost {
     repliesUrl?: string | null;
     /** The card its writer's name opens (forum#134); null where the post names nobody */
     authorCardUrl?: string | null;
+    /**
+     * The author's featured badges (forum#152), drawn next to whoever the post names: empty when
+     * the reader may not see the profile, without any badge source, and always for a shared
+     * character or in character for a writer without a public name
+     */
+    authorBadges?: ProfileBadge[];
 }
 
 /**
@@ -191,6 +198,8 @@ export interface ForumProfileCard {
     memberSince: string | null;
     showsMembership: boolean;
     isOwner: boolean;
+    /** The featured badges (core#776), at most 3; absent from a core before them */
+    badges?: ProfileBadge[];
 }
 
 /** The card a post's author opens with (GET /foro/mensajes/{post}/autor, forum#134) */

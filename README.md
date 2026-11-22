@@ -356,6 +356,39 @@ Todo se decide para quien mira con las reglas del propio foro (`Application\Serv
 - Lo escrito como un personaje compartido solo cuenta y sale para quien puede saber quién lo escribió: su autor, la moderación de la categoría y quien modera el personaje (`PostContentPresenter::charactersHidingTheirWriter()`, la misma regla que el tema y el filtro por autor). Lo escrito como personaje propio por alguien sin nombre público sigue `hidesCharacterPostsOf()`. Fuera de personaje y en personaje cuentan igual. Un tema abierto como personaje compartido tampoco cuenta para los demás, aunque su primer mensaje esté oculto o borrado: los personajes se deciden sobre los mensajes que se cuentan y sobre el primer mensaje de cada tema de la persona.
 - Las consultas son pocas y acotadas (`EloquentProfileActivityQuery`, índice `forum_posts_author_activity_idx` sobre autor, estado y publicación): las categorías, los personajes usados (y, si los hay, sus fichas, las categorías a las que están atados de una vez con `CharacterRules::boundCategoriesOf()`, y el nombre público de la persona), la lista, los nombres de sus menciones y una por contador; ninguna crece con los mensajes ni con los personajes. Las plantillas de los espacios de campaña se piden a su módulo una vez por espacio y petición, como en cualquier página del foro (las categorías que se pueden leer y moderar las consultan), no una por personaje: crecen con el número de espacios del sitio. Si las categorías de los personajes no se pueden leer, se informa una vez y nadie salvo la moderación de todo el foro los ve ni los modera.
 
+## Actividad
+
+El foro cuenta al contrato de actividad del core quién escribió qué (core ≥ 3.86, #774; `registerActivitySources()`), para que otros módulos (los logros) lo usen sin depender del foro:
+
+- **`forum.post`** (tipo `forum_post`, papel `author`): cada mensaje que cuenta, para quien lo escribió, en la fecha en que se publicó (o se aprobó). El mensaje de apertura de un tema cuenta como un mensaje más.
+- **`forum.discussion`** (tipo `forum_discussion`, papel `author`): cada tema que cuenta, para quien lo abrió, en la fecha en que se abrió. Va aparte de su mensaje de apertura.
+
+**Qué cuenta.** Solo lo que cualquier cuenta puede leer, decidido sin mirar quién pregunta (se lee en trabajos en cola):
+
+- Las categorías que lee cualquiera o cualquier cuenta, con la misma regla que el buscador (`ForumSearchAudiences`, a través de `Application\Activity\ActivityCategories`): una subcategoría necesita que su madre también, y nada de lo que depende de un módulo que falta. Las de socios, roles o la plantilla de una campaña no cuentan nunca. Con el foro en vista previa no cuenta nada; «Acceso al foro» se lee de su fila guardada en cada consulta (`StoredForumAccessInterface`), no de la configuración con la que arrancó un trabajador de la cola.
+- Mensajes visibles y numerados de temas visibles, numerados y que no esperan aprobación. Nunca lo pendiente de aprobar, lo oculto ni lo que borró su autor.
+- Un tema solo mientras tiene algún mensaje visible.
+- Lo escrito como personaje propio (o como uno borrado después) cuenta para quien lo escribió solo si tiene nombre público: sin él, el foro nunca une esos mensajes a la cuenta (`CharacterWriterNames`, el filtro por autor). Lo mismo para un tema abierto como personaje propio. Fuera de personaje cuenta siempre.
+- Lo escrito como **personaje compartido no cuenta**: el personaje se nombra a sí mismo y oculta a quien lo escribe, y el hecho lo revelaría. Un personaje compartido no puede abrir un tema.
+- Nunca lo que escribe la cuenta del sistema (los temas automáticos) ni un mensaje sin cuenta.
+
+**Lo que no se puede leer no es «no cuenta».** Si no se puede leer el ajuste guardado, la regla de una categoría o el registro de publicaciones del core, la fuente lanza una excepción: el core la lee como `Failed` y quien consume no borra nada. Las páginas del foro siguen fallando cerradas, como siempre.
+
+`history()` recorre por id, en páginas, con un cursor opaco propio de cada fuente; uno que no se puede leer lanza `InvalidArgumentException`. `describe()` da el título del tema (y «Mensaje N de «…»» para un mensaje) con su dirección, solo a quien puede leerlo según `ForumAccessInterface`, con una consulta por tipo.
+
+**Cuándo se publica.** `ActivityPublisherInterface::recorded()` desde los eventos de los modelos (`Infrastructure\Activity\ForumActivityObserver`, como el buscador), así que cada camino que escribe queda cubierto: publicar, aprobar, ocultar y mostrar (mensajes y temas), borrar (el autor sus mensajes, la moderación un tema con todos sus mensajes), mover, dividir y fusionar temas, y cambiar de personaje al editar. Una edición que solo cambia el texto no publica nada. Un mensaje publica también su tema (y el tema del que sale, al dividir o fusionar), porque un tema cuenta mientras tenga algún mensaje visible.
+
+Lo que afecta a muchos va a la cola tras el commit (`PublishForumActivityJob`): un trabajo que solo reparte ids en lotes de 200 temas o 500 mensajes y uno hijo por lote. Un lote de temas publica los temas y reparte sus mensajes en lotes propios, por grandes que sean los temas, así ningún trabajo publica más de un lote ni crece con el foro, y un reintento empieza por su propio lote. Pasa con:
+
+- los mensajes de un tema que se oculta, se muestra, se mueve o se aprueba;
+- todo lo de una categoría (y sus subcategorías) cuando cambia quién la lee, su madre o la publicación de la que depende;
+- todo el foro cuando cambia «Acceso al foro» en sus ajustes;
+- lo que una persona escribió como personaje y los temas que abrió, cuando gana o pierde el nombre público.
+
+Los mensajes de un personaje borrado (`character_removed`) son siempre de personajes propios: `CharacterService::delete()` nunca borra un personaje compartido con mensajes (se retira). Aun así, si otro camino lo borrara, el observador publica antes sus mensajes.
+
+**Límites conocidos.** Habilitar o deshabilitar el módulo del que depende una categoría («Mesas», «Campañas», los espacios de campaña) no publica nada: sus temas empiezan o dejan de contar sin aviso hasta que algo los vuelva a publicar o quien los consume recalcule desde `history()`.
+
 ## Tarjeta del autor
 
 El nombre de quien escribe un mensaje abre su tarjeta (forum#134, core ≥ 3.81): el nombre fuera de personaje, o el de «por …» en personaje. `ForumPresenter::posts()` da a cada mensaje `authorCardUrl` solo donde el mensaje nombra a una persona: nunca en un personaje compartido cuyo autor no puede conocer quien mira (`authorHidden`), en un personaje propio de alguien sin nombre público ni en los mensajes de la cuenta del foro.

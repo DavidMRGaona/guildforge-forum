@@ -27,6 +27,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Forum\Application\Contracts\ForumSettingsInterface;
 use Modules\Forum\Application\Embeds\EmbedProviders;
 use Modules\Forum\Application\Services\CategoryAccessPolicy;
 use Modules\Forum\Application\Services\ForumMenuLink;
@@ -36,6 +37,7 @@ use Modules\Forum\Domain\Enums\PostImageType;
 use Modules\Forum\Domain\Enums\SubjectConversationMode;
 use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\RemoteUrl;
+use Modules\Forum\Infrastructure\Activity\ForumActivityChanges;
 use Modules\Forum\Infrastructure\Services\ForumSettings;
 use Throwable;
 
@@ -264,10 +266,12 @@ final class ForumSettingsPage extends Page implements HasForms
             ->statePath('data');
     }
 
-    public function save(ModuleManagerServiceInterface $moduleManager, ModuleSettingsStoreInterface $settingsStore, ForumMenuLink $menuLink): void
+    public function save(ModuleManagerServiceInterface $moduleManager, ModuleSettingsStoreInterface $settingsStore, ForumMenuLink $menuLink, ForumSettingsInterface $settings, ForumActivityChanges $activity): void
     {
         // Livewire methods can be called without the page's button
         abort_unless(self::canAccess(), 403);
+
+        $accessBefore = $settings->access();
 
         // Keys this page does not show keep their stored values, and so do the conversation
         // modes of types no source offers now (their module is off): they apply again when it is on
@@ -280,6 +284,10 @@ final class ForumSettingsPage extends Page implements HasForms
         $moduleManager->updateSettings(new ModuleName('forum'), array_merge($stored, $state));
         // The menu link follows the access at once
         $menuLink->applyAccess();
+        // Nothing of a preview counts as activity: opening it or closing it changes everything (forum#151)
+        if ($accessBefore !== (is_string($state['access'] ?? null) ? ForumAccessMode::tryFrom($state['access']) : null)) {
+            $activity->everything();
+        }
 
         Notification::make()
             ->title(__('forum::messages.settings.saved'))

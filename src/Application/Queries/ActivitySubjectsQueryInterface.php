@@ -11,9 +11,11 @@ namespace Modules\Forum\Application\Queries;
  *
  * - a post that is visible and numbered, in a visible, numbered discussion not awaiting approval,
  *   written by an account (never the forum's system account) and not as a shared character, which
- *   names itself and never its writer;
+ *   names itself and never its writer; as a personal character (or one deleted since) only when
+ *   the writer has a public name, the only name the forum shows them by (CharacterWriterNames);
  * - a discussion that is visible, numbered, not awaiting approval and holds a visible post,
- *   opened by an account (never the system account);
+ *   opened by an account (never the system account), and not as a personal character by someone
+ *   without a public name;
  * - both only in the categories given (those every signed-in member reads: ActivityCategories).
  *
  * Rows come in id order, from the one after `$afterId`, `$limit` at most.

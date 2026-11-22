@@ -39,7 +39,7 @@ final readonly class ForumActivityChanges
      */
     public function postsOf(string $discussionId): void
     {
-        $this->queue(new PublishForumActivityJob(PublishForumActivityJob::DISCUSSION, $discussionId));
+        $this->queue(new PublishForumActivityJob(PublishForumActivityJob::DISCUSSIONS, ids: [$discussionId]));
     }
 
     /**
@@ -48,6 +48,15 @@ final readonly class ForumActivityChanges
     public function category(string $categoryId): void
     {
         $this->queue(new PublishForumActivityJob(PublishForumActivityJob::CATEGORY, $categoryId));
+    }
+
+    /**
+     * What the person wrote as a character and every discussion they opened (their public name
+     * came or went: without one, what they wrote as a character is never tied to them).
+     */
+    public function author(string $accountId): void
+    {
+        $this->queue(new PublishForumActivityJob(PublishForumActivityJob::AUTHOR, $accountId));
     }
 
     /**

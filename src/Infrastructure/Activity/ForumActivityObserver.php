@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Activity;
 
+use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Illuminate\Support\Facades\Log;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CharacterModel;
@@ -16,8 +17,9 @@ use Throwable;
  * of posts, discussions and categories, like the site search: every write goes through them
  * (ForumWriter, moderation, moving and deleting categories), so publishing, approving, hiding,
  * showing, deleting, moving, splitting and merging are all told without each path remembering it.
- * Only the changes that may decide whether something counts are told; a failure is logged and
- * never makes a forum write fail.
+ * An account whose public name comes or goes is told too, since what it wrote as a character
+ * counts only with one. Only the changes that may decide whether something counts are told; a
+ * failure is logged and never makes a forum write fail.
  */
 final class ForumActivityObserver
 {
@@ -60,7 +62,8 @@ final class ForumActivityObserver
                 $activity->discussion($discussion->id);
             }
 
-            if (! $discussion->wasRecentlyCreated && $discussion->wasChanged(self::DISCUSSION_COLUMNS_FOR_POSTS)) {
+            // Only an update has changes (an insert has none), even on an instance created earlier
+            if ($discussion->wasChanged(self::DISCUSSION_COLUMNS_FOR_POSTS)) {
                 $activity->postsOf($discussion->id);
             }
         }));
@@ -72,7 +75,9 @@ final class ForumActivityObserver
             }
         }));
 
-        // A shared character hides who wrote as it; once it is gone its posts name their writer and count
+        // CharacterService never deletes a shared character with posts (it is retired instead), so
+        // what is written as one never ends up as a deleted character's: this only guards against
+        // another path doing it, by telling about its posts before they would start to count
         CharacterModel::deleting(static fn (CharacterModel $character) => $observer->guard(static function (ForumActivityChanges $activity) use ($character): void {
             if ($character->owner_id !== null) {
                 return;
@@ -83,11 +88,26 @@ final class ForumActivityObserver
             }
         }));
 
+        // What someone wrote as a character counts only while they have a public name
+        // Checked before resolving anything: every account save of the site passes here
+        UserModel::saved(static function (UserModel $user) use ($observer): void {
+            if (! $user->wasChanged('display_name') || self::named($user->getPrevious()['display_name'] ?? null) === self::named($user->display_name)) {
+                return;
+            }
+
+            $observer->guard(static fn (ForumActivityChanges $activity) => $activity->author(strtolower((string) $user->getKey())));
+        });
+
         CategoryModel::saved(static fn (CategoryModel $category) => $observer->guard(static function (ForumActivityChanges $activity) use ($category): void {
-            if (! $category->wasRecentlyCreated && $category->wasChanged(self::CATEGORY_COLUMNS)) {
+            if ($category->wasChanged(self::CATEGORY_COLUMNS)) {
                 $activity->category($category->id);
             }
         }));
+    }
+
+    private static function named(mixed $displayName): bool
+    {
+        return is_string($displayName) && trim($displayName) !== '';
     }
 
     /**

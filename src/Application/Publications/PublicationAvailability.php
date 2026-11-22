@@ -9,6 +9,7 @@ use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\SystemCategory;
 use Modules\Forum\Domain\ValueObjects\CategorySubject;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -25,17 +26,27 @@ use Throwable;
  *
  * It fails closed: a registry that throws (reported) means the type is not offered. Answers are
  * remembered for the request (bound scoped), as resolving the registry's sources is not free.
+ * What must tell «not offered» from «could not tell» (the activity contract, forum#151: a failure
+ * there must never read as «does not count») asks with `$strict`, which throws instead.
  */
 final class PublicationAvailability
 {
     /** @var array<string, bool> */
     private array $offered = [];
 
+    /** @var array<string, Throwable> the types whose source could not be read */
+    private array $failures = [];
+
     public function __construct(
         private readonly PublicationSourceRegistryInterface $publications,
     ) {}
 
-    public function offers(string $type): bool
+    /**
+     * @param  bool  $strict  throw when the registry could not be read, instead of «not offered»
+     *
+     * @throws RuntimeException in strict mode, when the registry threw for the type
+     */
+    public function offers(string $type, bool $strict = false): bool
     {
         if (! array_key_exists($type, $this->offered)) {
             try {
@@ -43,7 +54,12 @@ final class PublicationAvailability
             } catch (Throwable $exception) {
                 report($exception);
                 $this->offered[$type] = false;
+                $this->failures[$type] = $exception;
             }
+        }
+
+        if ($strict && isset($this->failures[$type])) {
+            throw new RuntimeException("The publication source of type {$type} could not be read.", 0, $this->failures[$type]);
         }
 
         return $this->offered[$type];
@@ -63,20 +79,23 @@ final class PublicationAvailability
      * Whether the category is shown to anyone but the forum's moderators. A subcategory is checked
      * with its parent (the caller has it); without it only the category's own requirement is read.
      */
-    public function isAvailable(Category $category, ?Category $parent = null): bool
+    /**
+     * @throws RuntimeException in strict mode, when the registry could not be read
+     */
+    public function isAvailable(Category $category, ?Category $parent = null, bool $strict = false): bool
     {
-        return $this->ownSourceIsOffered($category) && (! $parent instanceof Category || $this->ownSourceIsOffered($parent));
+        return $this->ownSourceIsOffered($category, $strict) && (! $parent instanceof Category || $this->ownSourceIsOffered($parent, $strict));
     }
 
-    private function ownSourceIsOffered(Category $category): bool
+    private function ownSourceIsOffered(Category $category, bool $strict): bool
     {
         $systemKey = $category->systemKey();
-        if ($systemKey instanceof SystemCategory && ! $this->offers($systemKey->publicationType())) {
+        if ($systemKey instanceof SystemCategory && ! $this->offers($systemKey->publicationType(), $strict)) {
             return false;
         }
 
         $subject = $category->subject();
 
-        return ! $subject instanceof CategorySubject || $this->offers($subject->type);
+        return ! $subject instanceof CategorySubject || $this->offers($subject->type, $strict);
     }
 }

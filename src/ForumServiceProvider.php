@@ -63,6 +63,7 @@ use Modules\Forum\Application\Contracts\PostLinksInterface;
 use Modules\Forum\Application\Contracts\PostRateLimiterInterface;
 use Modules\Forum\Application\Contracts\PublicationSyncQueueInterface;
 use Modules\Forum\Application\Contracts\RemoteFetcherInterface;
+use Modules\Forum\Application\Contracts\StoredForumAccessInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\Contracts\UserBlocksInterface;
 use Modules\Forum\Application\Conversations\ConversationDocuments;
@@ -199,6 +200,7 @@ use Modules\Forum\Infrastructure\Services\QueuedConversationNotices;
 use Modules\Forum\Infrastructure\Services\QueuedForumNotices;
 use Modules\Forum\Infrastructure\Services\RouteForumUrls;
 use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
+use Modules\Forum\Infrastructure\Services\SettingsStoredForumAccess;
 use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Policies\CategoryPolicy;
 
@@ -297,6 +299,7 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->bind(ProfileActivityQueryInterface::class, EloquentProfileActivityQuery::class);
         // What counts as activity for the core's contract (forum#151)
         $this->app->bind(ActivitySubjectsQueryInterface::class, EloquentActivitySubjectsQuery::class);
+        $this->app->bind(StoredForumAccessInterface::class, SettingsStoredForumAccess::class);
         // What a profile shows of the forum: each owner and viewer worked out once per request (or queue job)
         $this->app->scoped(ProfileActivity::class);
         // The category rules, per request like the policy they read

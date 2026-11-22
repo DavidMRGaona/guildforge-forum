@@ -10,6 +10,7 @@ use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Enums\CategoryAudienceKind;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\CategoryId;
+use RuntimeException;
 
 /**
  * The search audience of what a category holds. The site search knows three levels (anyone, any
@@ -32,8 +33,11 @@ final readonly class ForumSearchAudiences
 
     /**
      * @param  array<string, Category>  $categories  every category by id
+     * @param  bool  $strict  throw when what the category depends on could not be read, instead of no audience
+     *
+     * @throws RuntimeException in strict mode (PublicationAvailability)
      */
-    public function for(Category $category, array $categories): ?SearchAudience
+    public function for(Category $category, array $categories, bool $strict = false): ?SearchAudience
     {
         $own = $this->level($category->viewAudience());
         if ($own === null) {
@@ -42,11 +46,11 @@ final readonly class ForumSearchAudiences
 
         $parentId = $category->parentId();
         if (! $parentId instanceof CategoryId) {
-            return $this->availability->isAvailable($category) ? $this->audience($own) : null;
+            return $this->availability->isAvailable($category, strict: $strict) ? $this->audience($own) : null;
         }
 
         $parent = $categories[$parentId->value] ?? null;
-        $inherited = $parent instanceof Category && $parent->isTopLevel() && $this->availability->isAvailable($category, $parent)
+        $inherited = $parent instanceof Category && $parent->isTopLevel() && $this->availability->isAvailable($category, $parent, $strict)
             ? $this->level($parent->viewAudience())
             : null;
 

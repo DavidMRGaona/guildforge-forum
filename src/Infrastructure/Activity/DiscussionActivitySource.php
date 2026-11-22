@@ -11,7 +11,6 @@ use Modules\Forum\Application\Activity\ActivityCategories;
 use Modules\Forum\Application\Contracts\ForumAccessInterface;
 use Modules\Forum\Application\Contracts\ForumUrlsInterface;
 use Modules\Forum\Application\Queries\ActivitySubjectsQueryInterface;
-use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Repositories\DiscussionRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\DiscussionId;
 
@@ -56,10 +55,14 @@ final readonly class DiscussionActivitySource extends ForumActivitySource
      */
     public function describe(array $subjectIds, ?Authenticatable $viewer): array
     {
+        $ids = self::wellFormed($subjectIds);
+        if ($ids === []) {
+            return [];
+        }
+
         $described = [];
-        foreach (self::wellFormed($subjectIds) as $id) {
-            $discussion = $this->discussions->find(DiscussionId::fromString($id));
-            if ($discussion instanceof Discussion && $discussion->number() !== null && $this->access->canRead($viewer, $discussion)) {
+        foreach ($this->discussions->findMany(array_map(DiscussionId::fromString(...), $ids)) as $id => $discussion) {
+            if ($discussion->number() !== null && $this->access->canRead($viewer, $discussion)) {
                 $described[$id] = new ActivitySubjectDTO($id, $discussion->title()->value, $this->urls->discussion($discussion));
             }
         }

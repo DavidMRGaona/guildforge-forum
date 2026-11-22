@@ -365,15 +365,27 @@ El foro cuenta al contrato de actividad del core quién escribió qué (core ≥
 
 **Qué cuenta.** Solo lo que cualquier cuenta puede leer, decidido sin mirar quién pregunta (se lee en trabajos en cola):
 
-- Las categorías que lee cualquiera o cualquier cuenta, con la misma regla que el buscador (`ForumSearchAudiences`, a través de `Application\Activity\ActivityCategories`): una subcategoría necesita que su madre también, y nada de lo que depende de un módulo que falta. Las de socios, roles o la plantilla de una campaña no cuentan nunca. Con el foro en vista previa no cuenta nada.
+- Las categorías que lee cualquiera o cualquier cuenta, con la misma regla que el buscador (`ForumSearchAudiences`, a través de `Application\Activity\ActivityCategories`): una subcategoría necesita que su madre también, y nada de lo que depende de un módulo que falta. Las de socios, roles o la plantilla de una campaña no cuentan nunca. Con el foro en vista previa no cuenta nada; «Acceso al foro» se lee de su fila guardada en cada consulta (`StoredForumAccessInterface`), no de la configuración con la que arrancó un trabajador de la cola.
 - Mensajes visibles y numerados de temas visibles, numerados y que no esperan aprobación. Nunca lo pendiente de aprobar, lo oculto ni lo que borró su autor.
 - Un tema solo mientras tiene algún mensaje visible.
-- Lo escrito como personaje propio cuenta para quien lo escribió, como el foro lo nombra. Lo escrito como **personaje compartido no cuenta**: el personaje se nombra a sí mismo y oculta a quien lo escribe, y el hecho lo revelaría. Un personaje compartido no puede abrir un tema.
+- Lo escrito como personaje propio (o como uno borrado después) cuenta para quien lo escribió solo si tiene nombre público: sin él, el foro nunca une esos mensajes a la cuenta (`CharacterWriterNames`, el filtro por autor). Lo mismo para un tema abierto como personaje propio. Fuera de personaje cuenta siempre.
+- Lo escrito como **personaje compartido no cuenta**: el personaje se nombra a sí mismo y oculta a quien lo escribe, y el hecho lo revelaría. Un personaje compartido no puede abrir un tema.
 - Nunca lo que escribe la cuenta del sistema (los temas automáticos) ni un mensaje sin cuenta.
 
-`history()` recorre por id, en páginas, con un cursor opaco propio de cada fuente; uno que no se puede leer lanza `InvalidArgumentException`. `describe()` da el título del tema (y «Mensaje N de «…»» para un mensaje) con su dirección, solo a quien puede leerlo según `ForumAccessInterface`.
+**Lo que no se puede leer no es «no cuenta».** Si no se puede leer el ajuste guardado, la regla de una categoría o el registro de publicaciones del core, la fuente lanza una excepción: el core la lee como `Failed` y quien consume no borra nada. Las páginas del foro siguen fallando cerradas, como siempre.
 
-**Cuándo se publica.** `ActivityPublisherInterface::recorded()` desde los eventos de los modelos (`Infrastructure\Activity\ForumActivityObserver`, como el buscador), así que cada camino que escribe queda cubierto: publicar, aprobar, ocultar y mostrar (mensajes y temas), borrar (el autor sus mensajes, la moderación un tema con todos sus mensajes), mover, dividir y fusionar temas, cambiar de personaje al editar y borrar un personaje compartido (lo escrito como él pasa a nombrar a quien lo escribió). Un mensaje publica también su tema, porque el tema cuenta mientras tenga algún mensaje visible. Lo que afecta a muchos va a un trabajo en cola tras el commit (`PublishForumActivityJob`, en lotes de 200 temas y 500 mensajes): los mensajes de un tema que se oculta, se muestra, se mueve o se aprueba; todo lo de una categoría (y sus subcategorías) cuando cambia quién la lee, su madre o la publicación de la que depende; y todo el foro cuando cambia «Acceso al foro» en sus ajustes.
+`history()` recorre por id, en páginas, con un cursor opaco propio de cada fuente; uno que no se puede leer lanza `InvalidArgumentException`. `describe()` da el título del tema (y «Mensaje N de «…»» para un mensaje) con su dirección, solo a quien puede leerlo según `ForumAccessInterface`, con una consulta por tipo.
+
+**Cuándo se publica.** `ActivityPublisherInterface::recorded()` desde los eventos de los modelos (`Infrastructure\Activity\ForumActivityObserver`, como el buscador), así que cada camino que escribe queda cubierto: publicar, aprobar, ocultar y mostrar (mensajes y temas), borrar (el autor sus mensajes, la moderación un tema con todos sus mensajes), mover, dividir y fusionar temas, y cambiar de personaje al editar. Una edición que solo cambia el texto no publica nada. Un mensaje publica también su tema (y el tema del que sale, al dividir o fusionar), porque un tema cuenta mientras tenga algún mensaje visible.
+
+Lo que afecta a muchos va a la cola tras el commit (`PublishForumActivityJob`): un trabajo que solo reparte ids en lotes de 200 temas o 500 mensajes y uno hijo por lote, así ninguno crece con el foro y un reintento empieza por su propio lote. Pasa con:
+
+- los mensajes de un tema que se oculta, se muestra, se mueve o se aprueba;
+- todo lo de una categoría (y sus subcategorías) cuando cambia quién la lee, su madre o la publicación de la que depende;
+- todo el foro cuando cambia «Acceso al foro» en sus ajustes;
+- lo que una persona escribió como personaje y los temas que abrió, cuando gana o pierde el nombre público.
+
+Los mensajes de un personaje borrado (`character_removed`) son siempre de personajes propios: `CharacterService::delete()` nunca borra un personaje compartido con mensajes (se retira). Aun así, si otro camino lo borrara, el observador publica antes sus mensajes.
 
 **Límites conocidos.** Habilitar o deshabilitar el módulo del que depende una categoría («Mesas», «Campañas», los espacios de campaña) no publica nada: sus temas empiezan o dejan de contar sin aviso hasta que algo los vuelva a publicar o quien los consume recalcule desde `history()`.
 

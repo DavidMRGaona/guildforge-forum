@@ -67,23 +67,24 @@ final readonly class PostActivitySource extends ForumActivitySource
             return [];
         }
 
-        /** @var array<string, Discussion|null> $discussions */
-        $discussions = [];
+        $posts = array_values(array_filter(
+            $this->posts->findMany(array_map(PostId::fromString(...), $ids)),
+            static fn (Post $post): bool => $post->isVisible() && $post->number() instanceof PostNumber,
+        ));
+        $discussionIds = [];
+        foreach ($posts as $post) {
+            $discussionIds[$post->discussionId()->value] = $post->discussionId();
+        }
+        $readable = array_filter(
+            $this->discussions->findMany(array_values($discussionIds)),
+            fn (Discussion $discussion): bool => $this->access->canRead($viewer, $discussion),
+        );
+
         $described = [];
-        foreach ($this->posts->findMany(array_map(PostId::fromString(...), $ids)) as $post) {
+        foreach ($posts as $post) {
+            $discussion = $readable[$post->discussionId()->value] ?? null;
             $number = $post->number();
-            if (! $post->isVisible() || ! $number instanceof PostNumber) {
-                continue;
-            }
-
-            $discussionId = $post->discussionId();
-            if (! array_key_exists($discussionId->value, $discussions)) {
-                $discussion = $this->discussions->find($discussionId);
-                $discussions[$discussionId->value] = $discussion instanceof Discussion && $this->access->canRead($viewer, $discussion) ? $discussion : null;
-            }
-
-            $discussion = $discussions[$discussionId->value];
-            if ($discussion instanceof Discussion) {
+            if ($discussion instanceof Discussion && $number instanceof PostNumber) {
                 $described[$post->id()->value] = $this->subject($post, $number, $discussion);
             }
         }

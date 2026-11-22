@@ -46,6 +46,11 @@ final class StaleNumberDiscussions implements DiscussionRepositoryInterface
         return $this->inner->find($id);
     }
 
+    public function findMany(array $ids): array
+    {
+        return $this->inner->findMany($ids);
+    }
+
     public function findOrFail(DiscussionId $id): Discussion
     {
         return $this->inner->findOrFail($id);

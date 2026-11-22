@@ -74,6 +74,16 @@ interface CategoryRepositoryInterface
     public function all(): array;
 
     /**
+     * Every category, in the order of all(), for what must not take an unreadable one for a
+     * narrower one (the activity contract, forum#151).
+     *
+     * @return list<Category>
+     *
+     * @throws InvalidCategoryException when the stored rules of one cannot be read
+     */
+    public function allOrFail(): array;
+
+    /**
      * The category's subcategories by position, left out those whose rules cannot be read.
      *
      * @return list<Category>

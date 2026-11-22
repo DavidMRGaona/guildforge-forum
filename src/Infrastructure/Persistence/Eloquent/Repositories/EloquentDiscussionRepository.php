@@ -42,6 +42,21 @@ final class EloquentDiscussionRepository implements DiscussionRepositoryInterfac
         return $model instanceof DiscussionModel ? $this->toEntity($model) : null;
     }
 
+    public function findMany(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $discussions = [];
+        foreach (DiscussionModel::query()->whereKey(array_map(static fn (DiscussionId $id): string => $id->value, $ids))->get() as $model) {
+            $discussion = $this->toEntity($model);
+            $discussions[$discussion->id()->value] = $discussion;
+        }
+
+        return $discussions;
+    }
+
     public function findOrFail(DiscussionId $id): Discussion
     {
         return $this->find($id) ?? throw DiscussionNotFoundException::withId($id->value);

@@ -20,6 +20,14 @@ interface DiscussionRepositoryInterface
     public function find(DiscussionId $id): ?Discussion;
 
     /**
+     * The discussions that exist among the ids, in one read.
+     *
+     * @param  list<DiscussionId>  $ids
+     * @return array<string, Discussion> by id, in lower case
+     */
+    public function findMany(array $ids): array;
+
+    /**
      * @throws DiscussionNotFoundException
      */
     public function findOrFail(DiscussionId $id): Discussion;

@@ -5,28 +5,43 @@ declare(strict_types=1);
 namespace Modules\Forum\Tests\Feature\Activity;
 
 use App\Application\Activity\DTOs\ActivityFactDTO;
+use App\Application\Activity\Enums\ActivityReadOutcome;
+use App\Application\Activity\Services\ActivityReaderInterface;
+use App\Application\Modules\Services\ModuleSettingsStoreInterface;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Domain\Activity\ActivityRole;
 use App\Domain\Activity\Events\ActivityRecorded;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Mockery\MockInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
+use Modules\Forum\Application\DTOs\SpeakerChoice;
 use Modules\Forum\Application\Services\CategoryManager;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
 use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
+use Modules\Forum\Domain\ValueObjects\CategorySlug;
+use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Domain\ValueObjects\CharacterId;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Infrastructure\Activity\DiscussionActivitySource;
 use Modules\Forum\Infrastructure\Activity\PostActivitySource;
+use Modules\Forum\Infrastructure\Jobs\PublishForumActivityJob;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use RuntimeException;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -115,7 +130,7 @@ final class ForumActivityRulesTest extends ModuleTestCase
     public function test_nothing_counts_while_the_forum_is_a_preview(): void
     {
         [$discussion, $post] = $this->aDiscussion($this->general, authorId: $this->anaId());
-        config(['modules.settings.forum.access' => 'preview']);
+        app(ModuleSettingsStoreInterface::class)->store('forum', ['access' => 'preview']);
 
         $this->assertSame([], $this->postFacts($post));
         $this->assertSame([], $this->discussionFacts($discussion));
@@ -317,7 +332,11 @@ final class ForumActivityRulesTest extends ModuleTestCase
         $this->assertNotContains($post->id()->value, $this->historyIds(app(PostActivitySource::class)));
     }
 
-    public function test_deleting_a_shared_character_publishes_what_was_written_as_it(): void
+    /**
+     * CharacterService never deletes a shared character with posts (it is retired instead), so
+     * this only happens around it, straight through the repository: its posts are told first.
+     */
+    public function test_a_shared_character_deleted_around_the_service_publishes_its_posts_first(): void
     {
         $space = $this->aCategoryFor(CategoryAudience::everyone(), 'espacio');
         [$discussion] = $this->aDiscussion($space, authorId: $this->anaId());
@@ -421,6 +440,187 @@ final class ForumActivityRulesTest extends ModuleTestCase
         $this->assertSame([], app(DiscussionActivitySource::class)->facts('42'));
     }
 
+    public function test_the_access_is_read_from_what_is_stored_now_not_from_the_booted_configuration(): void
+    {
+        [$discussion, $post] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        $store = app(ModuleSettingsStoreInterface::class);
+
+        // A worker booted with the forum open, then the panel turned it into a preview
+        $store->store('forum', ['access' => 'preview']);
+        $this->assertSame('open', config('modules.settings.forum.access'));
+        $this->assertSame([], $this->postFacts($post));
+        $this->assertSame([], $this->discussionFacts($discussion));
+
+        // And the other way round
+        config(['modules.settings.forum.access' => 'preview']);
+        $store->store('forum', ['access' => 'open']);
+        $this->assertNotSame([], $this->postFacts($post));
+    }
+
+    public function test_a_publication_registry_that_cannot_be_read_fails_the_read_instead_of_counting_nothing(): void
+    {
+        $space = new Category(CategoryId::generate(), 'Espacio', new CategorySlug('espacio'), subject: new CategorySubject('campaign', 'c-1'));
+        app(CategoryRepositoryInterface::class)->save($space);
+        [, $post] = $this->aDiscussion($this->general, authorId: $this->anaId());
+
+        $this->mock(PublicationSourceRegistryInterface::class, static function (MockInterface $registry): void {
+            $registry->shouldReceive('source')->andThrow(new RuntimeException('Registry down'));
+        });
+        $this->app->forgetScopedInstances();
+
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->facts(self::POST, $post->id()->value)->outcome);
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->history(self::DISCUSSION, null, 10)->outcome);
+    }
+
+    public function test_a_category_rule_that_cannot_be_read_fails_the_read_instead_of_counting_nothing(): void
+    {
+        $broken = $this->aCategoryFor(CategoryAudience::everyone(), 'rota');
+        [, $post] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        DB::table('forum_categories')->where('id', $broken->id()->value)->update(['view_rule' => null]);
+
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->facts(self::POST, $post->id()->value)->outcome);
+        // The forum's own pages keep failing closed: the broken category is just left out there
+        $this->assertNotContains($broken->id()->value, array_map(static fn (Category $category): string => $category->id()->value, app(CategoryRepositoryInterface::class)->all()));
+    }
+
+    public function test_what_someone_without_a_public_name_wrote_as_a_character_is_never_tied_to_them(): void
+    {
+        $nameless = strtolower((string) UserModel::factory()->create(['display_name' => null])->id);
+        $character = $this->aCharacterOf($nameless);
+        [$asCharacter, $characterOpening] = $this->aDiscussion($this->general, authorId: $nameless, title: 'Abierto en personaje');
+        $this->speakAs($characterOpening, $character->id());
+        [$outOfCharacter, $plainOpening] = $this->aDiscussion($this->general, authorId: $nameless, title: 'Abierto sin personaje');
+        $inCharacter = $this->replyBy($outOfCharacter, $nameless, '2026-11-11 09:30:00', characterId: $character->id());
+
+        $this->assertSame([], $this->postFacts($characterOpening));
+        $this->assertSame([], $this->postFacts($inCharacter));
+        $this->assertSame([], $this->discussionFacts($asCharacter));
+        $this->assertSame([$nameless], $this->authorsOf($this->postFacts($plainOpening)));
+        $this->assertSame([$nameless], $this->authorsOf($this->discussionFacts($outOfCharacter)));
+
+        // A character deleted since still hides them
+        app(CharacterRepositoryInterface::class)->delete($character->id());
+        $this->assertSame([], $this->postFacts($inCharacter));
+    }
+
+    public function test_gaining_or_losing_the_public_name_publishes_what_they_wrote_as_a_character_and_opened(): void
+    {
+        $user = UserModel::factory()->create(['display_name' => null]);
+        $nameless = strtolower((string) $user->id);
+        $character = $this->aCharacterOf($nameless);
+        [$discussion, $opening] = $this->aDiscussion($this->general, authorId: $nameless);
+        $inCharacter = $this->replyBy($discussion, $nameless, '2026-11-11 09:30:00', characterId: $character->id());
+        $plain = $this->replyBy($discussion, $nameless, '2026-11-11 09:40:00');
+
+        $this->fakeActivity();
+        $user->update(['display_name' => 'Ana']);
+
+        $this->assertPublished(self::POST, $inCharacter->id()->value);
+        $this->assertPublished(self::DISCUSSION, $discussion->id()->value);
+        $this->assertNotPublished(self::POST, $plain->id()->value);
+        $this->assertNotPublished(self::POST, $opening->id()->value);
+        $this->assertSame([$nameless], $this->authorsOf($this->postFacts($inCharacter)));
+
+        $this->fakeActivity();
+        $user->update(['display_name' => 'Ana María']);
+        Event::assertNotDispatched(ActivityRecorded::class);
+
+        $this->fakeActivity();
+        $user->update(['display_name' => '  ']);
+        $this->assertPublished(self::POST, $inCharacter->id()->value);
+        $this->assertSame([], $this->postFacts($inCharacter));
+    }
+
+    public function test_splitting_publishes_the_discussion_the_posts_leave(): void
+    {
+        [$discussion] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        $reply = $this->replyBy($discussion, $this->anaId(), '2026-11-11 09:30:00');
+
+        $this->fakeActivity();
+        $new = app(ForumModeration::class)->split($this->moderator, $discussion->id(), [2], 'Tema aparte', $this->general->id());
+
+        $this->assertPublished(self::POST, $reply->id()->value);
+        $this->assertPublished(self::DISCUSSION, $new->id()->value);
+        $this->assertPublished(self::DISCUSSION, $discussion->id()->value);
+        $this->assertSame([$this->anaId()], $this->authorsOf($this->discussionFacts($new)));
+    }
+
+    public function test_changing_the_character_while_editing_publishes_the_post_and_a_text_edit_does_not(): void
+    {
+        [$discussion] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        $reply = $this->replyBy($discussion, $this->anaId(), '2026-11-11 09:30:00');
+        $npc = $this->aSharedCharacterIn($this->general);
+
+        $this->fakeActivity();
+        app(ForumWriter::class)->editPost($reply->id(), self::aBody('Otra respuesta'), $this->anaId(), new DateTimeImmutable('2026-11-11 10:00:00'));
+        Event::assertNotDispatched(ActivityRecorded::class);
+
+        $this->fakeActivity();
+        app(ForumWriter::class)->editPost($reply->id(), self::aBody('Otra respuesta'), $this->anaId(), new DateTimeImmutable('2026-11-11 10:05:00'), SpeakerChoice::as($npc->id()));
+        $this->assertPublished(self::POST, $reply->id()->value);
+        $this->assertSame([], $this->postFacts($reply));
+    }
+
+    public function test_moving_a_category_under_a_narrower_parent_publishes_what_it_holds(): void
+    {
+        $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');
+        $open = $this->aCategoryFor(CategoryAudience::everyone(), 'suelta');
+        [$discussion, $opening] = $this->aDiscussion($open, authorId: $this->anaId());
+
+        $this->fakeActivity();
+        $open->changeAccess(CategoryAudience::associationMembers(), $open->writeAudience(), $open->moderators());
+        $open->moveUnder($members->id());
+        app(CategoryManager::class)->save($open);
+
+        $this->assertPublished(self::DISCUSSION, $discussion->id()->value);
+        $this->assertPublished(self::POST, $opening->id()->value);
+        $this->assertSame([], $this->postFacts($opening));
+    }
+
+    public function test_approving_a_discussion_queues_its_posts(): void
+    {
+        [$discussion, $opening] = $this->aDiscussion($this->general, authorId: $this->anaId(), needsApproval: true);
+        Queue::fake();
+
+        app(ForumModeration::class)->approve($this->moderator, $opening->id());
+
+        Queue::assertPushed(PublishForumActivityJob::class, static fn (PublishForumActivityJob $job): bool => $job->scope === PublishForumActivityJob::DISCUSSIONS && $job->ids === [$discussion->id()->value]);
+    }
+
+    public function test_publishing_everything_covers_every_discussion_and_post_in_batches(): void
+    {
+        $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');
+        $sub = $this->aCategoryFor(CategoryAudience::everyone(), 'sub', parent: $this->general);
+        $subjects = [];
+        foreach ([$this->general, $members, $sub] as $category) {
+            [$discussion, $opening] = $this->aDiscussion($category, authorId: $this->anaId());
+            $subjects[] = [self::DISCUSSION, $discussion->id()->value];
+            $subjects[] = [self::POST, $opening->id()->value];
+            $subjects[] = [self::POST, $this->replyBy($discussion, $this->anaId(), '2026-11-11 09:30:00')->id()->value];
+        }
+
+        $this->fakeActivity();
+        app(Dispatcher::class)->dispatchSync(new PublishForumActivityJob(PublishForumActivityJob::EVERYTHING));
+
+        foreach ($subjects as [$type, $id]) {
+            $this->assertPublished($type, $id);
+        }
+        Event::assertDispatchedTimes(ActivityRecorded::class, count($subjects));
+    }
+
+    public function test_publishing_everything_hands_each_batch_of_discussions_to_a_job_of_its_own(): void
+    {
+        $this->aDiscussion($this->general, authorId: $this->anaId());
+        $this->aDiscussion($this->general, authorId: $this->anaId());
+        Queue::fake();
+
+        // Run here: dispatched, the faked queue would only keep it
+        app()->call([new PublishForumActivityJob(PublishForumActivityJob::EVERYTHING), 'handle']);
+
+        Queue::assertPushed(PublishForumActivityJob::class, static fn (PublishForumActivityJob $job): bool => $job->scope === PublishForumActivityJob::DISCUSSIONS && count($job->ids) === 2);
+        Queue::assertPushed(PublishForumActivityJob::class, 1);
+    }
+
     private function anaId(): string
     {
         return strtolower((string) $this->ana->id);
@@ -482,6 +682,22 @@ final class ForumActivityRulesTest extends ModuleTestCase
     {
         Event::fake([ActivityRecorded::class]);
         $this->app->forgetScopedInstances();
+    }
+
+    /**
+     * Makes the post speak as the character, as if it was written so.
+     */
+    private function speakAs(Post $post, CharacterId $characterId): void
+    {
+        DB::table('forum_posts')->where('id', $post->id()->value)->update(['character_id' => $characterId->value]);
+    }
+
+    private function assertNotPublished(string $type, string $id): void
+    {
+        Event::assertNotDispatched(
+            ActivityRecorded::class,
+            static fn (ActivityRecorded $event): bool => $event->sourceType === $type && $event->subjectId === $id,
+        );
     }
 
     private function assertPublished(string $type, string $id): void

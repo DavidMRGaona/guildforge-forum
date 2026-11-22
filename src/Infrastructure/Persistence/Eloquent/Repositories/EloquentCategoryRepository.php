@@ -106,6 +106,21 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
 
     public function all(): array
     {
+        return $this->readable($this->ordered());
+    }
+
+    public function allOrFail(): array
+    {
+        return array_map($this->toEntity(...), $this->ordered());
+    }
+
+    /**
+     * Top-level categories in order, each followed by its subcategories.
+     *
+     * @return list<CategoryModel>
+     */
+    private function ordered(): array
+    {
         $models = CategoryModel::query()->orderBy('position')->orderBy('name')->orderBy('id')->get();
 
         $children = [];
@@ -127,7 +142,7 @@ final class EloquentCategoryRepository implements CategoryRepositoryInterface
             }
         }
 
-        return $this->readable($ordered);
+        return $ordered;
     }
 
     public function childrenOf(CategoryId $id): array

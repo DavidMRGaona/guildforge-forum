@@ -8,6 +8,7 @@ use App\Application\Services\SettingsServiceInterface;
 use App\Application\Services\TimezoneServiceInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Queries\ActivitySubjectRowDTO;
@@ -42,6 +43,10 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
             ->whereNotNull('p.number')
             ->whereNotNull('p.published_at');
 
+        // As a personal character (or one deleted since), the forum names the writer only by their public name
+        $query->leftJoin('users as u', 'u.id', '=', 'p.author_id')
+            ->where(fn (Builder $where) => $this->outOfCharacterOrNamed($where, 'p'));
+
         return $this->rows($this->written($query, 'p.author_id'), 'p', $onlyIds, $afterId, $limit, 'p.published_at');
     }
 
@@ -53,6 +58,19 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
 
         // A discussion with no visible post (its first awaits approval, or every one was hidden) is not listed
         $query = $this->listedDiscussions(DB::table('forum_discussions as d'), $categoryIds)->where('d.post_count', '>', 0);
+
+        // Opened as a personal character by someone without a public name, the forum never names the account
+        $query->leftJoin('forum_posts as fp', static function (JoinClause $join): void {
+            $join->on('fp.discussion_id', '=', 'd.id')->where('fp.number', '=', 1);
+        })
+            ->leftJoin('users as u', 'u.id', '=', 'd.author_id')
+            ->where(function (Builder $where): void {
+                // After a split or a merge the first post may be someone else's: its character says nothing then
+                $where->whereNull('fp.id')
+                    ->orWhereNull('fp.author_id')
+                    ->orWhereColumn('fp.author_id', '!=', 'd.author_id')
+                    ->orWhere(fn (Builder $named) => $this->outOfCharacterOrNamed($named, 'fp'));
+            });
 
         return $this->rows($this->written($query, 'd.author_id'), 'd', $onlyIds, $afterId, $limit, 'd.created_at');
     }
@@ -66,6 +84,19 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
             ->where('d.is_hidden', false)
             ->where('d.awaiting_approval', false)
             ->whereNotNull('d.number');
+    }
+
+    /**
+     * The post (`p` or `fp`) speaks out of character, or its writer (`u`) has a public name (the
+     * rule of CharacterWriterNames and of the forum's filter by author).
+     */
+    private function outOfCharacterOrNamed(Builder $where, string $post): void
+    {
+        $where->where(static function (Builder $outOfCharacter) use ($post): void {
+            $outOfCharacter->whereNull("{$post}.character_id")->where("{$post}.character_removed", false);
+        })->orWhere(static function (Builder $named): void {
+            $named->whereNotNull('u.display_name')->whereRaw("trim(u.display_name) <> ''");
+        });
     }
 
     private function written(Builder $query, string $author): Builder

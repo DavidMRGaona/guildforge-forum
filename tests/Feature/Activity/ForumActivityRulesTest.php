@@ -9,8 +9,10 @@ use App\Application\Activity\Enums\ActivityReadOutcome;
 use App\Application\Activity\Services\ActivityReaderInterface;
 use App\Application\Modules\Services\ModuleSettingsStoreInterface;
 use App\Application\Publications\Services\PublicationSourceRegistryInterface;
+use App\Application\Services\SettingsServiceInterface;
 use App\Domain\Activity\ActivityRole;
 use App\Domain\Activity\Events\ActivityRecorded;
+use App\Infrastructure\Modules\Services\SettingsTableModuleSettingsStore;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -19,6 +21,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Mockery;
 use Mockery\MockInterface;
 use Modules\Forum\Application\Contracts\SystemAccountInterface;
 use Modules\Forum\Application\DTOs\SpeakerChoice;
@@ -39,6 +42,7 @@ use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Infrastructure\Activity\DiscussionActivitySource;
 use Modules\Forum\Infrastructure\Activity\PostActivitySource;
 use Modules\Forum\Infrastructure\Jobs\PublishForumActivityJob;
+use Modules\Forum\Infrastructure\Services\SettingsStoredForumAccess;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
 use RuntimeException;
@@ -561,20 +565,51 @@ final class ForumActivityRulesTest extends ModuleTestCase
         $this->assertSame([], $this->postFacts($reply));
     }
 
-    public function test_moving_a_category_under_a_narrower_parent_publishes_what_it_holds(): void
+    public function test_moving_a_category_under_another_parent_publishes_what_it_holds(): void
     {
-        $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');
-        $open = $this->aCategoryFor(CategoryAudience::everyone(), 'suelta');
-        [$discussion, $opening] = $this->aDiscussion($open, authorId: $this->anaId());
+        // Same audience everywhere: only the parent changes
+        $loose = $this->aCategoryFor(CategoryAudience::everyone(), 'suelta');
+        [$discussion, $opening] = $this->aDiscussion($loose, authorId: $this->anaId());
 
         $this->fakeActivity();
-        $open->changeAccess(CategoryAudience::associationMembers(), $open->writeAudience(), $open->moderators());
-        $open->moveUnder($members->id());
-        app(CategoryManager::class)->save($open);
+        $loose->moveUnder($this->general->id());
+        app(CategoryManager::class)->save($loose);
 
         $this->assertPublished(self::DISCUSSION, $discussion->id()->value);
         $this->assertPublished(self::POST, $opening->id()->value);
-        $this->assertSame([], $this->postFacts($opening));
+        $this->assertNotSame([], $this->postFacts($opening));
+    }
+
+    public function test_stored_settings_that_are_not_json_fail_the_read_instead_of_counting_nothing(): void
+    {
+        [, $post] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        app(ModuleSettingsStoreInterface::class)->store('forum', ['access' => 'open']);
+        DB::table('settings')->where('key', SettingsTableModuleSettingsStore::KEY_PREFIX.'forum')->update(['value' => 'not json']);
+
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->facts(self::POST, $post->id()->value)->outcome);
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->history(self::POST, null, 10)->outcome);
+
+        DB::table('settings')->where('key', SettingsTableModuleSettingsStore::KEY_PREFIX.'forum')->update(['value' => '42']);
+        $this->assertSame(ActivityReadOutcome::Failed, app(ActivityReaderInterface::class)->facts(self::DISCUSSION, $post->discussionId()->value)->outcome);
+    }
+
+    public function test_stored_settings_that_cannot_be_read_throw_instead_of_reading_as_a_preview(): void
+    {
+        $settings = Mockery::mock(SettingsServiceInterface::class);
+        $settings->shouldReceive('getStored')->andThrow(new RuntimeException('Database down'));
+        $access = new SettingsStoredForumAccess($settings, app(ModuleSettingsStoreInterface::class));
+
+        $this->expectException(RuntimeException::class);
+        $access->current();
+    }
+
+    public function test_a_public_name_of_tabs_and_line_breaks_is_no_public_name(): void
+    {
+        $blank = strtolower((string) UserModel::factory()->create(['display_name' => "\t\n \r"])->id);
+        [$discussion] = $this->aDiscussion($this->general, authorId: $blank);
+        $inCharacter = $this->replyBy($discussion, $blank, '2026-11-11 09:30:00', characterId: $this->aCharacterOf($blank)->id());
+
+        $this->assertSame([], $this->postFacts($inCharacter));
     }
 
     public function test_approving_a_discussion_queues_its_posts(): void
@@ -619,6 +654,29 @@ final class ForumActivityRulesTest extends ModuleTestCase
 
         Queue::assertPushed(PublishForumActivityJob::class, static fn (PublishForumActivityJob $job): bool => $job->scope === PublishForumActivityJob::DISCUSSIONS && count($job->ids) === 2);
         Queue::assertPushed(PublishForumActivityJob::class, 1);
+    }
+
+    public function test_a_batch_of_discussions_hands_their_posts_to_batches_of_their_own(): void
+    {
+        [$discussion, $opening] = $this->aDiscussion($this->general, authorId: $this->anaId());
+        $reply = $this->replyBy($discussion, $this->anaId(), '2026-11-11 09:30:00');
+        $this->fakeActivity();
+        Queue::fake();
+
+        app()->call([new PublishForumActivityJob(PublishForumActivityJob::DISCUSSIONS, ids: [$discussion->id()->value]), 'handle']);
+
+        $this->assertPublished(self::DISCUSSION, $discussion->id()->value);
+        $this->assertNotPublished(self::POST, $opening->id()->value);
+        Queue::assertPushed(PublishForumActivityJob::class, static fn (PublishForumActivityJob $job): bool => $job->scope === PublishForumActivityJob::POSTS
+            && $job->ids === collect([$opening->id()->value, $reply->id()->value])->sort()->values()->all());
+        Queue::assertPushed(PublishForumActivityJob::class, 1);
+    }
+
+    public function test_an_unknown_scope_throws(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        app()->call([new PublishForumActivityJob('nonsense'), 'handle']);
     }
 
     private function anaId(): string

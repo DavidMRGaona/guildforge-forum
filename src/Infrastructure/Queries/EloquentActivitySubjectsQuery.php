@@ -95,7 +95,10 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
         $where->where(static function (Builder $outOfCharacter) use ($post): void {
             $outOfCharacter->whereNull("{$post}.character_id")->where("{$post}.character_removed", false);
         })->orWhere(static function (Builder $named): void {
-            $named->whereNotNull('u.display_name')->whereRaw("trim(u.display_name) <> ''");
+            // PHP's trim() (AccountDirectory, PublicProfileDTO::hasPublicName()) also drops tabs,
+            // line breaks and vertical tabs, which SQL's trim() keeps
+            $named->whereNotNull('u.display_name')
+                ->whereRaw("trim(replace(replace(replace(replace(u.display_name, ?, ''), ?, ''), ?, ''), ?, '')) <> ''", ["\t", "\n", "\r", "\x0B"]);
         });
     }
 

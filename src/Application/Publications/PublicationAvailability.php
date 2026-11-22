@@ -78,8 +78,7 @@ final class PublicationAvailability
     /**
      * Whether the category is shown to anyone but the forum's moderators. A subcategory is checked
      * with its parent (the caller has it); without it only the category's own requirement is read.
-     */
-    /**
+     *
      * @throws RuntimeException in strict mode, when the registry could not be read
      */
     public function isAvailable(Category $category, ?Category $parent = null, bool $strict = false): bool

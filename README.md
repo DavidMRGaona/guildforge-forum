@@ -378,7 +378,7 @@ El foro cuenta al contrato de actividad del core quién escribió qué (core ≥
 
 **Cuándo se publica.** `ActivityPublisherInterface::recorded()` desde los eventos de los modelos (`Infrastructure\Activity\ForumActivityObserver`, como el buscador), así que cada camino que escribe queda cubierto: publicar, aprobar, ocultar y mostrar (mensajes y temas), borrar (el autor sus mensajes, la moderación un tema con todos sus mensajes), mover, dividir y fusionar temas, y cambiar de personaje al editar. Una edición que solo cambia el texto no publica nada. Un mensaje publica también su tema (y el tema del que sale, al dividir o fusionar), porque un tema cuenta mientras tenga algún mensaje visible.
 
-Lo que afecta a muchos va a la cola tras el commit (`PublishForumActivityJob`): un trabajo que solo reparte ids en lotes de 200 temas o 500 mensajes y uno hijo por lote, así ninguno crece con el foro y un reintento empieza por su propio lote. Pasa con:
+Lo que afecta a muchos va a la cola tras el commit (`PublishForumActivityJob`): un trabajo que solo reparte ids en lotes de 200 temas o 500 mensajes y uno hijo por lote. Un lote de temas publica los temas y reparte sus mensajes en lotes propios, por grandes que sean los temas, así ningún trabajo publica más de un lote ni crece con el foro, y un reintento empieza por su propio lote. Pasa con:
 
 - los mensajes de un tema que se oculta, se muestra, se mueve o se aprueba;
 - todo lo de una categoría (y sus subcategorías) cuando cambia quién la lee, su madre o la publicación de la que depende;

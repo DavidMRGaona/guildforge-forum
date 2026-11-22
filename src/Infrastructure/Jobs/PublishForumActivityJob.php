@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Modules\Forum\Infrastructure\Activity\DiscussionActivitySource;
 use Modules\Forum\Infrastructure\Activity\PostActivitySource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
@@ -29,8 +30,11 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
  * - a category (its discussions and its subcategories' ones: who reads it, or where it hangs,
  *   changed) and the whole forum («Acceso al foro» changed) → batches of discussions;
  * - an author whose public name came or went → batches of their posts and discussions;
- * - a batch of discussions → each discussion and its posts; a batch of posts or of discussions
- *   alone → each one.
+ * - a batch of discussions → each discussion, and its posts to batches of posts of their own;
+ *   a batch of posts or of discussions alone → each one.
+ *
+ * So every job publishes at most one batch (200 discussions or 500 posts) or only lists ids,
+ * well within its timeout.
  */
 final class PublishForumActivityJob implements ShouldQueue
 {
@@ -93,12 +97,20 @@ final class PublishForumActivityJob implements ShouldQueue
                 $this->author($bus);
                 break;
             case self::DISCUSSIONS:
+                $this->publish($activity, DiscussionActivitySource::TYPE, $this->ids);
+                // However big the discussions are, their posts go to children of their own
+                if ($this->ids !== []) {
+                    $this->inBatches($bus, PostModel::query()->whereIn('discussion_id', $this->ids), self::POSTS, self::POSTS_PER_BATCH);
+                }
+                break;
             case self::OPENED:
-                $this->discussions($activity, withPosts: $this->scope === self::DISCUSSIONS);
+                $this->publish($activity, DiscussionActivitySource::TYPE, $this->ids);
                 break;
             case self::POSTS:
                 $this->publish($activity, PostActivitySource::TYPE, $this->ids);
                 break;
+            default:
+                throw new InvalidArgumentException("Unknown forum activity scope «{$this->scope}».");
         }
     }
 
@@ -124,17 +136,6 @@ final class PublishForumActivityJob implements ShouldQueue
             $ids = array_values(array_map(strval(...), $batch->modelKeys()));
             $bus->dispatch(new self($scope, ids: $ids));
         });
-    }
-
-    private function discussions(ActivityPublisherInterface $activity, bool $withPosts): void
-    {
-        $this->publish($activity, DiscussionActivitySource::TYPE, $this->ids);
-
-        if ($withPosts && $this->ids !== []) {
-            PostModel::query()->whereIn('discussion_id', $this->ids)->select('id')->chunkById(self::POSTS_PER_BATCH, function (Collection $posts) use ($activity): void {
-                $this->publish($activity, PostActivitySource::TYPE, array_values(array_map(strval(...), $posts->modelKeys())));
-            });
-        }
     }
 
     /**

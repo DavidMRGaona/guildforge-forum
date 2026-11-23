@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Media;
 
+use App\Application\Media\Contracts\ConcealsUnusedMediaFiles;
+use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Infrastructure\Media\Sources\EloquentColumnMediaSource;
 use Illuminate\Database\Eloquent\Model;
@@ -21,10 +23,10 @@ use WeakMap;
  * character nobody has seen yet, one that speaks only in narrower categories (the shared characters
  * of a campaign space, say) or in hidden posts is marked hidden, and so is its name.
  *
- * Like the posts' source it does not declare ShowsMediaPreviews yet: the core would show its unused
- * files, the replaced or left portraits of shared characters among them (core#843).
+ * Like the posts' source it shows its previews and conceals its unused files (core#843,
+ * forum#157): the replaced or left portraits of shared characters may give a secret away.
  */
-final class CharacterPortraitMediaSource extends EloquentColumnMediaSource
+final class CharacterPortraitMediaSource extends EloquentColumnMediaSource implements ConcealsUnusedMediaFiles, ShowsMediaPreviews
 {
     public const string TYPE = 'forum.characters';
 

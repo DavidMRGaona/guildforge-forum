@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Media;
 
-use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Application\Media\Services\MediaSourceRegistryInterface;
@@ -51,8 +50,6 @@ final class CharacterPortraitMediaSourceTest extends ModuleTestCase
     {
         $source = app(MediaSourceRegistryInterface::class)->source(CharacterPortraitMediaSource::TYPE);
 
-        // Not yet: the core would show the unused files of its folders (core#843)
-        $this->assertNotInstanceOf(ShowsMediaPreviews::class, $source);
         $this->assertInstanceOf(CharacterPortraitMediaSource::class, $source);
         $this->assertSame(['forum/characters/'], $source->folders());
         $this->assertSame([], $source->excludedSubfolders());

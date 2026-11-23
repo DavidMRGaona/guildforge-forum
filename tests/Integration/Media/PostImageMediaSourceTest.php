@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Tests\Integration\Media;
 
-use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Application\Media\Services\MediaSourceRegistryInterface;
@@ -74,12 +73,10 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->moderator = $this->anAccount('forum:forum.moderate');
     }
 
-    public function test_the_module_registers_the_source_for_its_folder_without_showing_its_previews_yet(): void
+    public function test_the_module_registers_the_source_for_its_folders(): void
     {
         $source = app(MediaSourceRegistryInterface::class)->source(PostImageMediaSource::TYPE);
 
-        // Not yet: the core would show the unused files of its folders (core#843)
-        $this->assertNotInstanceOf(ShowsMediaPreviews::class, $source);
         $this->assertInstanceOf(PostImageMediaSource::class, $source);
         $this->assertSame(['forum/posts/', 'forum/external/'], $source->folders());
         $this->assertFalse($source->hidden());

@@ -47,8 +47,9 @@ final class ModuleBootsTest extends ModuleTestCase
         // FormSelect for the category pickers in 3.69, the public profile sections and stats in 3.79,
         // the profile card (ProfileCardServiceInterface, ThrottleWhereListed) in 3.81, and the
         // activity contract (ActivitySourceInterface, ActivityPublisherInterface) in 3.86, and the
-        // media library's hidden usages and ShowsMediaPreviews in 3.90
-        $this->assertSame('^3.90.0', $manifest['requires']['core']);
+        // media library's hidden usages and ShowsMediaPreviews in 3.90, and the unused files a
+        // source conceals (ConcealsUnusedMediaFiles) in 3.91
+        $this->assertSame('^3.91.0', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }
 

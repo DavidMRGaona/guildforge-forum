@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Media;
 
+use App\Application\Media\Contracts\ConcealsUnusedMediaFiles;
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
+use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Domain\Media\ValueObjects\MediaFileId;
@@ -34,12 +36,12 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
  * read) is marked hidden, under a title that names neither the discussion nor the post. Private
  * messages hold no images (ConversationDocuments), so there is nothing else to hide.
  *
- * It does not declare ShowsMediaPreviews yet, so the library still conceals every file of its
- * folders: the core shows the unused files of a source with the marker (those of a deleted
- * discussion in a private category, of a purged post, uploads never posted), and the forum cannot
- * hide those until a source may ask for it (core#843).
+ * So it shows its previews (ShowsMediaPreviews) and conceals every unused file of its folders
+ * (ConcealsUnusedMediaFiles, core#843, forum#157): those of a deleted discussion in a private
+ * category, of a purged post and uploads never posted may be private, and nothing tells them apart.
+ * It does not release files through the core, so the library never offers them for reuse.
  */
-final readonly class PostImageMediaSource implements MediaUsageSourceInterface
+final readonly class PostImageMediaSource implements ConcealsUnusedMediaFiles, MediaUsageSourceInterface, ShowsMediaPreviews
 {
     public const string TYPE = 'forum.posts';
 

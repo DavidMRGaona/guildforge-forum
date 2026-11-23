@@ -35,6 +35,7 @@ El formulario tiene cuatro secciones.
 - **Quién escribe**: las mismas opciones, salvo cualquiera: para escribir hace falta una cuenta. Quien escribe tiene que poder verla.
 - Una subcategoría solo la ve quien también ve su categoría madre, así que nunca puede ser más abierta que ella.
 - **Solo lectura**: nadie escribe salvo quien modera todo el foro. Quien la modera sigue moderándola.
+- En la **Biblioteca de medios**, las imágenes del foro salen tapadas por ahora. Las de las categorías de **Socios** o de **Algunos roles** tampoco dicen de qué tema son. Al cambiar quién ve una categoría, la biblioteca se pone al día en unos minutos.
 
 **Moderación**
 - **Roles que la moderan**: además de quien modera todo el foro. Quien modera una categoría también modera sus subcategorías.

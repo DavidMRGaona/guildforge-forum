@@ -29,6 +29,8 @@ El sitio decide qué formatos admite (JPEG, PNG, WebP y GIF, nunca SVG), cuánto
 
 Al subirla, el foro le quita los metadatos (por ejemplo, dónde se hizo la foto) y la guarda reducida. Las imágenes que quites de un mensaje o de un mensaje borrado dejan de contar como usadas.
 
+Quien gestiona las imágenes del sitio en el panel no ve las imágenes del foro: por ahora salen todas tapadas. Además, las de los mensajes que no puede leer cualquier miembro llevan un título que no dice de qué tema son. Eso pasa si el mensaje está oculto, pendiente de aprobación o borrado, o si está en una categoría solo para socios, para un rol o para una campaña.
+
 ## Si algo no sale bien
 
 - **«No se ha podido subir la imagen»**: comprueba que es una imagen de un formato admitido y vuelve a intentarlo más tarde.

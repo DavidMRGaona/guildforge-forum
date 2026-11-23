@@ -17,6 +17,7 @@ use App\Application\Profiles\Contracts\ProfileStatInterface;
 use App\Application\Realtime\Contracts\RealtimeChannelInterface;
 use App\Application\Search\Contracts\IndexedSearchSourceInterface;
 use App\Application\Security\Services\ContentSecurityPolicySourcesInterface;
+use App\Domain\Activity\Events\ActivityRecorded;
 use App\Domain\Events\UserAnonymized;
 use App\Domain\Modules\Events\ModuleEnabled;
 use App\Domain\Modules\Events\ModuleUpdated;
@@ -32,6 +33,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Inertia;
 use Modules\Forum\Application\Content\Contracts\MarkTypeInterface;
@@ -136,8 +138,10 @@ use Modules\Forum\Infrastructure\Listeners\QueueSpaceRosterSync;
 use Modules\Forum\Infrastructure\Listeners\SyncPublicationsOnModuleChange;
 use Modules\Forum\Infrastructure\Media\CharacterPortraitMediaSource;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
+use Modules\Forum\Infrastructure\Media\RefreshForumImagesOnActivity;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CategoryModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\CharacterModel;
+use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Repositories\EloquentCharacterRepository;
@@ -203,6 +207,7 @@ use Modules\Forum\Infrastructure\Services\SettingsPostRateLimiter;
 use Modules\Forum\Infrastructure\Services\SettingsStoredForumAccess;
 use Modules\Forum\Notifications\ForumMailCategories;
 use Modules\Forum\Policies\CategoryPolicy;
+use Throwable;
 
 final class ForumServiceProvider extends ModuleServiceProvider
 {
@@ -304,6 +309,8 @@ final class ForumServiceProvider extends ModuleServiceProvider
         $this->app->scoped(ProfileActivity::class);
         // The category rules, per request like the policy they read
         $this->app->scoped(ForumAccessInterface::class, CategoryForumAccess::class);
+        // Remembers which portraits it refreshed, per request or job (forum#155)
+        $this->app->scoped(RefreshForumImagesOnActivity::class);
 
         // Built each time: the images a post may hold come from the settings
         $this->app->bind(DocumentSchema::class, static function (Application $app): DocumentSchema {
@@ -394,6 +401,35 @@ final class ForumServiceProvider extends ModuleServiceProvider
         );
         CharacterModel::saved($portraits->saved(...));
         CharacterModel::deleted($portraits->deleted(...));
+        // Whether the library may show them follows who reads each post (forum#155): what the forum
+        // tells the activity contract about posts refreshes their images and their character's portrait
+        Event::listen(ActivityRecorded::class, [RefreshForumImagesOnActivity::class, 'handle']);
+        // The character a post stops speaking as, or leaves when it goes, may no longer be seen
+        PostModel::saved(static function (PostModel $post): void {
+            $previous = $post->getPrevious()['character_id'] ?? null;
+            if ($post->wasChanged('character_id') && is_string($previous)) {
+                self::refreshPortrait($previous);
+            }
+        });
+        PostModel::deleted(static function (PostModel $post): void {
+            if ($post->character_id !== null) {
+                self::refreshPortrait($post->character_id);
+            }
+        });
+        // Deleting a discussion takes its posts without their own events: their characters are read first
+        DiscussionModel::deleting(static function (DiscussionModel $discussion): void {
+            try {
+                $characterIds = PostModel::query()->where('discussion_id', $discussion->id)->whereNotNull('character_id')->distinct()->pluck('character_id');
+            } catch (Throwable $exception) {
+                Log::warning('[Forum] Could not read the characters of a discussion being deleted.', ['exception' => $exception::class]);
+
+                return;
+            }
+
+            foreach ($characterIds as $characterId) {
+                self::refreshPortrait((string) $characterId);
+            }
+        });
 
         // The site search learns at once what was written, moved, hidden, approved or deleted
         ForumSearchObserver::register();
@@ -622,6 +658,18 @@ final class ForumServiceProvider extends ModuleServiceProvider
     public function registerFilamentWidgets(): array
     {
         return [ForumActivityWidget::class];
+    }
+
+    /**
+     * Never fails the write: the nightly media sync settles what a failure missed.
+     */
+    private static function refreshPortrait(string $characterId): void
+    {
+        try {
+            resolve(RefreshForumImagesOnActivity::class)->character($characterId);
+        } catch (Throwable $exception) {
+            Log::warning('[Forum] Could not refresh the media library after a character changed.', ['exception' => $exception::class]);
+        }
     }
 
     /**

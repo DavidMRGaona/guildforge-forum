@@ -220,7 +220,7 @@ Marcas: `bold`, `italic`, `strike`, `code` y `link` (solo `href`, a `http`, `htt
 Límites (`DocumentLimits`): 256 KB de JSON, 16 niveles, 10 000 nodos, 65 000 caracteres de texto, 20 menciones, 10 citas, 10 tiradas y 5 incrustaciones por mensaje; las imágenes por mensaje, según los ajustes. Un mensaje sin texto, imagen, mención ni tirada está vacío.
 
 - **Menciones y citas** guardan solo el id. El nombre y el enlace se buscan al pintar el mensaje, así que cambiar de nombre no rompe nada. Una cita muestra autor y enlace solo a quien puede leer el original, y al guardarla su texto tiene que estar en el mensaje citado (se comparan letras y cifras), para que nadie atribuya a otra persona lo que no dijo.
-- **Imágenes**: las sube quien tiene `forum:posts.upload_images` a `POST /foro/imagenes`, con los formatos (de JPEG, PNG, WebP y GIF; nunca SVG), el peso, el lado máximo, las imágenes por mensaje y las subidas por hora de los ajustes. El tipo se lee de los bytes. Se guardan en `forum/posts/<año>/<mes>/`. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado (hasta que se vacía).
+- **Imágenes**: las sube quien tiene `forum:posts.upload_images` a `POST /foro/imagenes`, con los formatos (de JPEG, PNG, WebP y GIF; nunca SVG), el peso, el lado máximo, las imágenes por mensaje y las subidas por hora de los ajustes. El tipo se lee de los bytes. Se guardan en `forum/posts/<año>/<mes>/`. La fuente de medios `forum.posts` las cuenta como usadas mientras alguna versión de un mensaje las muestre, también si el mensaje está oculto o borrado (hasta que se vacía). Por ahora la biblioteca de medios las enseña todas tapadas ([Biblioteca de medios](#biblioteca-de-medios)).
 - **Imágenes de otros sitios**: las pone quien tiene `forum:posts.external_images`, desde los sitios de los ajustes (`imgur.com` por defecto; cada uno vale con sus subdominios y solo por https). El navegador nunca pide nada al otro sitio:
   - El editor pide la copia a `POST /foro/imagenes/externas` (`{"url": …}`, mismo límite por hora que las subidas): botón «Imagen de otro sitio», o pegar la dirección de un archivo de imagen de un sitio permitido. Responde la dirección, la copia y dónde verla.
   - El servidor la descarga una vez (`ExternalImageImporter`), la comprueba como una subida (imagen real por sus bytes, de un formato admitido, sin pasar el peso ni 8000 px) y la guarda reducida y sin metadatos en `forum/external/<año>/<mes>/`. La tabla `forum_external_images` dice de qué dirección es cada copia; la misma dirección se reutiliza.
@@ -342,6 +342,37 @@ En `/buscar` salen como las pestañas «Temas del foro» y «Mensajes del foro»
 
 **Buscar dentro del foro.** `/foro/buscar?q=<texto>[&categoria=<slug>][&pagina=<n>]` usa el mismo motor (Meilisearch o la base de datos de reserva) limitado a los dos tipos y, además, comprueba cada resultado contra las tablas: un índice atrasado nunca enseña un mensaje que ya está oculto o borrado, ni una categoría que el lector ya no puede leer. Mira los 100 primeros resultados del motor (y avisa si hay más), en páginas de 10. Un fallo del motor da una página con el aviso, nunca un 500. Es una página con `noindex`, con un límite de 60 peticiones por minuto.
 
+## Biblioteca de medios
+
+El foro tiene dos fuentes de medios (`registerMediaSources()`): `forum.posts` (`PostImageMediaSource`, carpetas `forum/posts/` y `forum/external/`) y `forum.characters` (`CharacterPortraitMediaSource`, `forum/characters/`). Necesitan el core ≥ 3.90 (#830): marcan como ocultos (`MediaUsageDTO::$hidden`) los usos que no lee cualquier miembro y les dan un título neutro. El borrado no cambia: un fichero con usos ocultos sigue en uso.
+
+**Por ahora todo sale tapado.** Ninguna de las dos declara `ShowsMediaPreviews` (core#837), así que la biblioteca enseña el marcador en lugar de cada imagen del foro. El core enseñaría la miniatura de los ficheros sin usos de una fuente con la marca, y el foro tiene ficheros sin usos privados que no puede ocultar: las imágenes de un tema borrado de una categoría privada, las de un mensaje purgado, las que se suben mientras se escribe y no se envían, y los retratos que se cambian o quedan de un PNJ. Las fuentes declararán la marca cuando una fuente pueda pedir que se oculten sus ficheros sin usar (core#843).
+
+- **Qué cuenta como visible**: lo que lee cualquier miembro. Es la regla del contrato de actividad, en un único sitio: `ActivityCategories` para las categorías y `Infrastructure\Queries\EveryMemberReads` para mensajes y temas. La usan `EloquentActivitySubjectsQuery` y `PublicForumImages`. Hace falta:
+  - un mensaje visible, numerado y publicado;
+  - en un tema numerado, ni oculto ni a la espera de aprobación;
+  - en una categoría que lee cualquiera o cualquier cuenta, con su madre, y solo mientras exista lo que la alimenta;
+  - con el foro abierto.
+
+  Además, solo cuenta la versión actual del mensaje: lo que sale solo en versiones anteriores lo lee únicamente la moderación.
+- **Qué se marca oculto**: las imágenes, también las miniaturas de las incrustaciones, de:
+  - mensajes ocultos, pendientes o borrados;
+  - temas ocultos o a la espera de aprobación;
+  - categorías para socios, para un rol o para el reparto de una campaña;
+  - todo el foro mientras está en vista previa;
+  - versiones anteriores.
+
+  También los retratos de personajes que no hablan en ningún mensaje que lea cualquier miembro, como uno recién creado o un PNJ de un espacio de campaña.
+- **Títulos neutros**: un uso oculto se titula «Mensaje del foro» o «Personaje del foro», sin el tema, el número ni el nombre. La imagen de una versión anterior de un mensaje público conserva el título del tema.
+- **Mensajes privados**: no llevan imágenes (`ConversationDocuments`), así que no tienen fuente.
+- **Refresco**: el foro ya cuenta al contrato de actividad cada mensaje cuyos lectores o cuyo título pueden cambiar. Son los cambios al aprobar, ocultar, mostrar, borrar, mover, dividir o fusionar, al renombrar un tema y al cambiar quién lee una categoría (también su madre) o «Acceso al foro». `RefreshForumImagesOnActivity` escucha esos `ActivityRecorded` de `forum.post` y, después de confirmar la transacción, refresca:
+  - las imágenes del mensaje, solo si sus documentos nombran una imagen o una incrustación, o si el mensaje ya no existe;
+  - el retrato de su personaje, una vez por personaje y petición o trabajo.
+
+  El personaje que un mensaje deja, y los de los mensajes de un tema que se borra, se refrescan desde los eventos del modelo.
+- **Ventana en la que el refresco falla abierto**: entre un cambio y su refresco, el índice conserva la marca de antes, y el refresco va en cola. Si el refresco falla (por ejemplo, porque no se pueden leer los ajustes de acceso o las reglas de una categoría), la fila se queda como estaba hasta el `media:sync` de cada noche, y el core sigue tratando la fuente como al día. Lo mismo pasa con lo que cambia al habilitar o deshabilitar el módulo del que depende una categoría, que nadie avisa. Hoy no se nota, porque sin la marca todo sale tapado. Importará cuando se declare: el core debería dejar de contar como al día una fuente con un refresco fallido (core#844).
+- **Sincronización completa**: si los ajustes de acceso o las reglas de una categoría no se pueden leer, la sincronización de la fuente falla y el core oculta sus ficheros; nunca los enseña.
+
 ## Perfil público
 
 El foro pone su actividad en el perfil público de cada persona, `/miembros/<dirección>` (core ≥ 3.79, #742; `registerProfileSections()` y `registerProfileStats()`):
@@ -414,7 +445,7 @@ Junto al nombre de quien escribe van hasta tres insignias destacadas de su perfi
 Cada cuenta escribe como sus personajes, para que las partidas se lean como una historia.
 
 - **Personaje** (`forum_characters`, `Domain\Entities\Character`): nombre (60 caracteres), descripción corta (300) y retrato opcional; sin retrato se muestran las iniciales. 30 por cuenta, retirados incluidos. Se gestionan en la pestaña «Personajes» de Ajustes de la cuenta (ranura `profile-sections`) y desde el editor, con «Nuevo personaje…».
-- **Retratos**: se suben con el formulario, en los formatos de imagen de los ajustes (nunca SVG), hasta 2048 KB (o menos, si los ajustes piden menos), y se reducen a 512 px. Se guardan en `forum/characters/<año>/<mes>/`, carpeta de la fuente de medios `forum.characters`: la biblioteca de medios sabe de dónde vienen y da por sin uso los que se cambian o quedan de un personaje borrado.
+- **Retratos**: se suben con el formulario, en los formatos de imagen de los ajustes (nunca SVG), hasta 2048 KB (o menos, si los ajustes piden menos), y se reducen a 512 px. Se guardan en `forum/characters/<año>/<mes>/`, carpeta de la fuente de medios `forum.characters`: la biblioteca de medios sabe de dónde vienen y da por sin uso los que se cambian o quedan de un personaje borrado. Por ahora la biblioteca los enseña todos tapados ([Biblioteca de medios](#biblioteca-de-medios)).
 - **Atado a una categoría**: solo se ofrece en ella y en sus subcategorías, y solo lo ve quien puede leerla (`CategoryAccessPolicy`). A quien no la lee, sus mensajes le muestran la cuenta, como fuera de personaje. Si la categoría se borra, el personaje deja de estar atado.
 - **Hablar como**: encima del editor (responder, editar el mensaje propio y abrir tema) se elige el personaje o «Fuera de personaje». Al responder se propone el último personaje que la persona usó en ese tema, sin contar sus mensajes fuera de personaje, si aún puede usarlo. El mensaje muestra el retrato y el nombre del personaje y, debajo, «por» quien lo lleva. Las tiradas de un mensaje en personaje dicen quién tira («Arwen tira»), salvo las de un aparte `ooc`.
 - **Seguridad**: el servidor comprueba el personaje cada vez que se publica o se edita un mensaje (`Application\Services\PostSpeakers`, con las reglas de `CharacterRules`): nadie escribe como un personaje ajeno, retirado o atado a otra categoría, ni con los personajes apagados para él (422 `character_unavailable`). Al editar, el mensaje conserva su personaje aunque se haya retirado después; cambiarlo se comprueba como al publicar. La edición de la moderación nunca cambia el personaje. Las versiones del mensaje guardan con qué personaje habló cada una.

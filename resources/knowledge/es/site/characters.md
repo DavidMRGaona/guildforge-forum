@@ -45,6 +45,10 @@ En **Mis personajes** puedes **Editar**, **Retirar**, **Recuperar** y **Borrar**
 > [!IMPORTANT]
 > Si la moderación retira un personaje, queda bloqueado: solo ella puede recuperarlo. Si lo borra, sus mensajes pasan a mostrar tu cuenta.
 
+## Quién ve el retrato
+
+El retrato se ve junto a los mensajes del personaje. Quien gestiona las imágenes del sitio en el panel no lo ve: por ahora los retratos salen tapados. Si el personaje no habla en ningún mensaje que pueda leer cualquier miembro, tampoco ve su nombre.
+
 ## Qué puede hacer la moderación
 
 Quien modera el foro, o la categoría del personaje, puede editar su nombre, descripción y retrato, retirarlo y borrarlo, desde el menú **Moderar** de uno de sus mensajes. Todo queda en el historial de moderación.

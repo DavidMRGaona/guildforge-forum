@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Media;
 
-use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Infrastructure\Media\Sources\EloquentColumnMediaSource;
 use Illuminate\Database\Eloquent\Model;
@@ -20,9 +19,12 @@ use WeakMap;
  * Others see a portrait only next to the posts that speak as its character, so the media library
  * shows it only while one of those posts is read by every member (forum#155, PublicForumImages). A
  * character nobody has seen yet, one that speaks only in narrower categories (the shared characters
- * of a campaign space, say) or in hidden posts is hidden, and so is its name.
+ * of a campaign space, say) or in hidden posts is marked hidden, and so is its name.
+ *
+ * Like the posts' source it does not declare ShowsMediaPreviews yet: the core would show its unused
+ * files, the replaced or left portraits of shared characters among them (core#843).
  */
-final class CharacterPortraitMediaSource extends EloquentColumnMediaSource implements ShowsMediaPreviews
+final class CharacterPortraitMediaSource extends EloquentColumnMediaSource
 {
     public const string TYPE = 'forum.characters';
 

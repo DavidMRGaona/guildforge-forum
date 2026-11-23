@@ -6,10 +6,10 @@ namespace Modules\Forum\Tests\Feature\Media;
 
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaIndexerInterface;
-use App\Application\Modules\Services\ModuleSettingsStoreInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Mockery;
 use Mockery\MockInterface;
 use Modules\Forum\Application\Services\CategoryManager;
@@ -19,16 +19,19 @@ use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Character;
 use Modules\Forum\Domain\Entities\Discussion;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Enums\ForumAccessMode;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
 use Modules\Forum\Domain\Repositories\CharacterRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
-use Modules\Forum\Infrastructure\Activity\ForumActivityChanges;
+use Modules\Forum\Filament\Pages\ForumSettingsPage;
 use Modules\Forum\Infrastructure\Media\CharacterPortraitMediaSource;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
 use Modules\Forum\Tests\Support\BuildsCharacters;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Tests\Support\Modules\InteractsWithModulePanel;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 
@@ -41,6 +44,7 @@ final class ForumMediaRefreshTest extends ModuleTestCase
 {
     use BuildsCharacters;
     use BuildsForumContent;
+    use InteractsWithModulePanel;
     use UsesUtcStorage;
 
     private const string MAP = 'forum/posts/2026/11/0b6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5a.webp';
@@ -93,15 +97,69 @@ final class ForumMediaRefreshTest extends ModuleTestCase
         $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
     }
 
-    public function test_hiding_a_post_refreshes_its_images(): void
+    public function test_hiding_a_post_whose_image_only_an_earlier_version_holds_refreshes_it(): void
     {
         [$discussion] = $this->aDiscussion($this->general);
         $reply = $this->replyWithImage($discussion);
+        // Its current body names no image, so only the activity contract tells the library
+        app(ForumWriter::class)->editPost($reply->id(), self::aBody('Sin imagen'), null, new DateTimeImmutable('2026-11-11 09:10:00'));
 
         $this->watchIndexer();
         app(ForumModeration::class)->hidePost($this->moderator, $reply->id(), 'Destripe');
 
         $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
+    }
+
+    public function test_approving_a_pending_post_refreshes_its_images_and_shows_them(): void
+    {
+        [$discussion] = $this->aDiscussion($this->general);
+        $pending = $this->replyWithImage($discussion, needsApproval: true);
+        $this->assertTrue(app(PostImageMediaSource::class)->usagesFor($pending->id()->value)[0]->hidden);
+
+        $this->watchIndexer();
+        app(ForumModeration::class)->approve($this->moderator, $pending->id());
+
+        $this->assertRefreshed(PostImageMediaSource::TYPE, $pending->id()->value);
+        $this->assertFalse(app(PostImageMediaSource::class)->usagesFor($pending->id()->value)[0]->hidden);
+    }
+
+    public function test_splitting_posts_into_a_private_category_refreshes_and_hides_their_images(): void
+    {
+        $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');
+        [$discussion] = $this->aDiscussion($this->general);
+        $reply = $this->replyWithImage($discussion);
+
+        $this->watchIndexer();
+        app(ForumModeration::class)->split($this->moderator, $discussion->id(), [2], 'Aparte', $members->id());
+
+        $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
+        $this->assertTrue(app(PostImageMediaSource::class)->usagesFor($reply->id()->value)[0]->hidden);
+    }
+
+    public function test_merging_into_a_private_discussion_refreshes_and_hides_the_images_that_move(): void
+    {
+        $members = $this->aCategoryFor(CategoryAudience::associationMembers(), 'socios');
+        [$absorbed] = $this->aDiscussion($this->general);
+        $moved = $this->replyWithImage($absorbed);
+        [$into] = $this->aDiscussion($members, '2026-11-10 19:00:00', title: 'Plan secreto');
+
+        $this->watchIndexer();
+        app(ForumModeration::class)->merge($this->moderator, $absorbed->id(), $into->id());
+
+        $this->assertRefreshed(PostImageMediaSource::TYPE, $moved->id()->value);
+        $this->assertTrue(app(PostImageMediaSource::class)->usagesFor($moved->id()->value)[0]->hidden);
+    }
+
+    public function test_renaming_a_discussion_refreshes_the_titles_of_its_images(): void
+    {
+        [$discussion] = $this->aDiscussion($this->general);
+        $reply = $this->replyWithImage($discussion);
+
+        $this->watchIndexer();
+        app(ForumModeration::class)->rename($this->moderator, $discussion->id(), 'Sesión del sábado');
+
+        $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
+        $this->assertSame('Sesión del sábado, mensaje 2', app(PostImageMediaSource::class)->usagesFor($reply->id()->value)[0]->title);
     }
 
     public function test_narrowing_who_reads_a_category_refreshes_the_images_it_holds(): void
@@ -190,14 +248,34 @@ final class ForumMediaRefreshTest extends ModuleTestCase
         $this->assertRefreshed(CharacterPortraitMediaSource::TYPE, $character->id()->value);
     }
 
-    public function test_turning_the_forum_into_a_preview_refreshes_its_images(): void
+    public function test_a_subcategory_follows_its_parent_when_who_reads_the_parent_narrows(): void
     {
-        [$discussion] = $this->aDiscussion($this->general);
+        $sub = $this->aCategoryFor(CategoryAudience::everyone(), 'sub', parent: $this->general);
+        [$discussion] = $this->aDiscussion($sub);
         $reply = $this->replyWithImage($discussion);
+        $this->assertFalse(app(PostImageMediaSource::class)->usagesFor($reply->id()->value)[0]->hidden);
 
         $this->watchIndexer();
-        app(ModuleSettingsStoreInterface::class)->store('forum', ['access' => 'preview']);
-        app(ForumActivityChanges::class)->everything();
+        // Straight through the repository: the category editor would narrow the subcategory first
+        $this->general->changeAccess(CategoryAudience::associationMembers(), $this->general->writeAudience(), $this->general->moderators());
+        app(CategoryRepositoryInterface::class)->save($this->general);
+
+        $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
+        $this->assertTrue(app(PostImageMediaSource::class)->usagesFor($reply->id()->value)[0]->hidden);
+    }
+
+    public function test_turning_the_forum_into_a_preview_from_its_settings_page_refreshes_and_hides_its_images(): void
+    {
+        $this->registerOnAdminPanel([], [ForumSettingsPage::class]);
+        [$discussion] = $this->aDiscussion($this->general);
+        $reply = $this->replyWithImage($discussion);
+        $this->actingAs($this->anAccount('forum:settings.manage'));
+
+        $this->watchIndexer();
+        Livewire::test(ForumSettingsPage::class)
+            ->set('data.access', ForumAccessMode::Preview->value)
+            ->call('save')
+            ->assertHasNoErrors();
 
         $this->assertRefreshed(PostImageMediaSource::TYPE, $reply->id()->value);
         $this->assertTrue(app(PostImageMediaSource::class)->usagesFor($reply->id()->value)[0]->hidden);
@@ -219,14 +297,14 @@ final class ForumMediaRefreshTest extends ModuleTestCase
         $this->indexer->shouldHaveReceived('refresh')->with($type, $recordId)->atLeast()->once();
     }
 
-    private function replyWithImage(Discussion $discussion): Post
+    private function replyWithImage(Discussion $discussion, bool $needsApproval = false): Post
     {
         $body = new PostBody([
             'type' => 'doc',
             'content' => [['type' => 'image', 'attrs' => ['origin' => 'upload', 'src' => self::MAP]]],
         ], '');
 
-        return app(ForumWriter::class)->reply($discussion->id(), PostId::generate(), $this->ana->id, $body, new DateTimeImmutable('2026-11-11 09:00:00'), false);
+        return app(ForumWriter::class)->reply($discussion->id(), PostId::generate(), $this->ana->id, $body, new DateTimeImmutable('2026-11-11 09:00:00'), $needsApproval);
     }
 
     private function replyAs(Discussion $discussion, Character $character): Post

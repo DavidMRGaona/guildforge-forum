@@ -47,7 +47,7 @@ En **Mis personajes** puedes **Editar**, **Retirar**, **Recuperar** y **Borrar**
 
 ## Quién ve el retrato
 
-El retrato se ve junto a los mensajes del personaje. Quien gestiona las imágenes del sitio en el panel solo lo ve si el personaje habla en algún mensaje que puede leer cualquier miembro. Mientras tanto sale tapado y sin el nombre del personaje.
+El retrato se ve junto a los mensajes del personaje. Quien gestiona las imágenes del sitio en el panel no lo ve: por ahora los retratos salen tapados. Si el personaje no habla en ningún mensaje que pueda leer cualquier miembro, tampoco ve su nombre.
 
 ## Qué puede hacer la moderación
 

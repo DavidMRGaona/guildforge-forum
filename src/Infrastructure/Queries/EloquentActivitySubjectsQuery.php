@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Queries\ActivitySubjectRowDTO;
 use Modules\Forum\Application\Queries\ActivitySubjectsQueryInterface;
-use Modules\Forum\Domain\Enums\PostStatus;
 use Modules\Forum\Infrastructure\Services\EloquentSystemAccount;
 
 /**
@@ -33,15 +32,12 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
             return [];
         }
 
-        $query = $this->listedDiscussions(DB::table('forum_posts as p')->join('forum_discussions as d', 'd.id', '=', 'p.discussion_id'), $categoryIds)
+        $query = EveryMemberReads::postsInListedDiscussions(DB::table('forum_posts as p'), 'p', $categoryIds)
             // A shared character names itself, never its writer: whoever wrote it stays unknown
             ->leftJoin('forum_characters as c', 'c.id', '=', 'p.character_id')
             ->where(static function (Builder $where): void {
                 $where->whereNull('c.id')->orWhereNotNull('c.owner_id');
-            })
-            ->where('p.status', PostStatus::Visible->value)
-            ->whereNotNull('p.number')
-            ->whereNotNull('p.published_at');
+            });
 
         // As a personal character (or one deleted since), the forum names the writer only by their public name
         $query->leftJoin('users as u', 'u.id', '=', 'p.author_id')
@@ -57,7 +53,7 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
         }
 
         // A discussion with no visible post (its first awaits approval, or every one was hidden) is not listed
-        $query = $this->listedDiscussions(DB::table('forum_discussions as d'), $categoryIds)->where('d.post_count', '>', 0);
+        $query = EveryMemberReads::discussions(DB::table('forum_discussions as d'), 'd', $categoryIds)->where('d.post_count', '>', 0);
 
         // Opened as a personal character by someone without a public name, the forum never names the account
         $query->leftJoin('forum_posts as fp', static function (JoinClause $join): void {
@@ -73,17 +69,6 @@ final readonly class EloquentActivitySubjectsQuery implements ActivitySubjectsQu
             });
 
         return $this->rows($this->written($query, 'd.author_id'), 'd', $onlyIds, $afterId, $limit, 'd.created_at');
-    }
-
-    /**
-     * @param  list<string>  $categoryIds
-     */
-    private function listedDiscussions(Builder $query, array $categoryIds): Builder
-    {
-        return $query->whereIn('d.category_id', $categoryIds)
-            ->where('d.is_hidden', false)
-            ->where('d.awaiting_approval', false)
-            ->whereNotNull('d.number');
     }
 
     /**

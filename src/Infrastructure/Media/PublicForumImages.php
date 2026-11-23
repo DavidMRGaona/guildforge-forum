@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Forum\Infrastructure\Media;
 
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Forum\Application\Activity\ActivityCategories;
-use Modules\Forum\Domain\Enums\PostStatus;
-use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\DiscussionModel;
-use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostModel;
+use Modules\Forum\Infrastructure\Queries\EveryMemberReads;
 use RuntimeException;
 
 /**
  * Which forum images the media library may show (forum#155): those of what every signed-in member
- * reads. A post is read by every member while it is visible and published, its discussion is listed
- * (numbered, not hidden, not awaiting approval) and its category is one every member reads, by the
- * rule the activity contract counts with (ActivityCategories: anyone or any account, its parent too,
- * and nothing while the forum is a preview). Hidden, pending and deleted posts, and whatever sits in
- * a category for association members, a role or a campaign's roster, are not.
+ * reads, by the rule the activity contract counts with: the categories of ActivityCategories (anyone
+ * or any account, its parent too, and nothing while the forum is a preview) and the posts and
+ * discussions of EveryMemberReads. Hidden, pending and deleted posts, hidden discussions or ones
+ * awaiting approval, and whatever sits in a category for association members, a role or a
+ * campaign's roster, are not.
  *
  * Decided without the person who opens the library: it runs in the media sync and in queued
  * refreshes. What cannot be read throws, so a sync never takes a failure for «may be seen».
@@ -42,18 +39,28 @@ final readonly class PublicForumImages
     }
 
     /**
+     * Which of the posts every member reads, in one query.
+     *
+     * @param  list<string>  $postIds
      * @param  list<string>  $categoryIds  from categoryIds()
+     * @return array<string, true> ids in lower case
      */
-    public function isPostRead(PostModel $post, ?DiscussionModel $discussion, array $categoryIds): bool
+    public function readPostIds(array $postIds, array $categoryIds): array
     {
-        return $discussion instanceof DiscussionModel
-            && $post->status === PostStatus::Visible->value
-            && $post->number !== null
-            && $post->published_at !== null
-            && ! $discussion->is_hidden
-            && ! $discussion->awaiting_approval
-            && $discussion->number !== null
-            && in_array(strtolower($discussion->category_id), $categoryIds, true);
+        if ($postIds === [] || $categoryIds === []) {
+            return [];
+        }
+
+        $ids = EveryMemberReads::postsInListedDiscussions(DB::table('forum_posts as p'), 'p', $categoryIds)
+            ->whereIn('p.id', array_map(strtolower(...), $postIds))
+            ->pluck('p.id');
+
+        $read = [];
+        foreach ($ids as $id) {
+            $read[strtolower((string) $id)] = true;
+        }
+
+        return $read;
     }
 
     /**
@@ -68,18 +75,8 @@ final readonly class PublicForumImages
             return false;
         }
 
-        return DB::table('forum_posts as p')
-            ->join('forum_discussions as d', 'd.id', '=', 'p.discussion_id')
+        return EveryMemberReads::postsInListedDiscussions(DB::table('forum_posts as p'), 'p', $categoryIds)
             ->where('p.character_id', $characterId)
-            ->where('p.status', PostStatus::Visible->value)
-            ->whereNotNull('p.number')
-            ->whereNotNull('p.published_at')
-            ->where(static function (Builder $listed) use ($categoryIds): void {
-                $listed->whereIn('d.category_id', $categoryIds)
-                    ->where('d.is_hidden', false)
-                    ->where('d.awaiting_approval', false)
-                    ->whereNotNull('d.number');
-            })
             ->exists();
     }
 }

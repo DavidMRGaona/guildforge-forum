@@ -9,20 +9,30 @@ use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Application\Media\Services\MediaSourceRegistryInterface;
 use App\Application\Modules\Services\ModuleSettingsStoreInterface;
+use App\Application\Publications\Services\PublicationSourceRegistryInterface;
 use App\Domain\Media\ValueObjects\MediaFileId;
 use App\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Services\ForumModeration;
 use Modules\Forum\Application\Services\ForumWriter;
+use Modules\Forum\Domain\Entities\Category;
 use Modules\Forum\Domain\Entities\Discussion;
+use Modules\Forum\Domain\Entities\EmbedCard;
 use Modules\Forum\Domain\Entities\Post;
+use Modules\Forum\Domain\Repositories\CategoryRepositoryInterface;
+use Modules\Forum\Domain\Repositories\EmbedCardRepositoryInterface;
 use Modules\Forum\Domain\ValueObjects\CategoryAudience;
+use Modules\Forum\Domain\ValueObjects\CategoryId;
+use Modules\Forum\Domain\ValueObjects\CategorySlug;
+use Modules\Forum\Domain\ValueObjects\CategorySubject;
 use Modules\Forum\Domain\ValueObjects\PostBody;
 use Modules\Forum\Domain\ValueObjects\PostId;
 use Modules\Forum\Infrastructure\Media\PostImageMediaSource;
 use Modules\Forum\Tests\Support\BuildsForumContent;
+use Modules\Forum\Tests\Support\FakeCampaignSource;
 use Tests\Support\Modules\ModuleTestCase;
 use Tests\Support\Time\UsesUtcStorage;
 use Throwable;
@@ -46,6 +56,8 @@ final class PostImageMediaSourceTest extends ModuleTestCase
 
     private const string COPY = 'forum/external/2026/11/3e6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5d.png';
 
+    private const string OLD_THUMBNAIL = 'forum/external/2026/11/4f6f1d7e-3c1a-4f0e-9a51-6f1e2d3c4b5e.jpg';
+
     private const string MASKED = 'Mensaje del foro';
 
     protected ?string $moduleName = 'forum';
@@ -62,11 +74,12 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->moderator = $this->anAccount('forum:forum.moderate');
     }
 
-    public function test_the_module_registers_the_source_for_its_folder_and_shows_its_previews(): void
+    public function test_the_module_registers_the_source_for_its_folder_without_showing_its_previews_yet(): void
     {
         $source = app(MediaSourceRegistryInterface::class)->source(PostImageMediaSource::TYPE);
 
-        $this->assertInstanceOf(ShowsMediaPreviews::class, $source);
+        // Not yet: the core would show the unused files of its folders (core#843)
+        $this->assertNotInstanceOf(ShowsMediaPreviews::class, $source);
         $this->assertInstanceOf(PostImageMediaSource::class, $source);
         $this->assertSame(['forum/posts/', 'forum/external/'], $source->folders());
         $this->assertFalse($source->hidden());
@@ -190,6 +203,7 @@ final class PostImageMediaSourceTest extends ModuleTestCase
             $this->aCategoryFor(CategoryAudience::roles([(string) Str::uuid()]), 'junta'),
             // Open itself, but under a category only association members read
             $this->aCategoryFor(CategoryAudience::signedIn(), 'bajo-socios', parent: $members),
+            $this->aCampaignSpace(),
         ];
 
         foreach ($narrower as $category) {
@@ -249,6 +263,22 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->expectException(Throwable::class);
 
         iterator_to_array($this->source()->usages(), false);
+    }
+
+    public function test_an_embedded_post_shows_its_thumbnail_only_while_the_current_body_embeds_it(): void
+    {
+        $cards = app(EmbedCardRepositoryInterface::class);
+        $cards->save(new EmbedCard('youtube', 'aaaaaaaaaaa', true, 'Antes', null, self::OLD_THUMBNAIL, [], CarbonImmutable::now()));
+        $cards->save(new EmbedCard('youtube', 'bbbbbbbbbbb', true, 'Ahora', null, self::COPY, [], CarbonImmutable::now()));
+        [, $post] = $this->aDiscussion($this->aCategory());
+        $this->writer()->editPost($post->id(), $this->embedding('aaaaaaaaaaa'), null, new DateTimeImmutable('2026-11-10 18:40:00'));
+        $this->writer()->editPost($post->id(), $this->embedding('bbbbbbbbbbb'), null, new DateTimeImmutable('2026-11-10 18:50:00'));
+
+        $usages = $this->usagesByPath($post);
+
+        $this->assertFalse($usages[self::COPY]->hidden);
+        // Only an earlier version embeds it, and only moderators read versions
+        $this->assertTrue($usages[self::OLD_THUMBNAIL]->hidden);
     }
 
     public function test_the_copy_of_an_image_from_another_site_is_used_while_a_post_shows_it(): void
@@ -350,6 +380,30 @@ final class PostImageMediaSourceTest extends ModuleTestCase
         $this->assertInstanceOf(MediaFileId::class, $id);
 
         return $id;
+    }
+
+    private function embedding(string $videoId): PostBody
+    {
+        return new PostBody(['type' => 'doc', 'content' => [['type' => 'embed', 'attrs' => ['service' => 'youtube', 'id' => $videoId]]]], '');
+    }
+
+    /**
+     * A campaign's space: only its roster reads it.
+     */
+    private function aCampaignSpace(): Category
+    {
+        app(PublicationSourceRegistryInterface::class)->register(FakeCampaignSource::class, 'example');
+        $space = new Category(
+            CategoryId::generate(),
+            'Espacio de campaña',
+            new CategorySlug('espacio-campana'),
+            viewAudience: CategoryAudience::roster(),
+            writeAudience: CategoryAudience::roster(),
+            subject: new CategorySubject(FakeCampaignSource::TYPE, (string) Str::uuid()),
+        );
+        app(CategoryRepositoryInterface::class)->save($space);
+
+        return $space;
     }
 
     /**

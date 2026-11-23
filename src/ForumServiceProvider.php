@@ -418,7 +418,14 @@ final class ForumServiceProvider extends ModuleServiceProvider
         });
         // Deleting a discussion takes its posts without their own events: their characters are read first
         DiscussionModel::deleting(static function (DiscussionModel $discussion): void {
-            $characterIds = PostModel::query()->where('discussion_id', $discussion->id)->whereNotNull('character_id')->distinct()->pluck('character_id');
+            try {
+                $characterIds = PostModel::query()->where('discussion_id', $discussion->id)->whereNotNull('character_id')->distinct()->pluck('character_id');
+            } catch (Throwable $exception) {
+                Log::warning('[Forum] Could not read the characters of a discussion being deleted.', ['exception' => $exception::class]);
+
+                return;
+            }
+
             foreach ($characterIds as $characterId) {
                 self::refreshPortrait((string) $characterId);
             }
@@ -654,9 +661,6 @@ final class ForumServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * Whether a saved or deleted post had or has images, so most posts queue no refresh.
-     */
-    /**
      * Never fails the write: the nightly media sync settles what a failure missed.
      */
     private static function refreshPortrait(string $characterId): void
@@ -668,6 +672,9 @@ final class ForumServiceProvider extends ModuleServiceProvider
         }
     }
 
+    /**
+     * Whether a saved or deleted post had or has images, so most posts queue no refresh.
+     */
     private static function touchesImages(PostModel $post): bool
     {
         foreach ([$post->getOriginal('body'), $post->getAttribute('body')] as $body) {

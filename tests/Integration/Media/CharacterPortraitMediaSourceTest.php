@@ -51,7 +51,8 @@ final class CharacterPortraitMediaSourceTest extends ModuleTestCase
     {
         $source = app(MediaSourceRegistryInterface::class)->source(CharacterPortraitMediaSource::TYPE);
 
-        $this->assertInstanceOf(ShowsMediaPreviews::class, $source);
+        // Not yet: the core would show the unused files of its folders (core#843)
+        $this->assertNotInstanceOf(ShowsMediaPreviews::class, $source);
         $this->assertInstanceOf(CharacterPortraitMediaSource::class, $source);
         $this->assertSame(['forum/characters/'], $source->folders());
         $this->assertSame([], $source->excludedSubfolders());

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Media;
 
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
-use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Domain\Media\ValueObjects\MediaFileId;
 use App\Infrastructure\Media\Sources\StoredMediaIdPrefilter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use Modules\Forum\Application\Content\Nodes\EmbedNode;
 use Modules\Forum\Application\Content\Nodes\ImageNode;
@@ -27,14 +27,19 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
  * current body or in one of its earlier versions, whatever the post's status: hidden, pending
  * and deleted posts keep their body for moderators. Posts have no panel page, so no edit link.
  *
- * The media library shows an image only while every member reads it (forum#155, PublicForumImages):
- * in the current body of a post every member reads. The rest (hidden, pending or deleted posts,
- * hidden discussions or ones awaiting approval, categories for association members, a role or a
- * roster, the whole forum while it is a preview, and earlier versions, which only moderators read)
- * is hidden, under a title that names neither the discussion nor the post. Private messages hold no
- * images (ConversationDocuments), so there is nothing else to hide.
+ * Only what every member reads may be seen in the media library (forum#155, PublicForumImages): an
+ * image in the current body of a post every member reads. The rest (hidden, pending or deleted
+ * posts, hidden discussions or ones awaiting approval, categories for association members, a role
+ * or a roster, the whole forum while it is a preview, and earlier versions, which only moderators
+ * read) is marked hidden, under a title that names neither the discussion nor the post. Private
+ * messages hold no images (ConversationDocuments), so there is nothing else to hide.
+ *
+ * It does not declare ShowsMediaPreviews yet, so the library still conceals every file of its
+ * folders: the core shows the unused files of a source with the marker (those of a deleted
+ * discussion in a private category, of a purged post, uploads never posted), and the forum cannot
+ * hide those until a source may ask for it (core#843).
  */
-final readonly class PostImageMediaSource implements MediaUsageSourceInterface, ShowsMediaPreviews
+final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 {
     public const string TYPE = 'forum.posts';
 
@@ -86,8 +91,14 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface, 
         // Read once per walk; what cannot be read fails the walk, never shows anything
         $categoryIds = $this->public->categoryIds();
 
-        foreach ($this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->lazyById(self::CHUNK_SIZE) as $post) {
-            yield from $this->usagesOf($post, $categoryIds);
+        // Who reads them is asked once per chunk, not once per post
+        foreach ($this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->lazyById(self::CHUNK_SIZE)->chunk(self::CHUNK_SIZE) as $chunk) {
+            /** @var list<PostModel> $posts */
+            $posts = $chunk->values()->all();
+            $read = $this->public->readPostIds(array_map(static fn (PostModel $post): string => $post->id, $posts), $categoryIds);
+            foreach ($posts as $post) {
+                yield from $this->usagesOf($post, isset($read[strtolower($post->id)]));
+            }
         }
     }
 
@@ -99,7 +110,13 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface, 
 
         $post = PostModel::query()->find($recordId);
 
-        return $post instanceof PostModel ? $this->usagesOf($post, $this->public->categoryIds()) : [];
+        if (! $post instanceof PostModel) {
+            return [];
+        }
+
+        $read = $this->public->readPostIds([$post->id], $this->public->categoryIds());
+
+        return $this->usagesOf($post, isset($read[strtolower($post->id)]));
     }
 
     public function usesFile(MediaFileId $file): bool
@@ -142,8 +159,34 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface, 
      */
     public function mayHoldImages(string $postId): bool
     {
-        return Str::isUuid($postId)
-            && $this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->whereKey(strtolower($postId))->exists();
+        if (! Str::isUuid($postId)) {
+            return false;
+        }
+
+        // The post first, then its own versions only (a correlated EXISTS on post_id), never a
+        // scan of every version in the forum
+        $post = "CAST(forum_posts.body AS TEXT) LIKE ? ESCAPE '\\'";
+        $revision = "CAST(forum_post_revisions.body AS TEXT) LIKE ? ESCAPE '\\'";
+        $patterns = array_map($this->pattern(...), [self::IMAGE_MARKER, self::EMBED_MARKER]);
+
+        return PostModel::query()
+            ->whereKey(strtolower($postId))
+            ->where(static function (Builder $query) use ($post, $revision, $patterns): void {
+                foreach ($patterns as $pattern) {
+                    $query->orWhereRaw($post, [$pattern]);
+                }
+                $query->orWhereExists(static function (QueryBuilder $revisions) use ($revision, $patterns): void {
+                    $revisions->selectRaw('1')
+                        ->from('forum_post_revisions')
+                        ->whereColumn('forum_post_revisions.post_id', 'forum_posts.id')
+                        ->where(static function (QueryBuilder $mentions) use ($revision, $patterns): void {
+                            foreach ($patterns as $pattern) {
+                                $mentions->orWhereRaw($revision, [$pattern]);
+                            }
+                        });
+                });
+            })
+            ->exists();
     }
 
     /**
@@ -156,7 +199,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface, 
     {
         // json columns are compared as text, the same in PostgreSQL and SQLite
         $like = "CAST(body AS TEXT) LIKE ? ESCAPE '\\'";
-        $patterns = array_map(static fn (string $text): string => '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $text).'%', $texts);
+        $patterns = array_map($this->pattern(...), $texts);
 
         return PostModel::query()->where(static function (Builder $query) use ($like, $patterns): void {
             foreach ($patterns as $pattern) {
@@ -167,19 +210,28 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface, 
     }
 
     /**
-     * @param  list<string>  $categoryIds  the categories every member reads
+     * A LIKE pattern for the text, its wildcards escaped.
+     */
+    private function pattern(string $text): string
+    {
+        return '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $text).'%';
+    }
+
+    /**
+     * @param  bool  $read  whether every member reads the post (PublicForumImages)
      * @return list<MediaUsageDTO>
      */
-    private function usagesOf(PostModel $post, array $categoryIds): array
+    private function usagesOf(PostModel $post, bool $read): array
     {
         $paths = $this->pathsOf($post);
         if ($paths === []) {
             return [];
         }
 
-        $discussion = DiscussionModel::query()->find($post->discussion_id);
-        $read = $this->public->isPostRead($post, $discussion, $categoryIds);
-        $title = $read && $discussion instanceof DiscussionModel
+        // A post every member reads sits in a discussion that exists: only then is it named
+        $discussion = $read ? DiscussionModel::query()->find($post->discussion_id) : null;
+        $read = $discussion instanceof DiscussionModel;
+        $title = $discussion instanceof DiscussionModel
             ? __('forum::messages.media.post_title', ['discussion' => $discussion->title, 'number' => $post->number])
             : __('forum::messages.media.private_post_title');
         $role = __('forum::messages.media.role');

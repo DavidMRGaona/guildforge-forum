@@ -26,10 +26,14 @@ final class ForumActivityObserver
     /** What decides whether a post counts, and for whom */
     private const array POST_COLUMNS = ['status', 'number', 'published_at', 'discussion_id', 'author_id', 'character_id', 'character_removed'];
 
-    /** What decides whether a discussion counts; the first four also decide whether its posts do */
-    private const array DISCUSSION_COLUMNS = ['category_id', 'is_hidden', 'awaiting_approval', 'number', 'author_id'];
+    /**
+     * What decides whether a discussion counts, and its title, which names it and its posts where
+     * they are described (the media library titles a post's images with it, forum#155)
+     */
+    private const array DISCUSSION_COLUMNS = ['category_id', 'is_hidden', 'awaiting_approval', 'number', 'author_id', 'title'];
 
-    private const array DISCUSSION_COLUMNS_FOR_POSTS = ['category_id', 'is_hidden', 'awaiting_approval', 'number'];
+    /** What decides whether its posts count, and the title they are named by */
+    private const array DISCUSSION_COLUMNS_FOR_POSTS = ['category_id', 'is_hidden', 'awaiting_approval', 'number', 'title'];
 
     /** Who reads a category: its own rule, its parent's and what it depends on */
     private const array CATEGORY_COLUMNS = ['view_rule', 'parent_id', 'subject_type', 'subject_id'];

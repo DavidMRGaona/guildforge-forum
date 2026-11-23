@@ -46,8 +46,9 @@ final class ModuleBootsTest extends ModuleTestCase
         // frame-src origins of the embedded players in 3.57, and the searchable tree of
         // FormSelect for the category pickers in 3.69, the public profile sections and stats in 3.79,
         // the profile card (ProfileCardServiceInterface, ThrottleWhereListed) in 3.81, and the
-        // activity contract (ActivitySourceInterface, ActivityPublisherInterface) in 3.86
-        $this->assertSame('^3.86.0', $manifest['requires']['core']);
+        // activity contract (ActivitySourceInterface, ActivityPublisherInterface) in 3.86, and the
+        // media library's hidden usages and ShowsMediaPreviews in 3.90
+        $this->assertSame('^3.90.0', $manifest['requires']['core']);
         $this->assertTrue($manifest['storesUtc']);
     }
 

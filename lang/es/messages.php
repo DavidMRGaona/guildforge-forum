@@ -426,10 +426,11 @@ return [
         'source' => 'Mensajes del foro',
         'role' => 'Imagen del mensaje',
         'post_title' => ':discussion, mensaje :number',
-        'pending_post_title' => ':discussion, mensaje pendiente',
+        'private_post_title' => 'Mensaje del foro',
         'characters_source' => 'Personajes del foro',
         'portrait_role' => 'Retrato',
         'character_title' => 'Personaje :name',
+        'private_character_title' => 'Personaje del foro',
     ],
 
     'content' => [

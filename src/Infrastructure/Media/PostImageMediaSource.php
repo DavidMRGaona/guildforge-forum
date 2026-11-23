@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Forum\Infrastructure\Media;
 
 use App\Application\Media\Contracts\MediaUsageSourceInterface;
+use App\Application\Media\Contracts\ShowsMediaPreviews;
 use App\Application\Media\DTOs\MediaUsageDTO;
 use App\Application\Media\Services\MediaFileIdResolverInterface;
 use App\Domain\Media\ValueObjects\MediaFileId;
@@ -25,8 +26,15 @@ use Modules\Forum\Infrastructure\Persistence\Eloquent\Models\PostRevisionModel;
  * post shows it (an embedded post shows its card's thumbnail) in its
  * current body or in one of its earlier versions, whatever the post's status: hidden, pending
  * and deleted posts keep their body for moderators. Posts have no panel page, so no edit link.
+ *
+ * The media library shows an image only while every member reads it (forum#155, PublicForumImages):
+ * in the current body of a post every member reads. The rest (hidden, pending or deleted posts,
+ * hidden discussions or ones awaiting approval, categories for association members, a role or a
+ * roster, the whole forum while it is a preview, and earlier versions, which only moderators read)
+ * is hidden, under a title that names neither the discussion nor the post. Private messages hold no
+ * images (ConversationDocuments), so there is nothing else to hide.
  */
-final readonly class PostImageMediaSource implements MediaUsageSourceInterface
+final readonly class PostImageMediaSource implements MediaUsageSourceInterface, ShowsMediaPreviews
 {
     public const string TYPE = 'forum.posts';
 
@@ -45,6 +53,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
         private DocumentRenderer $renderer,
         private MediaFileIdResolverInterface $resolver,
         private EmbedCardRepositoryInterface $cards,
+        private PublicForumImages $public,
     ) {}
 
     public function type(): string
@@ -74,8 +83,11 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 
     public function usages(): iterable
     {
+        // Read once per walk; what cannot be read fails the walk, never shows anything
+        $categoryIds = $this->public->categoryIds();
+
         foreach ($this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->lazyById(self::CHUNK_SIZE) as $post) {
-            yield from $this->usagesOf($post);
+            yield from $this->usagesOf($post, $categoryIds);
         }
     }
 
@@ -87,7 +99,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 
         $post = PostModel::query()->find($recordId);
 
-        return $post instanceof PostModel ? $this->usagesOf($post) : [];
+        return $post instanceof PostModel ? $this->usagesOf($post, $this->public->categoryIds()) : [];
     }
 
     public function usesFile(MediaFileId $file): bool
@@ -95,7 +107,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
         $piece = StoredMediaIdPrefilter::longestPlainRun($file->value);
 
         foreach ($this->postsMentioning($piece === '' ? self::IMAGE_MARKER : $piece)->lazyById(self::CHUNK_SIZE) as $post) {
-            foreach ($this->pathsOf($post) as $path) {
+            foreach (array_keys($this->pathsOf($post)) as $path) {
                 if ($this->resolver->fromStoredPath($path)?->equals($file) === true) {
                     return true;
                 }
@@ -109,7 +121,7 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
             }
             $piece = StoredMediaIdPrefilter::longestPlainRun($card->embedId);
             foreach ($this->postsMentioning($piece === '' ? self::EMBED_MARKER : $piece)->lazyById(self::CHUNK_SIZE) as $post) {
-                if (in_array($card->thumbnailPath, $this->pathsOf($post), true)) {
+                if (array_key_exists($card->thumbnailPath, $this->pathsOf($post))) {
                     return true;
                 }
             }
@@ -121,6 +133,17 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
     public function editUrl(string $recordId, object $user): ?string
     {
         return null;
+    }
+
+    /**
+     * Whether the post's body, or an earlier version of it, may hold an image: only then can a
+     * change of who reads it change anything in the media library. A prefilter, never wrong the
+     * other way (a post without the markers holds no image).
+     */
+    public function mayHoldImages(string $postId): bool
+    {
+        return Str::isUuid($postId)
+            && $this->postsMentioning(self::IMAGE_MARKER, self::EMBED_MARKER)->whereKey(strtolower($postId))->exists();
     }
 
     /**
@@ -144,22 +167,37 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
     }
 
     /**
+     * @param  list<string>  $categoryIds  the categories every member reads
      * @return list<MediaUsageDTO>
      */
-    private function usagesOf(PostModel $post): array
+    private function usagesOf(PostModel $post, array $categoryIds): array
     {
-        $title = $this->titleOf($post);
+        $paths = $this->pathsOf($post);
+        if ($paths === []) {
+            return [];
+        }
 
-        return array_map(
-            static fn (string $path): MediaUsageDTO => new MediaUsageDTO($path, $post->id, __('forum::messages.media.role'), $title),
-            $this->pathsOf($post),
-        );
+        $discussion = DiscussionModel::query()->find($post->discussion_id);
+        $read = $this->public->isPostRead($post, $discussion, $categoryIds);
+        $title = $read && $discussion instanceof DiscussionModel
+            ? __('forum::messages.media.post_title', ['discussion' => $discussion->title, 'number' => $post->number])
+            : __('forum::messages.media.private_post_title');
+        $role = __('forum::messages.media.role');
+
+        $usages = [];
+        foreach ($paths as $path => $inCurrentBody) {
+            // What only an earlier version shows is read by moderators alone
+            $usages[] = new MediaUsageDTO($path, $post->id, $role, $title, hidden: ! $read || ! $inCurrentBody);
+        }
+
+        return $usages;
     }
 
     /**
-     * Image paths of the post and its earlier versions, each once.
+     * Image paths of the post and its earlier versions, each once, telling whether the current
+     * body shows it (the path of a card's thumbnail counts as shown when the current body embeds it).
      *
-     * @return list<string>
+     * @return array<string, bool>
      */
     private function pathsOf(PostModel $post): array
     {
@@ -169,41 +207,40 @@ final readonly class PostImageMediaSource implements MediaUsageSourceInterface
 
         $paths = [];
         $embeds = [];
-        foreach ($documents as $document) {
+        foreach ($documents as $index => $document) {
             if (! is_array($document)) {
                 continue;
             }
+            $current = $index === 0;
             $found = $this->renderer->attributesOf($document, [$image, $embed]);
             foreach ($found[$image] ?? [] as $attributes) {
                 /** @var array<string, mixed> $attributes */
                 $path = ImageNode::storedPath($attributes);
                 if ($path !== null) {
-                    $paths[$path] = true;
+                    $paths[$path] = ($paths[$path] ?? false) || $current;
                 }
             }
             foreach ($found[$embed] ?? [] as $attributes) {
                 if (is_string($attributes['service'] ?? null) && is_string($attributes['id'] ?? null)) {
-                    $embeds[$attributes['service'].' '.$attributes['id']] = [$attributes['service'], $attributes['id']];
+                    $key = $attributes['service'].' '.$attributes['id'];
+                    $embeds[$key] = [$attributes['service'], $attributes['id'], ($embeds[$key][2] ?? false) || $current];
                 }
             }
         }
 
-        foreach ($this->cards->findMany(array_values($embeds)) as $card) {
+        $shownEmbeds = [];
+        foreach ($embeds as [$service, $id, $current]) {
+            $shownEmbeds[$service.' '.$id] = $current;
+        }
+
+        $cards = $this->cards->findMany(array_values(array_map(static fn (array $embed): array => [$embed[0], $embed[1]], $embeds)));
+        foreach ($cards as $card) {
             if ($card->thumbnailPath !== null && str_starts_with($card->thumbnailPath, ImageNode::EXTERNAL_FOLDER)) {
-                $paths[$card->thumbnailPath] = true;
+                $current = $shownEmbeds[$card->service.' '.$card->embedId] ?? false;
+                $paths[$card->thumbnailPath] = ($paths[$card->thumbnailPath] ?? false) || $current;
             }
         }
 
-        return array_map(strval(...), array_keys($paths));
-    }
-
-    private function titleOf(PostModel $post): string
-    {
-        $discussion = DiscussionModel::query()->find($post->discussion_id);
-        $title = $discussion instanceof DiscussionModel ? $discussion->title : '';
-
-        return $post->number === null
-            ? __('forum::messages.media.pending_post_title', ['discussion' => $title])
-            : __('forum::messages.media.post_title', ['discussion' => $title, 'number' => $post->number]);
+        return $paths;
     }
 }
